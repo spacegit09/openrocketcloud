@@ -1,0 +1,45 @@
+# OPuhRohCum: the real OpenRocket in the browser, with live sharing.
+#   Install with ready-made images:  docker compose pull && docker compose up -d
+#   Build from source instead:       docker compose up -d --build
+# Settings live in .env (see .env.example).
+name: openrocket-cloud
+
+services:
+  server:
+    build: ./server
+    image: ${ORC_IMAGES:-ghcr.io/spacegit09/openrocketcloud}-server:${ORC_VERSION:-latest}
+    container_name: orcloud-server
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATA_DIR: /data
+      WORKER_IMAGE: ${ORC_IMAGES:-ghcr.io/spacegit09/openrocketcloud}-worker:${ORC_VERSION:-latest}
+      SESSION_NETWORK: orcloud-sessions
+      COLLAB_INTERNAL_URL: ws://orcloud-server:8081/collab
+    ports:
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
+    volumes:
+      # Starts and stops one OpenRocket container per open design.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - orcloud-data:/data
+    networks: [default, sessions]
+    stop_grace_period: 45s
+
+  # The OpenRocket session image. Built here; the server starts copies of it on demand.
+  worker:
+    build: ./worker
+    image: ${ORC_IMAGES:-ghcr.io/spacegit09/openrocketcloud}-worker:${ORC_VERSION:-latest}
+    entrypoint: ["true"]
+    restart: "no"
+    network_mode: none
+
+networks:
+  # Sessions only reach the server, never the internet.
+  sessions:
+    name: orcloud-sessions
+    internal: true
+
+volumes:
+  orcloud-data:

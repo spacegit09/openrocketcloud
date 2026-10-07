@@ -1,0 +1,35 @@
+#!/bin/bash
+# Session entrypoint: VNC display + window manager + OpenRocket (with live share).
+set -euo pipefail
+
+: "${ORC_VNC_PASSWORD:?ORC_VNC_PASSWORD is required}"
+WIDTH="${ORC_WIDTH:-1600}"
+HEIGHT="${ORC_HEIGHT:-900}"
+
+mkdir -p "$HOME/.vnc" "$ORC_WORKDIR"
+printf '%s\n' "$ORC_VNC_PASSWORD" | vncpasswd -f > "$HOME/.vnc/passwd"
+chmod 600 "$HOME/.vnc/passwd"
+
+Xvnc :1 -geometry "${WIDTH}x${HEIGHT}" -depth 24 -rfbport 5901 \
+  -SecurityTypes VncAuth -PasswordFile "$HOME/.vnc/passwd" \
+  -AlwaysShared -AcceptSetDesktopSize -desktop OpenRocket \
+  >/tmp/xvnc.log 2>&1 &
+
+for _ in $(seq 1 100); do
+  xdpyinfo -display :1 >/dev/null 2>&1 && break
+  sleep 0.1
+done
+
+openbox --config-file /etc/orcloud/openbox.xml >/tmp/openbox.log 2>&1 &
+
+MAIN="${ORC_MAIN:-orcloud.bridge.Main}"
+exec java \
+  -XX:MaxRAMPercentage=75 \
+  --add-exports java.base/java.lang=ALL-UNNAMED \
+  --add-exports java.desktop/sun.awt=ALL-UNNAMED \
+  --add-exports java.desktop/sun.java2d=ALL-UNNAMED \
+  -Dsun.java2d.noddraw=true -Dsun.java2d.d3d=false -Dswing.useflipBufferStrategy=True \
+  -Dawt.useSystemAAFontSettings=lcd -Dswing.aatext=true \
+  ${ORC_JAVA_OPTS:-} \
+  -cp /opt/openrocket/OpenRocket.jar:/opt/openrocket/liveshare.jar \
+  "$MAIN" "$@"

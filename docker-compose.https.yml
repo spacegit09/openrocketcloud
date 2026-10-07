@@ -1,0 +1,26 @@
+# Public deployment with automatic HTTPS (Let's Encrypt) via Caddy.
+#   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+# Requires DOMAIN in .env and PUBLIC_URL=https://$DOMAIN, and DNS for DOMAIN pointing here.
+services:
+  caddy:
+    image: caddy:2
+    container_name: orcloud-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [server]
+
+  server:
+    ports: !reset []
+
+volumes:
+  caddy-data:
+  caddy-config:

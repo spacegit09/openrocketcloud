@@ -1,0 +1,200 @@
+# OPuhRohCum
+
+The real [OpenRocket](https://openrocket.info) running in the cloud, with **live sharing**: sign in
+with a Google account, open a rocket design in your browser, and edit it together with your team
+in real time. Every person gets the genuine OpenRocket 24.12 desktop application, with the same physics
+engine, the same windows and dialogs, and the same results. The only addition is that everyone's edits
+appear in everyone else's OpenRocket within a fraction of a second.
+
+## How it works
+
+```
+ Browser (any OS)                       Server (Docker host)
+┌──────────────────────┐   HTTPS   ┌────────────────────────────┐   Docker   ┌──────────────────────────────┐
+│ Dashboard: designs,  │──────────▶│ Node server                │──────────▶│ One container per person      │
+│ sharing, upload/down │           │  • Google sign-in          │           │ per open design:              │
+│                      │           │  • projects, sharing, DB   │   VNC     │  Xvnc + openbox               │
+│ Session: OpenRocket  │◀──────────│  • VNC proxy (authorised)  │◀─────────▶│  OpenRocket-24.12.jar         │
+│ screen (noVNC) +     │    SSE    │  • live-share hub ◀────────┼───────────┤  (official, unmodified)      │
+│ presence & activity  │◀──────────│    (orders & merges edits) │ WebSocket │  + live-share bridge (same JVM)│
+└──────────────────────┘           └────────────────────────────┘           └──────────────────────────────┘
+```
+
+- **Unchanged OpenRocket.** The session image downloads the official `OpenRocket-24.12.jar`
+  (checksum-pinned) and runs it as is. Nothing in OpenRocket is reimplemented or patched.
+- **Live share bridge** (`worker/bridge`). A small Java module starts OpenRocket in the same JVM
+  and watches the open design. When you edit, OpenRocket's own change events say which components
+  you touched. The bridge snapshots the design with OpenRocket's own `.ork` writer and sends only
+  what changed, one component property at a time. Remote edits are applied with the same property
+  setters OpenRocket's file loader uses, in place, so dialogs you have open stay open. Structural
+  changes (adding, removing or moving parts) reload the rocket the way OpenRocket's undo does.
+- **Merging.** The server puts all edits to a design in one order and keeps the authoritative copy.
+  Different properties merge cleanly; for the same property at the same moment, the last edit wins.
+  Edits made while offline are re-sent when the connection returns.
+- **Undo** reverts your own edits only. OpenRocket's undo restores a whole-rocket snapshot, so the
+  bridge keeps collaborators' later changes instead of rolling them back.
+- **Simulations** are shared, results included. OpenRocket re-runs out-of-date simulations by itself
+  after every change. Each result records the exact design it was computed for, so results for an
+  older version of the design are shown as out of date and never as current.
+
+## Install
+
+**Website and setup guide:** <https://spacegit09.github.io/openrocketcloud/>
+
+On any machine with Docker (a Linux server for a team, or Docker Desktop on Mac/Windows to try
+it), run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/spacegit09/openrocketcloud/main/install.sh | bash
+```
+
+The installer asks where people will open it (this computer only, or a public domain with
+automatic HTTPS) and for optional Google sign-in keys. It then downloads ready-made images from
+GitHub Packages and starts everything in `~/openrocketcloud`. Run it again to update; settings and
+designs are kept.
+
+Without Google keys, a local install turns on a test sign-in (any email, localhost only), so you
+can try it right away. To try two people on one computer, use `http://localhost:8080` in one tab
+and `http://127.0.0.1:8080` in another. They keep separate sign-ins.
+
+### Build from source
+
+```bash
+git clone https://github.com/spacegit09/openrocketcloud && cd openrocketcloud
+cp .env.example .env    # set DEV_LOGIN=true to try without Google
+docker compose up -d --build
+```
+
+The first build downloads OpenRocket and a Java runtime (a few minutes). Opening a design starts
+its OpenRocket in about 5–20 seconds.
+
+## Google sign-in
+
+1. Open [Google Cloud Console](https://console.cloud.google.com/), then create or pick a project.
+2. **APIs & Services → OAuth consent screen**: choose *External*, enter the app name and
+   support email, and add the scopes `openid`, `email` and `profile`. While the app is in
+   *Testing*, only the test users you list can sign in. Click **Publish app** to allow any Google
+   account. These basic scopes need no Google review.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID**, type *Web
+   application*. Under *Authorized redirect URIs* add `PUBLIC_URL` + `/auth/google/callback`, for
+   example `http://localhost:8080/auth/google/callback` and
+   `https://rocket.example.com/auth/google/callback`.
+4. Put the client ID and secret into `.env` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) and
+   run `docker compose up -d`.
+
+To limit who can sign in, set `ALLOWED_EMAIL_DOMAINS=gmail.com,yourschool.org` and/or
+`ALLOWED_EMAILS=a@gmail.com,b@gmail.com`.
+
+## Deploying to the cloud
+
+Any Linux server with Docker works (x86-64 or ARM). For example, a Google Cloud, AWS or DigitalOcean
+VM with 4 vCPUs and 16 GB RAM comfortably serves about 10 people with designs open at once. Each
+open design runs one OpenRocket, typically 0.6–1 GB of RAM, capped by `SESSION_MEMORY_MB`.
+
+1. Point a DNS name (e.g. `rocket.example.com`) at the server and open ports 80 and 443.
+2. Copy this folder to the server, `cp .env.example .env`, and set:
+   `PUBLIC_URL=https://rocket.example.com`, `DOMAIN=rocket.example.com`, the Google client ID and
+   secret, and `DEV_LOGIN=false`.
+3. Start with automatic HTTPS (Caddy and Let's Encrypt):
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+   ```
+
+**Backups.** All designs, sharing and version history live in the `orcloud-data` volume, in one
+SQLite database:
+
+```bash
+docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine tar czf /backup/orcloud-backup.tgz /data
+```
+
+**Security notes.**
+
+- The server controls Docker through `/var/run/docker.sock` (it starts and stops session
+  containers), so treat the host as dedicated to this app.
+- Session containers run as an unprivileged user with a read-only root filesystem, no Linux
+  capabilities, and memory, CPU and process limits.
+- Session containers sit on an internal network: they can reach the server but not the internet.
+- The live-share hub listens on a separate port that is never published.
+
+## Using it
+
+- **New design**: blank (exactly like OpenRocket's *File → New*), one of OpenRocket's example
+  designs, or upload an `.ork` file (drag and drop works too).
+- **Share**: invite people by their Google email as *Can edit* or *Can view*. Viewers see every
+  change live and can click around, but nothing they change is shared; it snaps back.
+- **Saving** is continuous. **Download .ork** gives a file that opens in desktop OpenRocket.
+  **Saved copies** keeps a downloadable copy every 10 minutes while people are editing.
+- **Edit history** (clock button in the session, or ⋯ on a design): who changed what and when,
+  e.g. "Nose cone · Length: 10 cm → 14 cm". **Undo these changes** reverts one person's edit,
+  keeping anything changed again since; **Restore to before this** puts the whole design back to
+  that moment. Reverts are shared live and can themselves be undone. OpenRocket's automatic
+  simulation re-runs are not listed.
+- **Motors** (dashboard): upload custom motor files (`.eng` RASP or `.rse` RockSim). They appear in
+  OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
+  the custom motors of all its members, so collaborators always see the same motors. Reopen
+  OpenRocket to load motors added while it's open.
+- **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
+  or 3D exports, Save As) appears under the folder button, ready to download.
+- **Who's here**: avatars show who has the design open and which part each person has selected.
+  The bar shows recent changes ("Mina edited Fin set").
+- **Mac keyboards**: ⌘-shortcuts are sent as Ctrl-shortcuts, which is what OpenRocket expects on
+  the Linux machine it runs on. Copy and paste go through your browser's clipboard; allow
+  clipboard access when asked.
+- OpenRocket closes itself after 15 idle minutes (`SESSION_IDLE_MINUTES`). Your work is saved.
+
+What is per person: window layout, selection, open dialogs, undo history, and OpenRocket
+preferences such as units, which are remembered for you across sessions.
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PUBLIC_URL` | `http://localhost:8080` | Address users open; used for the Google redirect URI and cookie security |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | Google OAuth client |
+| `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_EMAILS` | empty (anyone) | Restrict sign-in |
+| `HTTP_BIND`, `HTTP_PORT` | `127.0.0.1`, `8080` | Where the site listens on the host |
+| `MAX_SESSIONS` | `20` | OpenRocket instances running at once (server-wide) |
+| `MAX_SESSIONS_PER_USER` | `2` | Designs one person can have open at once |
+| `SESSION_MEMORY_MB`, `SESSION_CPUS` | `1536`, `2` | Limits per OpenRocket instance |
+| `SESSION_IDLE_MINUTES` | `15` | Close OpenRocket after this long without a viewer |
+| `DOMAIN` | — | Host name for `docker-compose.https.yml` |
+| `DEV_LOGIN` | `false` | Sign in as any email without Google (localhost only) |
+| `DEBUG_OPS` | `false` | Log every merged edit (server and bridges) |
+
+## Known limits
+
+- Two people changing *the same field* at the same instant: the later one wins.
+- If someone adds, removes or moves parts, other people's open component dialogs close. That is
+  the same thing OpenRocket does on undo.
+- OpenRocket's simulations use a fresh random turbulence seed on every run. A re-run of a simulation
+  that is already up to date stays on your screen and is not broadcast.
+- *File → Open* or *New* inside the cloud OpenRocket opens a separate, unshared window. Shared
+  designs are created on the dashboard.
+- Keyboard input methods (e.g. Korean IME) don't compose through the remote screen. Paste text
+  instead.
+
+## Development
+
+```
+worker/            OpenRocket session image
+  Dockerfile       downloads the official jar, builds the bridge
+  bridge/src/      live-share bridge (Java 17, no dependencies besides OpenRocket)
+  bridge/test/     SelfTest: checks the sync model against real OpenRocket on all example designs
+  rootfs/          session entrypoint (Xvnc + openbox + OpenRocket), window manager config
+server/            Node 24 server (Express, ws, dockerode, SQLite)
+  src/model.js     server twin of the bridge's Model.java (must stay identical in behaviour)
+  public/          dashboard and session page (vanilla JS, noVNC)
+  test/            parity tests against fixtures generated by the Java self-test
+```
+
+Run everything with `scripts/test.sh`. It runs the bridge self-test inside the worker image
+against the real OpenRocket (all 17 bundled example designs), then the server tests, including
+Java/Node parity. Set `DEBUG_OPS=true` to watch edits flow between sessions in
+`docker compose logs -f server`.
+
+## License
+
+GPL-3.0-or-later, like OpenRocket, which this runs and links against. OpenRocket is © the
+OpenRocket team; see <https://github.com/openrocket/openrocket>. This project is not affiliated
+with or endorsed by the OpenRocket project.

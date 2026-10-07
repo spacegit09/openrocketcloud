@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OPuhRohCum</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e8590c'/%3E%3Cpath d='M9 23l3-3m2-9c4-4 9-4 9-4s0 5-4 9l-5 3-3-3z' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+    body { display: flex; flex-direction: column; }
+    .sbar {
+      display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; flex: none;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+    }
+    .sbar .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: #fff; }
+    .sbar .logo svg { width: 14px; height: 14px; }
+    .title { font-weight: 650; font-size: 14.5px; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
+    .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .pill.live { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+    .pill.wait { color: #f08c00; background: color-mix(in srgb, #f08c00 12%, transparent); }
+    .pill.off { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+    .activity { color: var(--muted); font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1; transition: opacity .4s; }
+    .activity b { color: var(--text); font-weight: 600; }
+    .people { display: flex; align-items: center; cursor: pointer; padding: 2px 4px; border-radius: 8px; }
+    .people:hover { background: var(--surface-2); }
+    .people .avatar { width: 26px; height: 26px; }
+    .people .avatar + .avatar { margin-left: -7px; }
+    .popover { position: absolute; right: 8px; top: 48px; z-index: 30; width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 8px; }
+    .popover h4 { margin: 6px 8px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .popover .feed .item { font-size: 12.5px; }
+    #screen { flex: 1; min-height: 0; background: #2b2f36; position: relative; overflow: hidden; }
+    #screen > div { background: #2b2f36 !important; }
+    .overlay { position: absolute; inset: 44px 0 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 92%, transparent); z-index: 10; }
+    .overlay .box { text-align: center; max-width: 420px; padding: 24px; }
+    .overlay h2 { margin: 14px 0 6px; font-size: 19px; }
+    .overlay p { color: var(--muted); margin: 0 0 18px; }
+    .spinner { width: 42px; height: 42px; border-radius: 50%; border: 4px solid var(--border); border-top-color: var(--accent); animation: spin .9s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .steps { display: grid; gap: 6px; text-align: left; margin: 14px auto 0; width: max-content; color: var(--muted); font-size: 13px; }
+    .steps .done { color: var(--ok); }
+    .steps .now { color: var(--text); font-weight: 600; }
+    @media (max-width: 760px) { .activity, .hide-sm { display: none; } .title { max-width: 40vw; } }
+  </style>
+</head>
+<body>
+  <header class="sbar">
+    <a class="btn ghost icon" href="/" title="All designs" aria-label="All designs" id="back"></a>
+    <span class="logo" id="logo"></span>
+    <span class="title" id="title">Loading…</span>
+    <span class="badge" id="role-badge" hidden>View only</span>
+    <span class="pill wait" id="status">Starting</span>
+    <span class="activity" id="activity" aria-live="polite"></span>
+    <span class="spacer"></span>
+    <span class="people" id="people" title="Who's here" role="button" tabindex="0"></span>
+    <button class="ghost" id="share-btn" hidden></button>
+    <button class="ghost icon hide-sm" id="history-btn" title="Edit history" aria-label="Edit history"></button>
+    <button class="ghost icon hide-sm" id="files-btn" title="Files saved in OpenRocket" aria-label="Files saved in OpenRocket"></button>
+    <button class="ghost icon hide-sm" id="download-btn" title="Download .ork" aria-label="Download .ork"></button>
+    <button class="ghost icon hide-sm" id="fullscreen-btn" title="Full screen" aria-label="Full screen"></button>
+    <button class="ghost icon" id="end-btn" title="Close OpenRocket" aria-label="Close OpenRocket"></button>
+  </header>
+  <div class="popover" id="popover" hidden></div>
+  <div id="screen"></div>
+  <div class="overlay" id="overlay">
+    <div class="box" id="overlay-box"></div>
+  </div>
+  <script type="module" src="/session.js"></script>
+</body>
+</html>
