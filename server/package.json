@@ -1,0 +1,20 @@
+{
+  "name": "openrocket-cloud-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Collaboration server for OpenRocket Cloud: Google sign-in, projects, live-share hub and OpenRocket session containers",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@novnc/novnc": "^1.6.0",
+    "adm-zip": "^0.5.16",
+    "dockerode": "^4.0.7",
+    "express": "^5.1.0",
+    "ws": "^8.18.3"
+  }
+}

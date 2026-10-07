@@ -1,0 +1,6 @@
+.env
+node_modules/
+server/data/
+worker/.cache/
+.DS_Store
+.tunnel-url
