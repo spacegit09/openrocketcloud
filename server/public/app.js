@@ -3,7 +3,6 @@ import {
 } from './common.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
-$('#logo').append(icon('rocket'));
 
 const ERRORS = {
   not_allowed: 'This Google account is not allowed to use this site. Ask the administrator to add it.',

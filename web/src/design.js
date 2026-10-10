@@ -12,7 +12,6 @@ const designId = new URLSearchParams(location.search).get('id') ?? '';
 const screen = $('#screen');
 
 $('#back').append(icon('back'));
-$('#logo').append(icon('rocket'));
 $('#share-btn').append(icon('share'), 'Share');
 $('#download-btn').append(icon('download'));
 $('#history-btn').append(icon('history'));

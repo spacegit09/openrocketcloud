@@ -12,7 +12,6 @@ import { fromJson, toJson } from '../../server/src/model.js';
 import { readMotorFile } from '../../server/src/motors.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
-$('#logo').append(icon('rocket'));
 
 const JAR = '/or/OpenRocket-web.jar';
 let me = null;
