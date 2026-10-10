@@ -1,4 +1,5 @@
-// Google sign-in (OAuth 2.0 authorization code flow with PKCE) and signed session cookies.
+// Google sign-in (OAuth 2.0 authorization code flow with PKCE), sign-in through the optional
+// Base44 front door, and signed session cookies.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import { config } from './config.js';
@@ -78,14 +79,85 @@ function startSession(res, user) {
   }));
 }
 
-const safeReturn = (r) => (typeof r === 'string' && /^\/(?!\/)/.test(r) ? r : '/');
+const safeReturn = (r) => (typeof r === 'string' && /^\/(?![/\\])/.test(r) ? r : '/');
+
+// ---- Base44 front door (frontdoor/). The Base44 site signs people in with Google and sends them
+// to /auth/base44 with a one-time pass: base64url(JSON) + "." + HMAC-SHA256(secret, "pass." + body).
+const frontDoor = config.base44.appUrl && config.base44.secret ? config.base44.appUrl : '';
+const usedPasses = new Map(); // nonce -> expiry, so each pass works once
+
+const base44Mac = (kind, body) => createHmac('sha256', config.base44.secret).update(`${kind}.${body}`).digest();
+
+function verifyPass(pass) {
+  if (typeof pass !== 'string') return null;
+  const [body, mac] = pass.split('.');
+  if (!body || !mac) return null;
+  const expected = base44Mac('pass', body);
+  const given = Buffer.from(mac, 'base64url');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  let p;
+  try {
+    p = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  } catch {
+    return null;
+  }
+  const now = Date.now();
+  if (!(p.exp > now) || p.exp - now > 5 * 60e3) return null;
+  if (typeof p.n !== 'string' || typeof p.sub !== 'string' || !/^[^@\s]+@[^@\s]+$/.test(p.email ?? '')) return null;
+  for (const [n, exp] of usedPasses) if (exp <= now) usedPasses.delete(n);
+  if (usedPasses.has(p.n)) return null;
+  usedPasses.set(p.n, p.exp);
+  return p;
+}
+
+/** Tells the Base44 front door where this server is (PUBLIC_URL): at start and every few hours. */
+export function registerWithFrontDoor() {
+  if (!frontDoor) return;
+  const send = async (attempt = 0) => {
+    const url = config.publicUrl;
+    const ts = Date.now();
+    try {
+      const res = await fetch(`${frontDoor}/functions/registerEngine`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ url, ts, sig: base44Mac('engine', `${url}.${ts}`).toString('base64url') }),
+        signal: AbortSignal.timeout(30e3),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0, 200)}`);
+      console.log(`Front door ${frontDoor} now sends people to ${url}`);
+    } catch (e) {
+      console.error(`Could not register with the front door ${frontDoor}: ${e.message}`);
+      if (attempt < 10) setTimeout(() => send(attempt + 1), Math.min(15e3 * 2 ** attempt, 30 * 60e3)).unref();
+    }
+  };
+  send();
+  setInterval(() => send(), 6 * 3600e3).unref();
+}
 
 export function authRouter() {
   const router = express.Router();
   const redirectUri = `${config.publicUrl}/auth/google/callback`;
 
   router.get('/config', (req, res) => {
-    res.json({ google: Boolean(config.google.clientId), devLogin: config.devLogin });
+    res.json({ google: Boolean(config.google.clientId), devLogin: config.devLogin, frontDoor: frontDoor || null });
+  });
+
+  // Where "Sign in" goes: the Base44 front door when there is one, otherwise Google directly.
+  router.get('/login', (req, res) => {
+    const ret = safeReturn(req.query.return);
+    if (frontDoor) return res.redirect(`${frontDoor}/?next=${encodeURIComponent(ret)}`);
+    res.redirect(`/auth/google?return=${encodeURIComponent(ret)}`);
+  });
+
+  router.get('/base44', (req, res) => {
+    if (!frontDoor) return res.status(404).send('Base44 sign-in is not configured (BASE44_APP_URL, BASE44_SECRET).');
+    const pass = verifyPass(req.query.pass);
+    if (!pass) return res.redirect(`${frontDoor}/?error=signin_expired`);
+    if (!emailAllowed(pass.email)) return res.redirect(`${frontDoor}/?error=not_allowed`);
+    const user = users.upsert({ id: `base44:${pass.sub}`, email: pass.email, name: pass.name || pass.email.split('@')[0] });
+    startSession(res, user);
+    res.redirect(safeReturn(pass.next));
   });
 
   router.get('/google', (req, res) => {
@@ -151,7 +223,8 @@ export function authRouter() {
 
   router.post('/logout', (req, res) => {
     res.append('Set-Cookie', cookie(SESSION_COOKIE, '', { maxAge: 0 }));
-    res.json({ ok: true });
+    // With a front door, sign out there too, or it would sign the person straight back in.
+    res.json({ ok: true, next: frontDoor ? `${frontDoor}/?signout=1` : '/' });
   });
 
   if (config.devLogin) {

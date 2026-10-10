@@ -1,0 +1,21 @@
+// Loads the deployed site signed out: landing page renders, and a design link asks for sign-in.
+import puppeteer from 'puppeteer-core';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const site = process.argv[2];
+const browser = await puppeteer.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, userDataDir: mkdtempSync(join(tmpdir(), 'orc-live-')) });
+const page = await browser.newPage();
+await page.setViewport({ width: 1280, height: 800 });
+const errors = [];
+page.on('pageerror', (e) => errors.push(e.message));
+page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+await page.goto(site, { waitUntil: 'networkidle2' });
+await page.waitForSelector('#landing:not([hidden])', { timeout: 20000 });
+console.log('landing shown:', await page.$eval('h1', (e) => e.textContent));
+await page.screenshot({ path: join(import.meta.dirname, '..', 'out', 'live-landing.png') });
+await page.goto(`${site}/design.html?id=does-not-matter`, { waitUntil: 'domcontentloaded' });
+await new Promise((r) => setTimeout(r, 4000));
+console.log('design page while signed out goes to:', new URL(page.url()).host);
+console.log('errors:', errors.length ? errors.join(' | ').slice(0, 400) : 'none');
+await browser.close();

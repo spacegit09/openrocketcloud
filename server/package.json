@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@novnc/novnc": "^1.6.0",
-    "adm-zip": "^0.5.16",
     "dockerode": "^4.0.7",
     "express": "^5.1.0",
     "ws": "^8.18.3"

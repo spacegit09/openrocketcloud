@@ -1,0 +1,37 @@
+// A shared OpenRocket design. Its content, edit history and saved copies live in the
+// DesignRoom actor session with the same id; this record is for listing and sharing.
+{
+  "name": "Design",
+  "type": "object",
+  "description": "A shared OpenRocket design",
+  "properties": {
+    "name": { "type": "string", "maxLength": 200 },
+    "owner_email": { "type": "string" },
+    "owner_name": { "type": "string" },
+    "members": {
+      "type": "array",
+      "description": "People it is shared with (the owner not included)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["editor", "viewer"] }
+        }
+      }
+    },
+    "member_emails": {
+      "type": "array",
+      "description": "Owner and members, for listing designs shared with someone",
+      "items": { "type": "string" }
+    },
+    "version": { "type": "integer" },
+    "edited_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["name", "owner_email"],
+  "rls": {
+    "create": { "data.owner_email": "{{user.email}}" },
+    "read": { "$or": [{ "data.owner_email": "{{user.email}}" }, { "data.member_emails": "{{user.email}}" }] },
+    "update": { "data.owner_email": "{{user.email}}" },
+    "delete": { "data.owner_email": "{{user.email}}" }
+  }
+}

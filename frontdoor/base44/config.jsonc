@@ -1,0 +1,13 @@
+// Base44 project: the public front door of OPuhRohCum.
+// Docs: https://docs.base44.com/developers/backend/overview/project-structure
+{
+  "name": "OPuhRohCum",
+  "description": "Sign in with Google and open OPuhRohCum, the real OpenRocket with live sharing.",
+  "visibility": "public",
+  "site": {
+    "installCommand": "npm install",
+    "buildCommand": "npm run build",
+    "serveCommand": "npm run dev",
+    "outputDirectory": "./dist"
+  }
+}

@@ -25,8 +25,8 @@ async function main() {
   const name = h('span', { class: 'name' }, me.name);
   const out = h('button', { class: 'ghost', title: 'Sign out' }, icon('logout'), 'Sign out');
   out.onclick = async () => {
-    await fetch('/auth/logout', { method: 'POST' });
-    location.href = '/';
+    const res = await fetch('/auth/logout', { method: 'POST' }).then((r) => r.json()).catch(() => ({}));
+    location.href = res.next ?? '/';
   };
   $('#me').replaceChildren(avatar(me), name, out);
   $('#me').hidden = false;
@@ -62,7 +62,9 @@ async function showLanding() {
     $('#signin-error').hidden = false;
   }
   const cfg = await fetch('/auth/config').then((r) => r.json()).catch(() => ({}));
-  if (!cfg.google) $('#google-signin').title = 'Google sign-in is not configured on this server';
+  // The Base44 front door is the way in; it signs people back in here without a click.
+  if (cfg.frontDoor && !err) return location.replace('/auth/login');
+  if (!cfg.google && !cfg.frontDoor) $('#google-signin').title = 'Google sign-in is not configured on this server';
   if (cfg.devLogin) {
     $('#dev-login').hidden = false;
     $('#dev-login').onsubmit = (e) => {

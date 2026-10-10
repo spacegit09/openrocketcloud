@@ -1,12 +1,22 @@
 # OPuhRohCum
 
-The real [OpenRocket](https://openrocket.info) running in the cloud, with **live sharing**: sign in
-with a Google account, open a rocket design in your browser, and edit it together with your team
-in real time. Every person gets the genuine OpenRocket 24.12 desktop application, with the same physics
-engine, the same windows and dialogs, and the same results. The only addition is that everyone's edits
-appear in everyone else's OpenRocket within a fraction of a second.
+The real [OpenRocket](https://openrocket.info) with **live sharing**: sign in with a Google account,
+open a rocket design, and edit it together with your team in real time. Everyone runs the genuine
+OpenRocket 24.12, with the same physics engine, the same windows and dialogs, and the same results.
+The only addition is that everyone's edits appear in everyone else's OpenRocket within a moment.
 
-## How it works
+**Live:** <https://opuh-roh-cum-f189e90c.base44.app> · **About the code:**
+<https://spacegit09.github.io/openrocketcloud/>
+
+There are two ways to run it:
+
+- **In the browser, on Base44** (what the live site uses): OpenRocket runs inside each person's
+  browser, and Base44 hosts the site, sign-in and live sharing. No server of your own. See
+  [Browser version on Base44](#browser-version-on-base44-no-server).
+- **Self-hosted with Docker**: each person gets OpenRocket on your server, streamed to their
+  browser. Full desktop speed and the 3D view. Most of this README covers this version.
+
+## How the self-hosted version works
 
 ```
  Browser (any OS)                       Server (Docker host)
@@ -37,9 +47,55 @@ appear in everyone else's OpenRocket within a fraction of a second.
   after every change. Each result records the exact design it was computed for, so results for an
   older version of the design are shown as out of date and never as current.
 
-## Install
+## Browser version on Base44 (no server)
 
-**Website and setup guide:** <https://spacegit09.github.io/openrocketcloud/>
+`web/` is a second way to run OPuhRohCum: OpenRocket runs inside each person's browser
+([CheerpJ](https://cheerpj.com), Java in WebAssembly), and [Base44](https://base44.com) hosts
+everything else for free: the website, Google sign-in, the design list and sharing, custom motors,
+and live sharing. Nothing runs on your own computer or server.
+
+```
+ Browser (each person)                                     Base44
+┌──────────────────────────────────┐   WebSocket   ┌──────────────────────────────┐
+│ OpenRocket-web.jar (CheerpJ)     │◀────────────▶│ DesignRoom actor, one per    │
+│  + live-share bridge (BrowserLink)│  via the page │ design: orders and merges    │
+│ dashboard / design page          │               │ edits, stores the design,    │
+└──────────────────────────────────┘               │ edit history, saved copies   │
+                                                   │ Design + Motor records       │
+                                                   └──────────────────────────────┘
+```
+
+- **Same OpenRocket.** `scripts/build-web-jars.sh` makes `OpenRocket-web.jar` from the official
+  jar by removing only what a browser cannot use: native libraries for Windows, macOS and Linux,
+  the GraalJS engine behind the *Scripting* simulation extension, and Photo Studio's sky images.
+  Simulation results match desktop OpenRocket (checked to 8–13 significant digits).
+- **Same live sharing.** The bridge from `worker/bridge` runs unchanged; in the browser its
+  connection goes through the page (`worker/bridge/web/orcloud/bridge/BrowserLink.java`) to the
+  `DesignRoom` Base44 actor, which runs the same merge and edit-history code as the Node hub
+  (`web/base44/actors/DesignRoom/room.js`, using `server/src/model.js` and `edits.js`).
+- **Browser fixes** (`worker/bridge/web`): Java's XML setup is warmed up on one thread, the plugin
+  list is precomputed (OpenRocket's class-path scanner cannot run under CheerpJ), and running
+  simulations pause briefly so the window stays responsive.
+- **Limits:** no 3D view (no OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
+  run about 15× slower than desktop (1–4 s each); "Update flight estimates in design window"
+  (Preferences → Design) starts switched off, because its background simulation makes every edit
+  wait 1–2 s; *Save As* and exports download straight to your computer. CheerpJ's free licence is
+  for personal and non-commercial use.
+
+Build and deploy (needs Docker, Node 20+ and the Base44 CLI: `npm install -g base44`):
+
+```bash
+scripts/build-web-jars.sh       # OpenRocket-web.jar and orcloud-web.jar into web/public/or/
+cd web && npm install
+base44 login
+base44 link --create --name "My OpenRocket"   # once per checkout
+base44 deploy --build --yes                   # site, actor, records, Google sign-in
+```
+
+Tests: `npm test` (the room and `.ork` handling) and `node test/e2e.mjs` (two headless Chrome
+windows running the real OpenRocket against a local stand-in for the actor).
+
+## Installing the self-hosted version
 
 On any machine with Docker (a Linux server for a team, or Docker Desktop on Mac/Windows to try
 it), run:
@@ -84,6 +140,29 @@ its OpenRocket in about 5–20 seconds.
 
 To limit who can sign in, set `ALLOWED_EMAIL_DOMAINS=gmail.com,yourschool.org` and/or
 `ALLOWED_EMAILS=a@gmail.com,b@gmail.com`.
+
+## Front door on Base44 (optional)
+
+Instead of setting up Google sign-in yourself, you can put a free [Base44](https://base44.com) site in
+front of the server (`frontdoor/`). People open the Base44 address and sign in with Google there,
+and the site sends them on to OpenRocket with a one-time pass that expires after a minute. The
+server tells the site its current address every time it starts, so the Base44 link keeps working
+even when the server's own address changes (for example a Cloudflare quick tunnel on a laptop).
+Base44 only hosts the sign-in page; OpenRocket itself still runs on your server.
+
+```bash
+npm install -g base44
+cd frontdoor && npm install
+base44 login
+base44 link --create --name "My OpenRocket"
+openssl rand -hex 32                      # the shared secret
+base44 secrets set ENGINE_SECRET=<secret>
+base44 deploy --build --yes               # prints the App URL
+```
+
+Then set `BASE44_APP_URL=<App URL>` and `BASE44_SECRET=<secret>` in `.env` and run
+`docker compose up -d`. The site allows Google accounts only (`frontdoor/base44/auth/config.jsonc`);
+`ALLOWED_EMAIL_DOMAINS` and `ALLOWED_EMAILS` still apply on the server.
 
 ## Deploying to the cloud
 
@@ -152,6 +231,7 @@ preferences such as units, which are remembered for you across sessions.
 |---|---|---|
 | `PUBLIC_URL` | `http://localhost:8080` | Address users open; used for the Google redirect URI and cookie security |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | — | Google OAuth client |
+| `BASE44_APP_URL`, `BASE44_SECRET` | — | Sign in through a Base44 front door instead (see above) |
 | `ALLOWED_EMAIL_DOMAINS`, `ALLOWED_EMAILS` | empty (anyone) | Restrict sign-in |
 | `HTTP_BIND`, `HTTP_PORT` | `127.0.0.1`, `8080` | Where the site listens on the host |
 | `MAX_SESSIONS` | `20` | OpenRocket instances running at once (server-wide) |
@@ -180,8 +260,15 @@ preferences such as units, which are remembered for you across sessions.
 worker/            OpenRocket session image
   Dockerfile       downloads the official jar, builds the bridge
   bridge/src/      live-share bridge (Java 17, no dependencies besides OpenRocket)
+  bridge/web/      browser start-up and CheerpJ fixes (BrowserLink, WebMain, plugin list, ...)
   bridge/test/     SelfTest: checks the sync model against real OpenRocket on all example designs
   rootfs/          session entrypoint (Xvnc + openbox + OpenRocket), window manager config
+web/               browser version (Base44 project)
+  base44/          DesignRoom actor (room.js), Design and Motor records, sign-in settings
+  src/             dashboard and design page (vanilla JS), .ork zip handling, CheerpJ start-up
+  test/            room tests, local stand-in for the actor, two-browser end-to-end test
+frontdoor/         optional Base44 sign-in site for the self-hosted server
+docs/              GitHub Pages: a guide to the code
 server/            Node 24 server (Express, ws, dockerode, SQLite)
   src/model.js     server twin of the bridge's Model.java (must stay identical in behaviour)
   public/          dashboard and session page (vanilla JS, noVNC)

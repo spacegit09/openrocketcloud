@@ -342,7 +342,7 @@ async function main() {
   try {
     [project, me] = await Promise.all([api(`/projects/${projectId}`), api('/me')]);
   } catch (e) {
-    if (e.status === 401) location.href = `/auth/google?return=${encodeURIComponent(location.pathname)}`;
+    if (e.status === 401) location.href = `/auth/login?return=${encodeURIComponent(location.pathname)}`;
     else showOverlay([h('h2', {}, 'Design not found'), h('p', {}, 'It may have been deleted, or it is not shared with you.'), h('a', { class: 'btn', href: '/' }, 'All designs')]);
     return;
   }

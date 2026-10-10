@@ -1,0 +1,18 @@
+{
+  "name": "opuhrohcum-frontdoor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Base44 site that signs people in with Google and sends them to the OpenRocket server",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@base44/sdk": "^0.8.53"
+  },
+  "devDependencies": {
+    "@base44/vite-plugin": "^1.0.30",
+    "vite": "^6.1.0"
+  }
+}

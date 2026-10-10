@@ -3,30 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OPuhRohCum · OpenRocket together, in the browser</title>
-  <meta name="description" content="Run the real OpenRocket 24.12 in the browser and design rockets together in real time. Self-hosted, free and open source.">
+  <title>OPuhRohCum · source code</title>
+  <meta name="description" content="The source code of OPuhRohCum: the official OpenRocket 24.12 running in the browser, with real-time collaborative editing. How it works and where to find things.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e8590c'/%3E%3Cpath d='M9 23l3-3m2-9c4-4 9-4 9-4s0 5-4 9l-5 3-3-3z' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <style>
     :root {
       --bg: #f7f8fa; --surface: #fff; --surface-2: #f1f3f5; --border: #e3e6ea;
       --text: #1d2330; --muted: #5d6676; --accent: #e8590c; --accent-hover: #d9480f; --accent-soft: #fff0e6;
-      --code: #1f2430; --code-text: #e8eaed; --shadow: 0 18px 48px rgb(16 24 40 / 14%);
+      --shadow: 0 18px 48px rgb(16 24 40 / 14%);
       color-scheme: light;
     }
     @media (prefers-color-scheme: dark) {
       :root:not([data-theme="light"]) {
         --bg: #101318; --surface: #181c22; --surface-2: #21262e; --border: #2d333c;
         --text: #e8eaed; --muted: #9aa3b2; --accent: #ff7a2f; --accent-hover: #ff8f50; --accent-soft: #3a2416;
-        --code: #0b0d11; --code-text: #e8eaed; --shadow: 0 18px 48px rgb(0 0 0 / 45%);
+        --shadow: 0 18px 48px rgb(0 0 0 / 45%);
         color-scheme: dark;
       }
+    }
+    :root[data-theme="dark"] {
+      --bg: #101318; --surface: #181c22; --surface-2: #21262e; --border: #2d333c;
+      --text: #e8eaed; --muted: #9aa3b2; --accent: #ff7a2f; --accent-hover: #ff8f50; --accent-soft: #3a2416;
+      --shadow: 0 18px 48px rgb(0 0 0 / 45%);
+      color-scheme: dark;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; overflow-x: hidden; }
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
     body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif; }
     a { color: var(--accent); }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
     header.top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
     header.top .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
     .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 17px; color: var(--text); text-decoration: none; }
@@ -38,53 +44,56 @@
     .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 10px; font-weight: 650; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--surface); }
     .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
     .btn.primary:hover { background: var(--accent-hover); }
-    .hero { padding: 72px 0 40px; text-align: center; }
+    .hero { padding: 64px 0 36px; text-align: center; }
     .eyebrow { display: inline-block; font-size: 13.5px; font-weight: 650; color: var(--accent); background: var(--accent-soft); padding: 4px 12px; border-radius: 99px; margin-bottom: 18px; }
-    h1 { font-size: clamp(34px, 5.4vw, 58px); line-height: 1.07; letter-spacing: -0.025em; margin: 0 auto 18px; max-width: 840px; }
-    .lead { font-size: 19px; color: var(--muted); max-width: 720px; margin: 0 auto 30px; }
+    h1 { font-size: clamp(32px, 5.2vw, 56px); line-height: 1.08; letter-spacing: -0.025em; margin: 0 auto 18px; max-width: 840px; }
+    .lead { font-size: 19px; color: var(--muted); max-width: 740px; margin: 0 auto 30px; }
     .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-    .shot { margin: 46px auto 0; max-width: 980px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--surface); }
+    .shot { margin: 44px auto 0; max-width: 1000px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--surface); }
     .shot .bar { display: flex; gap: 7px; padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--border); }
     .shot .bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--border); display: block; }
     .shot img { display: block; width: 100%; height: auto; }
-    section { padding: 64px 0; }
+    .caption { color: var(--muted); font-size: 14.5px; margin: 12px auto 0; max-width: 760px; }
+    section { padding: 60px 0; }
     h2 { font-size: clamp(26px, 3.4vw, 36px); letter-spacing: -0.02em; margin: 0 0 10px; }
-    .sub { color: var(--muted); font-size: 17px; margin: 0 0 32px; max-width: 720px; }
+    .sub { color: var(--muted); font-size: 17px; margin: 0 0 30px; max-width: 760px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+    .grid > *, .gallery > *, .arch > * { min-width: 0; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
-    .card h3 { margin: 10px 0 6px; font-size: 18px; }
+    .card h3 { margin: 0 0 6px; font-size: 18px; }
     .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
-    .icon { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
-    .icon svg { width: 20px; height: 20px; }
-    .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px; }
+    .card p + p { margin-top: 8px; }
+    .arch { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 0; align-items: center; }
+    .arch .card ul { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 15px; }
+    .arrow { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.3; padding: 0 8px; }
+    .arrow b { display: block; font-size: 26px; color: var(--accent); }
+    .tour { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; font-size: 15px; }
+    .tour th, .tour td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .tour tr:last-child td { border-bottom: 0; }
+    .tour th { background: var(--surface-2); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .tour td:first-child { white-space: nowrap; }
+    .tour td:last-child { color: var(--muted); }
+    .table-scroll { overflow-x: auto; border-radius: 14px; }
+    .gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
     figure { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-    figure img { width: 100%; display: block; border-bottom: 1px solid var(--border); }
-    figcaption { padding: 14px 16px; font-size: 15px; color: var(--muted); }
+    figure img { width: 100%; height: auto; display: block; border-bottom: 1px solid var(--border); }
+    figcaption { padding: 12px 14px; font-size: 14.5px; color: var(--muted); }
     figcaption b { color: var(--text); }
-    .how { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: stretch; }
-    .step { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; position: relative; }
-    .step .n { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
-    .step h3 { margin: 10px 0 6px; font-size: 17px; }
-    .step p { margin: 0; color: var(--muted); font-size: 15px; }
-    pre { margin: 0; }
-    .code { position: relative; background: var(--code); color: var(--code-text); border-radius: 12px; padding: 16px 84px 16px 18px; font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x: auto; }
-    .code button { position: absolute; top: 10px; right: 10px; border: 1px solid #3a404b; background: #262b35; color: #e8eaed; border-radius: 7px; padding: 4px 10px; font: 13px system-ui, sans-serif; cursor: pointer; }
-    .install { display: grid; grid-template-columns: 1.15fr 1fr; gap: 26px; align-items: start; }
-    .install > *, .grid > *, .gallery > *, ol.steps > li { min-width: 0; }
-    ol.steps { margin: 0; padding-left: 22px; display: grid; gap: 12px; }
-    ol.steps li::marker { color: var(--accent); font-weight: 700; }
-    .note { background: var(--accent-soft); border-radius: 12px; padding: 14px 16px; font-size: 15px; }
-    details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; }
+    details { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; }
     details + details { margin-top: 10px; }
-    summary { cursor: pointer; font-weight: 650; }
+    summary { cursor: pointer; font-weight: 650; font-size: 17px; }
     details p, details ul { color: var(--muted); margin: 10px 0 0; }
-    code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 0.92em; }
+    details ul { padding-left: 20px; }
+    code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 0.9em; overflow-wrap: anywhere; }
     footer { border-top: 1px solid var(--border); padding: 30px 0 50px; color: var(--muted); font-size: 14.5px; }
     footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
     @media (max-width: 820px) {
       nav { display: none; }
-      .gallery, .how, .install { grid-template-columns: 1fr; }
-      .hero { padding-top: 48px; }
+      .gallery { grid-template-columns: 1fr; }
+      .arch { grid-template-columns: 1fr; gap: 10px; }
+      .arrow b { transform: rotate(90deg); }
+      .hero { padding-top: 44px; }
+      .tour td:first-child { white-space: normal; }
     }
   </style>
 </head>
@@ -93,10 +102,9 @@
     <div class="wrap">
       <a class="brand" href="#"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg></span>OPuhRohCum</a>
       <nav>
-        <a href="#features">Features</a>
-        <a href="#install">Install</a>
-        <a href="#google">Google sign-in</a>
-        <a href="#faq">FAQ</a>
+        <a href="#how">How it works</a>
+        <a href="#tour">Code tour</a>
+        <a href="#notes">Engineering notes</a>
         <a href="https://github.com/spacegit09/openrocketcloud">GitHub</a>
       </nav>
     </div>
@@ -104,127 +112,125 @@
 
   <main>
     <div class="wrap hero">
-      <span class="eyebrow">Free &amp; open source · runs the official OpenRocket 24.12</span>
-      <h1>Design rockets together, in the browser.</h1>
-      <p class="lead">OPuhRohCum runs the real OpenRocket on your server and streams it to everyone's browser. Your whole team edits the same design and sees every change instantly, with nothing to install on their computers.</p>
+      <span class="eyebrow">Source code · GPL-3.0</span>
+      <h1>OpenRocket, multiplayer, in the browser.</h1>
+      <p class="lead">OPuhRohCum runs the official OpenRocket 24.12 rocket simulator inside a web browser and lets a team edit one rocket design together in real time. This page is a short guide to how it is built and where things live in the code.</p>
       <div class="cta">
-        <a class="btn primary" href="#install">Install it</a>
-        <a class="btn" href="https://github.com/spacegit09/openrocketcloud">View on GitHub</a>
+        <a class="btn primary" href="https://github.com/spacegit09/openrocketcloud">Browse the code</a>
+        <a class="btn" href="https://opuh-roh-cum-f189e90c.base44.app">See it running</a>
       </div>
-      <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="assets/openrocket-live.jpg" alt="OpenRocket's rocket design window running in a browser tab, marked Live" width="800" height="600"></div>
+      <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="assets/browser-live.jpg" alt="OpenRocket's rocket design window inside a browser page. The toolbar shows two people online and the note “a added Nose Cone”; the component tree and side view show the new nose cone." width="1400" height="900"></div>
+      <p class="caption">Person B's browser, a few seconds after person A added a nose cone in theirs. Both are running the real OpenRocket, each in their own browser.</p>
     </div>
 
-    <section id="features">
-      <div class="wrap">
-        <h2>The OpenRocket you know, now multiplayer</h2>
-        <p class="sub">Nothing in OpenRocket is reimplemented: the same simulator, the same windows and dialogs, the same results. OPuhRohCum adds the parts a team needs.</p>
-        <div class="grid">
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/></svg></div><h3>Unchanged OpenRocket</h3><p>Each person gets the official OpenRocket 24.12 release, checksum-verified. Physics engine and interface are exactly the desktop app.</p></div>
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><h3>Live sharing</h3><p>Edits appear in everyone's OpenRocket within a second, and dialogs you have open stay open. Undo reverts only your own changes.</p></div>
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h3>Google sign-in &amp; sharing</h3><p>Sign in with a Google account. Share designs by email as <em>can edit</em> or <em>can view</em>, and see who is online and what they selected.</p></div>
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg></div><h3>Edit history</h3><p>Who changed what and when, down to the value: “Nose cone · Length: 10 cm → 14 cm”. Undo one person's change or restore any earlier moment.</p></div>
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg></div><h3>Custom motors</h3><p>Upload <code>.eng</code> or <code>.rse</code> thrust curves. They appear in OpenRocket's motor selector for everyone working on the design.</p></div>
-          <div class="card"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg></div><h3>Your files, always</h3><p>Upload any <code>.ork</code>, download it back for desktop OpenRocket at any time, and grab anything you export (CSV, PDF, RockSim). Everything saves continuously.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="wrap">
-        <h2>See it in action</h2>
-        <p class="sub">Screenshots from a real session with two test users.</p>
-        <div class="gallery">
-          <figure><img src="assets/live-share.jpg" alt="OpenRocket with a component dialog open while a collaborator's change arrives" loading="lazy" width="800" height="600"><figcaption><b>Live sharing.</b> Alice keeps her Body Tube dialog open while Bob's nose cone change arrives and the simulation updates.</figcaption></figure>
-          <figure><img src="assets/edit-history.jpg" alt="Edit history panel listing an edit with undo and restore buttons" loading="lazy" width="800" height="600"><figcaption><b>Edit history.</b> Every change with its author, time and exact values, plus undo and restore.</figcaption></figure>
-          <figure><img src="assets/custom-motors.jpg" alt="OpenRocket's motor selector showing an uploaded custom motor" loading="lazy" width="800" height="600"><figcaption><b>Custom motors.</b> An uploaded <code>.eng</code> file in OpenRocket's own motor selector.</figcaption></figure>
-          <figure><img src="assets/dashboard.jpg" alt="The OPuhRohCum dashboard listing designs" loading="lazy" width="800" height="600"><figcaption><b>Dashboard.</b> Your designs, sharing, motors and history, all in one place.</figcaption></figure>
-        </div>
-      </div>
-    </section>
-
-    <section>
+    <section id="how">
       <div class="wrap">
         <h2>How it works</h2>
-        <p class="sub">Your users only need a web browser. The heavy lifting happens on the computer you install OPuhRohCum on.</p>
-        <div class="how">
-          <div class="step"><div class="n">1</div><h3>One OpenRocket per person</h3><p>When someone opens a design, the server starts the official OpenRocket for them in its own container and streams its screen to their browser.</p></div>
-          <div class="step"><div class="n">2</div><h3>Edits are merged</h3><p>A small add-on inside OpenRocket notices what you changed and sends it, one property at a time, to the server, which puts all edits in one order.</p></div>
-          <div class="step"><div class="n">3</div><h3>Everyone updates</h3><p>Each person's OpenRocket applies the others' changes the way OpenRocket's own file loader would. The design and history are saved continuously.</p></div>
+        <p class="sub">OpenRocket is a Java desktop program. Here it runs unchanged inside each person's browser, and a small add-on keeps everyone's copy of the design in sync through a shared room on the server.</p>
+        <div class="arch">
+          <div class="card">
+            <h3>In each browser</h3>
+            <p>The official OpenRocket jar, run by <a href="https://cheerpj.com">CheerpJ</a> (a Java virtual machine compiled to WebAssembly).</p>
+            <ul>
+              <li>A live-share <b>bridge</b> in the same Java process watches OpenRocket's own change events and applies other people's edits.</li>
+              <li>The web page carries the bridge's messages to and from the room.</li>
+            </ul>
+          </div>
+          <div class="arrow"><b>⇄</b>edits over a WebSocket</div>
+          <div class="card">
+            <h3>On Base44</h3>
+            <p>One <b>design room</b> per design (a Base44 actor, a Cloudflare Durable Object underneath).</p>
+            <ul>
+              <li>Puts everyone's edits in one order, merges them and stores the design.</li>
+              <li>Keeps the edit history, saved copies, who is online and what they selected.</li>
+              <li>Base44 also hosts the site, Google sign-in, and the design and motor records.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="grid" style="margin-top:18px">
+          <div class="card"><h3>Edits are small</h3><p>The bridge sends one changed property at a time (“nose cone length is now 14 cm”), not the whole file. Two people editing different things never clash; for the same field, the later edit wins.</p></div>
+          <div class="card"><h3>OpenRocket stays in charge</h3><p>Remote edits are applied with the same setters OpenRocket's file loader uses, so the physics, the windows and the results are OpenRocket's own. Dialogs you have open stay open.</p></div>
+          <div class="card"><h3>Two ways to run it</h3><p>The same bridge and room logic also run as a self-hosted Docker version, where each person gets OpenRocket on a server, streamed to their browser with noVNC.</p></div>
         </div>
       </div>
     </section>
 
-    <section id="install">
+    <section id="tour">
       <div class="wrap">
-        <h2>Install</h2>
-        <p class="sub">Install it once on a computer or server; your team then uses it from any browser.</p>
-        <div class="install">
-          <div>
-            <ol class="steps">
-              <li><b>Get a machine with Docker.</b> A Linux server (any cloud provider) is best for a team; a Mac or Windows PC with <a href="https://docs.docker.com/get-docker/">Docker Desktop</a> works for trying it out. Plan about 1 GB of memory per person working at the same time.</li>
-              <li><b>Run the installer</b> and answer a few questions (address, optional Google keys):
-                <div class="code" style="margin-top:10px"><pre id="cmd">curl -fsSL https://raw.githubusercontent.com/spacegit09/openrocketcloud/main/install.sh | bash</pre><button type="button" data-copy="cmd">Copy</button></div>
-              </li>
-              <li><b>Open the address it prints.</b> On a server with a domain name, HTTPS is set up automatically (ports 80 and 443 must be open).</li>
-              <li><b>Turn on Google sign-in</b> with the <a href="#google">5-minute setup below</a>, then invite your team.</li>
-            </ol>
-          </div>
-          <div class="note">
-            <p style="margin-top:0"><b>What the installer does.</b> It downloads three small setup files into <code>~/openrocketcloud</code>, writes your answers to <code>~/openrocketcloud/.env</code>, downloads the ready-made images (about 1.5 GB the first time), and starts everything.</p>
-            <p><b>Update:</b> run the same command again. Your settings and designs are kept.</p>
-            <p style="margin-bottom:0"><b>Prefer to build it yourself?</b> Clone the repository and run <code>docker compose up -d --build</code>. Details are in the <a href="https://github.com/spacegit09/openrocketcloud#readme">README</a>.</p>
-          </div>
+        <h2>Code tour</h2>
+        <p class="sub">Where to look first. The <a href="https://github.com/spacegit09/openrocketcloud#readme">README</a> covers building, deploying and configuration.</p>
+        <div class="table-scroll">
+          <table class="tour">
+            <thead><tr><th>Path</th><th>What is there</th></tr></thead>
+            <tbody>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/tree/main/worker/bridge/src/orcloud/bridge"><code>worker/bridge/src</code></a></td><td>The live-share bridge (Java, no dependencies besides OpenRocket). <code>Bridge.java</code> turns OpenRocket's change events into edits and applies incoming ones; <code>Model.java</code> is the design as a set of objects with ordered children; <code>OrDoc.java</code> holds everything that touches OpenRocket internals.</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/tree/main/worker/bridge/web"><code>worker/bridge/web</code></a></td><td>The browser start-up: <code>WebMain.java</code>, <code>BrowserLink.java</code> (the bridge's connection, via JavaScript natives), and the fixes that make OpenRocket run under CheerpJ.</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/blob/main/web/base44/actors/DesignRoom/room.js"><code>web/base44/actors/DesignRoom</code></a></td><td>The design room: ordering and merging edits, storage in size-limited pieces, edit history with undo and restore, saved copies, presence.</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/blob/main/server/src/model.js"><code>server/src/model.js</code></a>, <a href="https://github.com/spacegit09/openrocketcloud/blob/main/server/src/edits.js"><code>edits.js</code></a></td><td>The design model and edit history in JavaScript, shared by the room and the Node server. Kept identical in behaviour to <code>Model.java</code> (checked by parity tests).</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/tree/main/web/src"><code>web/src</code></a></td><td>The dashboard and design page (plain JavaScript), starting OpenRocket in the page (<code>java.js</code>), and reading and writing <code>.ork</code> zip files in the browser (<code>lib/</code>).</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/tree/main/scripts"><code>scripts</code></a></td><td><code>build-web-jars.sh</code> builds the browser jars; <code>slim-openrocket-jar.py</code> removes what a browser cannot use from the official jar.</td></tr>
+              <tr><td><a href="https://github.com/spacegit09/openrocketcloud/tree/main/server"><code>server</code></a>, <a href="https://github.com/spacegit09/openrocketcloud/tree/main/worker"><code>worker</code></a></td><td>The self-hosted version: Node server (Express, Docker sessions, noVNC proxy, live-share hub) and the session image (official jar, Xvnc, bridge).</td></tr>
+              <tr><td>Tests</td><td><code>worker/bridge/test/SelfTest.java</code> runs 237 sync checks against the real OpenRocket on all its example designs; <code>server/test</code> includes Java–JavaScript parity tests; <code>web/test</code> tests the room and runs two headless Chrome windows with the real OpenRocket editing one design.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <section id="google">
+    <section id="notes">
       <div class="wrap">
-        <h2>Google sign-in setup</h2>
-        <p class="sub">Google requires every site that offers “Sign in with Google” to register once. It's free and takes about five minutes.</p>
-        <ol class="steps">
-          <li>Open <a href="https://console.cloud.google.com/">Google Cloud Console</a>, sign in, and create a project (any name).</li>
-          <li>Search for <b>Google Auth Platform</b> and click <b>Get started</b>: app name <code>OPuhRohCum</code>, your email for support and contact, audience <b>External</b>.</li>
-          <li>Under <b>Audience</b>, click <b>Publish app</b> so any Google account can sign in, or add your team as test users.</li>
-          <li>Under <b>Clients</b>, click <b>Create client</b> → <b>Web application</b>, and add this redirect URI with your own address: <code>https://your-address/auth/google/callback</code></li>
-          <li>Copy the <b>Client ID</b> and <b>Client secret</b> into the installer, or into <code>~/openrocketcloud/.env</code> as <code>GOOGLE_CLIENT_ID</code> and <code>GOOGLE_CLIENT_SECRET</code>, and run the installer again.</li>
-        </ol>
-        <p class="sub" style="margin-top:20px">To let only certain people in, set <code>ALLOWED_EMAIL_DOMAINS=yourschool.org</code> or <code>ALLOWED_EMAILS=…</code> in <code>.env</code>.</p>
+        <h2>Engineering notes</h2>
+        <p class="sub">The problems that took the most work.</p>
+        <details open>
+          <summary>Syncing a desktop app that was never built for it</summary>
+          <p>OpenRocket has no collaboration features, so the bridge works from the outside. It snapshots the design with OpenRocket's own <code>.ork</code> writer, compares only the components OpenRocket reports as changed, and sends those properties. Incoming edits go through OpenRocket's file-loader setters in place; adding, removing or moving parts reloads the rocket the way OpenRocket's undo does. Undo reverts only your own edits, simulation results remember exactly which version of the design they were computed for, and the edit history can undo one person's change while keeping later changes by others.</p>
+        </details>
+        <details>
+          <summary>Running OpenRocket 24.12 in a browser</summary>
+          <ul>
+            <li>CheerpJ's Java 17 lacks the reflection natives behind type annotations, which OpenRocket's dependency-injection library asks for; the page supplies them (“no type annotations”).</li>
+            <li>OpenRocket finds its plugins by scanning its own jar, which cannot run under CheerpJ; the browser build ships a plugin list computed at build time.</li>
+            <li>Two Java threads setting up XML at the same moment failed at random, and so did loading runtime files while Java was running. Warming up XML on one thread and preloading the runtime files took fresh starts from 4 successes in 9 to 6 in 6.</li>
+            <li>The 3D view needs OpenGL, so it uses OpenRocket's own switch for computers without 3D.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Fitting on free hosting</summary>
+          <p>Base44 accepts at most 50 MB per site and the official jar is 83 MB. Most of it is the JavaScript engine behind the <em>Scripting</em> simulation extension plus native libraries for desktop systems, none of which can run in a browser. Removing only those gives a 42 MB jar with OpenRocket's own code untouched. CheerpJ reads it with HTTP range requests, so visitors download only the parts they use.</p>
+        </details>
+        <details>
+          <summary>Keeping editing responsive</summary>
+          <p>In the browser every Java thread shares one thread, and CheerpJ never switches away from a busy one. Chrome's profiler showed that OpenRocket's background flight-estimate simulation, re-run after every change, held the window for 2–3 seconds per edit. With that preference off by default (it is OpenRocket's own setting), an edit takes about 0.4 seconds; long-running simulations also pause briefly so clicks get through.</p>
+        </details>
+        <details>
+          <summary>Real-time rooms on a key-value store</summary>
+          <p>Each design room stores the design in 64 hashed buckets, each split into values under 96 KB, so an edit rewrites only what it touched. Messages over 400 KB (simulation results, decal images) travel in fragments, and the room handles events strictly one at a time so two edits never interleave. Locally, the same room code runs behind a plain WebSocket server for tests.</p>
+        </details>
+        <details>
+          <summary>Is it really the same physics?</summary>
+          <p>With the random wind seed fixed, the browser and desktop Java agree on the example rocket's apogee, velocity and flight time to 8–13 significant digits, the same level at which two desktop computers differ (Java allows math functions such as sine to differ in the last digit). Mass and centre of gravity match bit for bit.</p>
+        </details>
       </div>
     </section>
 
-    <section id="faq">
+    <section>
       <div class="wrap">
-        <h2>FAQ</h2>
-        <details><summary>Is it really the same as desktop OpenRocket?</summary><p>Yes. Every session runs the unmodified OpenRocket 24.12 release. Designs download as normal <code>.ork</code> files that open in desktop OpenRocket.</p></details>
-        <details><summary>Do my teammates need to install anything?</summary><p>No, just a modern web browser. On a Mac, ⌘-shortcuts are mapped to the Ctrl-shortcuts OpenRocket expects.</p></details>
-        <details><summary>What happens if two people change the same thing at once?</summary><p>Different properties merge cleanly. For the same field at the same moment, the later edit wins, and the edit history lets you undo either one.</p></details>
-        <details><summary>How big a server do I need?</summary><p>Each open design uses roughly 0.6–1 GB of memory. A server with 8 GB serves about 5 people at once; 16 GB about 10–12.</p></details>
-        <details><summary>Where is my data, and how do I back it up?</summary><p>On your own server, in one Docker volume (<code>orcloud-data</code>) holding a SQLite database. The README shows a one-line backup command.</p></details>
-        <details><summary>Is this made by the OpenRocket team?</summary><p>No. OPuhRohCum is an independent project built around the official OpenRocket release. OpenRocket is © the OpenRocket team and licensed under GPL-3.0, as is this project.</p></details>
+        <h2>Screens</h2>
+        <p class="sub">The dashboard and dialogs around OpenRocket.</p>
+        <div class="gallery">
+          <figure><img src="assets/dashboard.jpg" alt="Dashboard listing rocket designs as cards" width="800" height="600" loading="lazy"><figcaption><b>Dashboard.</b> Your designs and the ones shared with you.</figcaption></figure>
+          <figure><img src="assets/edit-history.jpg" alt="Edit history dialog listing changes by person, with undo and restore buttons" width="800" height="600" loading="lazy"><figcaption><b>Edit history.</b> Who changed what, with undo and restore.</figcaption></figure>
+          <figure><img src="assets/custom-motors.jpg" alt="Custom motors dialog with an uploaded .eng file" width="800" height="600" loading="lazy"><figcaption><b>Custom motors.</b> <code>.eng</code> and <code>.rse</code> files shared with the team.</figcaption></figure>
+        </div>
       </div>
     </section>
   </main>
 
   <footer>
     <div class="wrap">
-      <span>OPuhRohCum · GPL-3.0 · Built around <a href="https://openrocket.info">OpenRocket</a>, not affiliated with the OpenRocket project.</span>
-      <a href="https://github.com/spacegit09/openrocketcloud">Source on GitHub</a>
+      <span>GPL-3.0-or-later. Runs <a href="https://openrocket.info">OpenRocket</a> © the OpenRocket team; not affiliated with or endorsed by the OpenRocket project. Java in the browser by CheerpJ (community edition).</span>
+      <a href="https://github.com/spacegit09/openrocketcloud">github.com/spacegit09/openrocketcloud</a>
     </div>
   </footer>
-
-  <script>
-    for (const b of document.querySelectorAll('[data-copy]')) {
-      b.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent.trim());
-          b.textContent = 'Copied';
-        } catch {
-          b.textContent = 'Select & copy';
-        }
-        setTimeout(() => (b.textContent = 'Copy'), 2000);
-      });
-    }
-  </script>
 </body>
 </html>

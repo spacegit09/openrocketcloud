@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env.*
+.DS_Store
+# Base44 (links this folder to one Base44 app; every checkout links its own)
+.app.json*
+.types/

@@ -1,0 +1,13 @@
+// Google accounts only: the OpenRocket server identifies people by their Google email.
+{
+  "enableUsernamePassword": false,
+  "enableGoogleLogin": true,
+  "enableMicrosoftLogin": false,
+  "enableFacebookLogin": false,
+  "enableAppleLogin": false,
+  "googleOAuthMode": "default",
+  "googleOAuthClientId": null,
+  "enableSSOLogin": false,
+  "ssoProviderName": null,
+  "useWorkspaceSSO": false
+}
