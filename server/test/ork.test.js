@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import AdmZip from 'adm-zip';
+import { readZip } from '../src/zip.js';
 import { importOrk, exportOrk } from '../src/ork.js';
 import { toXml, ATT } from '../src/model.js';
 
@@ -19,10 +19,10 @@ test('export with decals puts rocket.ork first (OpenRocket reads only the first 
   m.objs.set('att:decals/a.png', { t: ATT, p: 'doc', o: 1000, k: ['data'], v: new Map([['@', ''], ['data', Buffer.from('png').toString('base64')]]) });
   const { body, zip } = exportOrk(m);
   assert.equal(zip, true);
-  const entries = new AdmZip(body).getEntries();
-  assert.equal(entries[0].entryName, 'rocket.ork');
-  assert.equal(entries[0].getData().toString('utf8'), toXml(m));
-  assert.equal(entries[1].getData().toString(), 'png');
+  const entries = readZip(body);
+  assert.equal(entries[0].name, 'rocket.ork');
+  assert.equal(entries[0].data.toString('utf8'), toXml(m));
+  assert.equal(entries[1].data.toString(), 'png');
   // and it round-trips
   const again = importOrk(body);
   assert.equal(toXml(again), toXml(m));

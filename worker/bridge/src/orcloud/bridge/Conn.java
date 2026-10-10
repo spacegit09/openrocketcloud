@@ -17,17 +17,9 @@ import java.util.concurrent.TimeUnit;
  * WebSocket connection to the collaboration server with automatic reconnect. Sends are
  * serialized on one thread (java.net.http.WebSocket allows one outstanding send).
  */
-final class Conn implements WebSocket.Listener {
-	interface Handler {
-		void onOpen();
-
-		void onMessage(Map<String, Object> msg);
-
-		void onClosed(String reason);
-	}
-
+final class Conn implements Link, WebSocket.Listener {
 	private final URI uri;
-	private final Handler handler;
+	private final Link.Handler handler;
 	private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 	private final ExecutorService sender = Executors.newSingleThreadExecutor(r -> daemon(r, "liveshare-send"));
 	private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> daemon(r, "liveshare-timer"));
@@ -36,7 +28,7 @@ final class Conn implements WebSocket.Listener {
 	private volatile boolean closed;
 	private long backoffMs = 500;
 
-	Conn(URI uri, Handler handler) {
+	Conn(URI uri, Link.Handler handler) {
 		this.uri = uri;
 		this.handler = handler;
 	}
@@ -47,7 +39,8 @@ final class Conn implements WebSocket.Listener {
 		return t;
 	}
 
-	void start() {
+	@Override
+	public void start() {
 		connect();
 		timer.scheduleAtFixedRate(() -> {
 			WebSocket w = ws;
@@ -79,8 +72,8 @@ final class Conn implements WebSocket.Listener {
 		timer.schedule(this::connect, delay, TimeUnit.MILLISECONDS);
 	}
 
-	/** Drops the connection and reconnects (the server then sends a fresh welcome). */
-	void reconnect() {
+	@Override
+	public void reconnect() {
 		WebSocket w = ws;
 		ws = null;
 		if (w != null) {
@@ -91,11 +84,13 @@ final class Conn implements WebSocket.Listener {
 		scheduleReconnect();
 	}
 
-	boolean isOpen() {
+	@Override
+	public boolean isOpen() {
 		return ws != null;
 	}
 
-	CompletableFuture<Void> send(Map<String, Object> msg) {
+	@Override
+	public CompletableFuture<Void> send(Map<String, Object> msg) {
 		String text = Json.stringify(msg);
 		CompletableFuture<Void> done = new CompletableFuture<>();
 		sender.execute(() -> {
@@ -113,7 +108,8 @@ final class Conn implements WebSocket.Listener {
 		return done;
 	}
 
-	void close() {
+	@Override
+	public void close() {
 		closed = true;
 		WebSocket w = ws;
 		if (w != null) {

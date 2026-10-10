@@ -4,7 +4,6 @@
 //
 // Shape: { objs: Map<id, { t, p, o, k: string[], v: Map<key, string> }> }
 
-import { randomUUID } from 'node:crypto';
 import { El, parse, canonical, attrsCanonical } from './xml.js';
 
 export const DOC = 'doc';
@@ -77,7 +76,7 @@ function addObject(m, el, givenId, parent, pos, component) {
   const idEl = component ? el.first('id') : null;
   if (component && idEl) id = idEl.text().trim();
   const regen = !id || m.objs.has(id) || reserved(id);
-  if (regen) id = randomUUID();
+  if (regen) id = globalThis.crypto.randomUUID();
   const obj = { t: el.tag, p: parent, o: pos, k: [], v: new Map([[ATTRS, attrsCanonical(el.attrs)]]) };
   m.objs.set(id, obj);
   const counts = new Map();
@@ -101,7 +100,20 @@ function addObject(m, el, givenId, parent, pos, component) {
   }
 }
 
-/** Builds a model from an OpenRocket XML document; attachments: Map<name, Buffer>. */
+// Base64 for attachments, in Node (Buffer) and in browsers and Base44 actors (btoa/atob).
+function toBase64(bytes) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(bytes).toString('base64');
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+function fromBase64(s) {
+  if (typeof Buffer !== 'undefined') return Buffer.from(s, 'base64');
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
+/** Builds a model from an OpenRocket XML document; attachments: Map<name, bytes>. */
 export function fromXml(xml, attachments = new Map(), simIds = null) {
   const root = typeof xml === 'string' ? parse(xml) : xml;
   if (root.tag !== 'openrocket') throw new Error('Not an OpenRocket design (expected <openrocket>)');
@@ -134,7 +146,7 @@ export function fromXml(xml, attachments = new Map(), simIds = null) {
   if (!haveRocket) throw new Error('The file contains no rocket');
   let pos = 1000;
   for (const [name, data] of [...attachments.entries()].sort((a, b) => cmp(a[0], b[0]))) {
-    m.objs.set(`att:${name}`, { t: ATT, p: DOC, o: pos++, k: ['data'], v: new Map([[ATTRS, ''], ['data', data.toString('base64')]]) });
+    m.objs.set(`att:${name}`, { t: ATT, p: DOC, o: pos++, k: ['data'], v: new Map([[ATTRS, ''], ['data', toBase64(data)]]) });
   }
   return m;
 }
@@ -171,7 +183,7 @@ export function toXml(m) {
 export function attachments(m) {
   const out = new Map();
   for (const [id, o] of [...m.objs.entries()].sort((a, b) => cmp(a[0], b[0]))) {
-    if (o.t === ATT && id.startsWith('att:')) out.set(id.slice(4), Buffer.from(o.v.get('data') ?? '', 'base64'));
+    if (o.t === ATT && id.startsWith('att:')) out.set(id.slice(4), fromBase64(o.v.get('data') ?? ''));
   }
   return out;
 }

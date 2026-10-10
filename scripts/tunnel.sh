@@ -23,7 +23,12 @@ cloudflared tunnel --no-autoupdate --url "http://localhost:${port:-8080}" 2>&1 |
       echo "Tunnel address changed to $url; updating .env and restarting the server"
       sed -i '' "s#^PUBLIC_URL=.*#PUBLIC_URL=$url#" .env
       docker compose up -d --force-recreate server
-      osascript -e "display notification \"New address: $url. Add $url/auth/google/callback in Google Cloud.\" with title \"OpenRocket Cloud\"" || true
+      if grep -qE '^BASE44_APP_URL=.+' .env; then
+        msg="New address: $url. The Base44 link keeps working; nothing to do."
+      else
+        msg="New address: $url. Add $url/auth/google/callback in Google Cloud."
+      fi
+      osascript -e "display notification \"$msg\" with title \"OpenRocket Cloud\"" || true
     fi
   fi
 done

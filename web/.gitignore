@@ -1,0 +1,15 @@
+node_modules
+dist
+.cache
+.env
+.env.*
+.DS_Store
+# Base44 (links this folder to one Base44 app; every checkout links its own)
+.app.json*
+.types/
+# Generated (scripts/prebuild.mjs, scripts/build-web-jars.sh)
+base44/actors/DesignRoom/lib/
+public/templates/
+public/or/*.jar
+test/out/
+test/live/actor-check.js

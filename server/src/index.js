@@ -2,7 +2,7 @@ import http from 'node:http';
 import { join } from 'node:path';
 import express from 'express';
 import { config } from './config.js';
-import { authRouter } from './auth.js';
+import { authRouter, registerWithFrontDoor } from './auth.js';
 import { apiRouter } from './api.js';
 import { attachCollab, persistAll } from './collab.js';
 import { initSessions, stopAll } from './sessions.js';
@@ -33,7 +33,10 @@ const vnc = vncUpgradeHandler();
 server.on('upgrade', (req, socket, head) => {
   if (!vnc(req, socket, head)) socket.destroy();
 });
-server.listen(config.port, () => console.log(`OpenRocket Cloud on ${config.publicUrl} (port ${config.port})`));
+server.listen(config.port, () => {
+  console.log(`OpenRocket Cloud on ${config.publicUrl} (port ${config.port})`);
+  registerWithFrontDoor();
+});
 
 // ---- internal: live-share connections from session containers only (not published)
 const internal = http.createServer((req, res) => res.writeHead(404).end());

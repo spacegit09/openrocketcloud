@@ -34,6 +34,12 @@ export const config = {
   allowedEmails: list(env.ALLOWED_EMAILS),
   // Local testing without Google. Refused unless the site runs on localhost.
   devLogin: env.DEV_LOGIN === 'true' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(publicUrl),
+  // Optional Base44 front door (frontdoor/): people sign in on the Base44 site, which sends them
+  // here with a short-lived pass signed with the shared secret.
+  base44: {
+    appUrl: (env.BASE44_APP_URL ?? '').replace(/\/$/, ''),
+    secret: env.BASE44_SECRET ?? '',
+  },
   worker: {
     image: env.WORKER_IMAGE ?? 'orcloud-worker',
     network: env.SESSION_NETWORK ?? 'orcloud-sessions',

@@ -51,10 +51,10 @@ import info.openrocket.swing.gui.main.BasicFrame;
  * Remote edits: {@code server} advances and the document is moved to server + pending,
  * property by property where possible so open dialogs stay open.
  */
-final class Bridge implements Conn.Handler {
+final class Bridge implements Link.Handler {
 	private static final int DEBOUNCE_MS = 200;
 
-	private final Conn conn;
+	private final Link conn;
 	private final String token;
 	private final Path workDir;
 	private final CountDownLatch firstWelcome = new CountDownLatch(1);
@@ -106,9 +106,13 @@ final class Bridge implements Conn.Handler {
 	}
 
 	Bridge(URI collabUrl, String token, Path workDir) {
+		this(handler -> new Conn(collabUrl, handler), token, workDir);
+	}
+
+	Bridge(java.util.function.Function<Link.Handler, Link> link, String token, Path workDir) {
 		this.token = token;
 		this.workDir = workDir;
-		this.conn = new Conn(collabUrl, this);
+		this.conn = link.apply(this);
 	}
 
 	void start() {

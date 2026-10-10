@@ -1,0 +1,25 @@
+// Where the OpenRocket server is right now. Written only by the registerEngine function (service
+// role); nobody can read or change it through the API.
+{
+  "name": "Engine",
+  "type": "object",
+  "description": "Public address of the OpenRocket server",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Address the server registered, e.g. https://example.trycloudflare.com"
+    },
+    "seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the server last registered"
+    }
+  },
+  "required": ["url"],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
