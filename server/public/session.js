@@ -6,7 +6,6 @@ const screen = $('#screen');
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform);
 
 $('#back').append(icon('back'));
-$('#logo').append(icon('rocket'));
 $('#share-btn').append(icon('share'), 'Share');
 $('#download-btn').append(icon('download'));
 $('#files-btn').append(icon('folder'));

@@ -95,7 +95,7 @@ svg.i { width: 16px; height: 16px; flex: none; }
 }
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 16px; color: var(--text); }
 .brand:hover { text-decoration: none; }
-.brand .logo { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; color: #fff; }
+.brand .logo { width: 28px; height: 28px; display: block; }
 .spacer { flex: 1; }
 .me { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 
@@ -211,8 +211,7 @@ body.design-page { height: 100vh; overflow: hidden; display: flex; flex-directio
   display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; flex: none;
   background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.sbar .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: #fff; }
-.sbar .logo svg { width: 14px; height: 14px; }
+.sbar .logo { width: 24px; height: 24px; display: block; }
 .title { font-weight: 650; font-size: 14.5px; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }

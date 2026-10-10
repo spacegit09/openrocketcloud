@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rocket in Cloud</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23e8590c'/%3E%3Cpath d='M9 23l3-3m2-9c4-4 9-4 9-4s0 5-4 9l-5 3-3-3z' stroke='white' stroke-width='2.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="stylesheet" href="/style.css">
   <style>
     html, body { height: 100%; overflow: hidden; }
@@ -13,8 +14,7 @@
       display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 10px; flex: none;
       background: var(--surface); border-bottom: 1px solid var(--border);
     }
-    .sbar .logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent); display: grid; place-items: center; color: #fff; }
-    .sbar .logo svg { width: 14px; height: 14px; }
+    .sbar .logo { width: 24px; height: 24px; display: block; }
     .title { font-weight: 650; font-size: 14.5px; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
     .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
@@ -47,7 +47,7 @@
 <body>
   <header class="sbar">
     <a class="btn ghost icon" href="/" title="All designs" aria-label="All designs" id="back"></a>
-    <span class="logo" id="logo"></span>
+    <img class="logo" src="/logo.png" alt="">
     <span class="title" id="title">Loading…</span>
     <span class="badge" id="role-badge" hidden>View only</span>
     <span class="pill wait" id="status">Starting</span>
