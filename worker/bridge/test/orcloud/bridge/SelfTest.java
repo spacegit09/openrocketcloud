@@ -7,8 +7,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -16,9 +18,17 @@ import javax.swing.SwingUtilities;
 
 import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.file.GeneralRocketLoader;
+import info.openrocket.core.motor.Motor;
+import info.openrocket.core.motor.MotorConfiguration;
 import info.openrocket.core.rocketcomponent.BodyTube;
+import info.openrocket.core.rocketcomponent.ComponentChangeEvent;
+import info.openrocket.core.rocketcomponent.DeploymentConfiguration;
+import info.openrocket.core.rocketcomponent.FlightConfigurationId;
 import info.openrocket.core.rocketcomponent.MassComponent;
+import info.openrocket.core.rocketcomponent.MotorMount;
 import info.openrocket.core.rocketcomponent.NoseCone;
+import info.openrocket.core.rocketcomponent.RecoveryDevice;
+import info.openrocket.core.rocketcomponent.Rocket;
 import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.rocketcomponent.SymmetricComponent;
 import info.openrocket.swing.startup.SwingStartup;
@@ -351,6 +361,71 @@ public final class SelfTest {
 			check("merged document loads", merged.getRocket().getName().equals("Renamed concurrently")
 					&& merged.getRocket().findComponent(mass.getID()) != null);
 		}
+
+		// 4. Motors & Configuration tab: its panels change mounts and recovery devices but
+		//    report the change on the rocket. What the bridge sends for that event must carry it.
+		OpenRocketDocument d6 = load(m1);
+		Rocket rocket = d6.getRocket();
+		FlightConfigurationId fcid = rocket.getSelectedConfiguration().getFlightConfigurationID();
+		FlightConfigurationId[] fcids = { fcid };
+		Set<String> heard = new HashSet<>();
+		rocket.addComponentChangeListener(e -> {
+			if (e.getSource() instanceof RocketComponent && !e.isUndoChange()) {
+				heard.addAll(Bridge.changedIds(e));
+			}
+		});
+		MotorMount mount = null;
+		for (RocketComponent c : rocket) {
+			if (c instanceof MotorMount && ((MotorMount) c).getMotorConfig(fcid).getMotor() != null) {
+				mount = (MotorMount) c;
+				break;
+			}
+		}
+		if (mount != null) {
+			Motor motor = mount.getMotorConfig(fcid).getMotor();
+			Model before = model(d6, false);
+			heard.clear();
+			mount.setMotorConfig(null, fcid); // as MotorConfigurationPanel.deleteMotor
+			rocket.fireComponentChangeEvent(ComponentChangeEvent.MOTOR_CHANGE, fcids);
+			checkSent("motor removal is sent", before, model(d6, false), new HashSet<>(heard));
+
+			Model removed = model(d6, false);
+			heard.clear();
+			MotorConfiguration chosen = new MotorConfiguration(mount, fcid, mount.getMotorConfig(fcid));
+			chosen.setMotor(motor); // as MotorConfigurationPanel.selectMotor
+			chosen.setEjectionDelay(3);
+			mount.setMotorConfig(chosen, fcid);
+			rocket.fireComponentChangeEvent(ComponentChangeEvent.MOTOR_CHANGE, fcids);
+			Model sent = checkSent("motor choice is sent", removed, model(d6, false), new HashSet<>(heard));
+			MotorMount reopened = (MotorMount) load(sent).getRocket().findComponent(((RocketComponent) mount).getID());
+			check("reopened design has the chosen motor", reopened != null
+					&& reopened.getMotorConfig(fcid).getMotor() != null);
+		}
+		RecoveryDevice device = null;
+		for (RocketComponent c : rocket) {
+			if (c instanceof RecoveryDevice) {
+				device = (RecoveryDevice) c;
+				break;
+			}
+		}
+		if (device != null && !fcid.equals(FlightConfigurationId.DEFAULT_VALUE_FCID)) {
+			Model before = model(d6, false);
+			heard.clear();
+			DeploymentConfiguration dc = device.getDeploymentConfigurations().get(fcid).clone();
+			dc.setDeployEvent(DeploymentConfiguration.DeployEvent.ALTITUDE);
+			dc.setDeployAltitude(dc.getDeployAltitude() + 50);
+			device.getDeploymentConfigurations().set(fcid, dc); // as DeploymentSelectionDialog
+			rocket.fireComponentChangeEvent(ComponentChangeEvent.AERODYNAMIC_CHANGE, fcids);
+			checkSent("deployment change is sent", before, model(d6, false), new HashSet<>(heard));
+		}
+	}
+
+	/** Applies what the bridge would send for an edit (diff limited to scope); returns the result. */
+	private static Model checkSent(String what, Model base, Model edited, Set<String> scope) {
+		Model sent = base.copy();
+		sent.applyAll(Model.diff(base, edited, scope));
+		check(what, sent, edited);
+		return sent;
 	}
 
 	@SuppressWarnings("unchecked")
