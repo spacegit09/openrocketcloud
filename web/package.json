@@ -1,9 +1,9 @@
 {
-  "name": "opuhrohcum-web",
+  "name": "rocket-in-cloud-web",
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "OPuhRohCum in the browser: OpenRocket runs in each visitor's browser (CheerpJ); Base44 hosts the site, sign-in, data and live sharing",
+  "description": "Rocket in Cloud in the browser: OpenRocket runs in each visitor's browser (CheerpJ); Base44 hosts the site, sign-in, data and live sharing",
   "scripts": {
     "prebuild": "node scripts/prebuild.mjs",
     "build": "vite build",

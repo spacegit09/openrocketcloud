@@ -128,7 +128,7 @@ function showActivity(a) {
 function setName(n) {
   name = n || 'Rocket';
   $('#title').textContent = name;
-  document.title = `${name} · OPuhRohCum`;
+  document.title = `${name} · Rocket in Cloud`;
 }
 
 $('#download-btn').onclick = async () => {

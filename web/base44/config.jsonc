@@ -1,9 +1,9 @@
-// Base44 project: OPuhRohCum in the browser. OpenRocket runs in each visitor's browser (CheerpJ);
+// Base44 project: Rocket in Cloud in the browser. OpenRocket runs in each visitor's browser (CheerpJ);
 // Base44 hosts the site, Google sign-in, the Design and Motor records, and live sharing (the
 // DesignRoom actor). Build the Java side first: scripts/build-web-jars.sh
 // Docs: https://docs.base44.com/developers/backend/overview/project-structure
 {
-  "name": "OPuhRohCum",
+  "name": "Rocket in Cloud",
   "description": "The real OpenRocket in your browser, with live sharing for your team.",
   "visibility": "public",
   "site": {

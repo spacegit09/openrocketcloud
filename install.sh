@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# OPuhRohCum installer: the real OpenRocket in the browser, with live sharing.
+# Rocket in Cloud installer: the real OpenRocket in the browser, with live sharing.
 #
 #   curl -fsSL https://raw.githubusercontent.com/spacegit09/openrocketcloud/main/install.sh | bash
 #
@@ -7,10 +7,10 @@
 # Re-running it updates an existing installation and keeps its settings and designs.
 set -euo pipefail
 
-REPO="${OPUHROHCUM_REPO:-spacegit09/openrocketcloud}"
-BRANCH="${OPUHROHCUM_BRANCH:-main}"
-DIR="${OPUHROHCUM_DIR:-$HOME/openrocketcloud}"
-RAW="${OPUHROHCUM_RAW:-https://raw.githubusercontent.com/$REPO/$BRANCH}"
+REPO="${ROCKET_IN_CLOUD_REPO:-spacegit09/openrocketcloud}"
+BRANCH="${ROCKET_IN_CLOUD_BRANCH:-main}"
+DIR="${ROCKET_IN_CLOUD_DIR:-$HOME/openrocketcloud}"
+RAW="${ROCKET_IN_CLOUD_RAW:-https://raw.githubusercontent.com/$REPO/$BRANCH}"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 fail() { printf '\n\033[31m%s\033[0m\n' "$*" >&2; exit 1; }
@@ -35,7 +35,7 @@ command -v docker >/dev/null || fail "Docker is not installed. Get it from https
 docker info >/dev/null 2>&1 || fail "Docker is installed but not running (or you need sudo). Start Docker and run this again."
 docker compose version >/dev/null 2>&1 || fail "The Docker Compose plugin is missing. See https://docs.docker.com/compose/install/"
 
-say "Installing OPuhRohCum into $DIR"
+say "Installing Rocket in Cloud into $DIR"
 mkdir -p "$DIR"
 cd "$DIR"
 for f in docker-compose.yml docker-compose.https.yml Caddyfile .env.example; do
@@ -77,7 +77,7 @@ if grep -q '^DOMAIN=.\+' .env; then
   compose+=(-f docker-compose.yml -f docker-compose.https.yml)
 fi
 
-say "Downloading OPuhRohCum (the first time this is about 1.5 GB)"
+say "Downloading Rocket in Cloud (the first time this is about 1.5 GB)"
 "${compose[@]}" pull
 say "Starting"
 "${compose[@]}" up -d --no-build --remove-orphans

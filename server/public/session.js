@@ -262,7 +262,7 @@ function listen() {
       case 'renamed':
         project.name = ev.name;
         $('#title').textContent = ev.name;
-        document.title = `${ev.name} · OPuhRohCum`;
+        document.title = `${ev.name} · Rocket in Cloud`;
         break;
       case 'notice':
         toast(ev.message);
@@ -292,7 +292,7 @@ async function poll() {
   if (p.name !== project.name) {
     project.name = p.name;
     $('#title').textContent = p.name;
-    document.title = `${p.name} · OPuhRohCum`;
+    document.title = `${p.name} · Rocket in Cloud`;
   }
   if (!session || state === 'ended') return;
   if (!p.session || p.session.id !== session.id) {
@@ -347,7 +347,7 @@ async function main() {
     return;
   }
   $('#title').textContent = project.name;
-  document.title = `${project.name} · OPuhRohCum`;
+  document.title = `${project.name} · Rocket in Cloud`;
   $('#role-badge').hidden = project.role !== 'viewer';
   $('#share-btn').hidden = project.role !== 'owner';
   members = project.online;

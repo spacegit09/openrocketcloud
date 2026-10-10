@@ -1,11 +1,11 @@
-# OPuhRohCum
+# Rocket in Cloud
 
 The real [OpenRocket](https://openrocket.info) with **live sharing**: sign in with a Google account,
 open a rocket design, and edit it together with your team in real time. Everyone runs the genuine
 OpenRocket 24.12, with the same physics engine, the same windows and dialogs, and the same results.
 The only addition is that everyone's edits appear in everyone else's OpenRocket within a moment.
 
-**Live:** <https://opuh-roh-cum-f189e90c.base44.app> · **About the code:**
+**Live:** <https://rocketincloud.base44.app> · **About the code:**
 <https://spacegit09.github.io/openrocketcloud/>
 
 There are two ways to run it:
@@ -49,7 +49,7 @@ There are two ways to run it:
 
 ## Browser version on Base44 (no server)
 
-`web/` is a second way to run OPuhRohCum: OpenRocket runs inside each person's browser
+`web/` is a second way to run Rocket in Cloud: OpenRocket runs inside each person's browser
 ([CheerpJ](https://cheerpj.com), Java in WebAssembly), and [Base44](https://base44.com) hosts
 everything else for free: the website, Google sign-in, the design list and sharing, custom motors,
 and live sharing. Nothing runs on your own computer or server.

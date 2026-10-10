@@ -1,4 +1,4 @@
-// OPuhRohCum front door, hosted on Base44: sign in with Google here, then go on to the OpenRocket
+// Rocket in Cloud front door, hosted on Base44: sign in with Google here, then go on to the OpenRocket
 // server with a one-time pass from the `launch` function.
 import { createClient, getAccessToken } from '@base44/sdk';
 import './style.css';
@@ -18,12 +18,12 @@ const ROCKET = '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-
 const CHECK = '<path d="M20 6 9 17l-5-5"/>';
 
 const ERRORS = {
-  not_allowed: 'This Google account is not allowed to use OPuhRohCum. Ask the administrator to add it.',
+  not_allowed: 'This Google account is not allowed to use Rocket in Cloud. Ask the administrator to add it.',
   signin_expired: 'The sign-in link expired. Please try again.',
   signin_failed: 'Sign-in failed. Please try again.',
-  offline: 'OPuhRohCum is offline right now: the computer that runs OpenRocket is switched off or asleep. Please try again later.',
-  not_configured: 'OPuhRohCum is not set up yet (the shared secret is missing).',
-  failed: 'Something went wrong while opening OPuhRohCum. Please try again.',
+  offline: 'Rocket in Cloud is offline right now: the computer that runs OpenRocket is switched off or asleep. Please try again later.',
+  not_configured: 'Rocket in Cloud is not set up yet (the shared secret is missing).',
+  failed: 'Something went wrong while opening Rocket in Cloud. Please try again.',
 };
 
 const params = new URLSearchParams(location.search);
@@ -48,7 +48,7 @@ function returnUrl() {
 async function launch() {
   $('#open').disabled = true;
   notice('');
-  status('Opening OPuhRohCum…');
+  status('Opening Rocket in Cloud…');
   try {
     const { data } = await base44.functions.invoke('launch', { next });
     if (data?.url) return location.replace(data.url);

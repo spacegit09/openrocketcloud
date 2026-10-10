@@ -1,4 +1,4 @@
-# OPuhRohCum: the real OpenRocket in the browser, with live sharing.
+# Rocket in Cloud: the real OpenRocket in the browser, with live sharing.
 #   Install with ready-made images:  docker compose pull && docker compose up -d
 #   Build from source instead:       docker compose up -d --build
 # Settings live in .env (see .env.example).

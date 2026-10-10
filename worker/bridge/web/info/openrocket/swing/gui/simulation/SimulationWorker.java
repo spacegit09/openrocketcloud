@@ -124,7 +124,7 @@ public abstract class SimulationWorker extends SwingWorker<FlightData, Simulatio
 	 * @author Sampo Niskanen <sampo.niskanen@iki.fi>
 	 */
 	private class CancelListener extends AbstractSimulationListener {
-		// OPuhRohCum (browser build): under CheerpJ all Java threads share one browser thread and a busy
+		// Rocket in Cloud (browser build): under CheerpJ all Java threads share one browser thread and a busy
 		// thread is not interrupted, so a running simulation would freeze the window until it ends.
 		// Pausing for 1 ms every 30 ms lets the window respond; the simulation itself is unchanged.
 		private long sliceStart = System.currentTimeMillis();
