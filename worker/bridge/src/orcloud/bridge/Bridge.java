@@ -31,6 +31,8 @@ import info.openrocket.core.appearance.DecalImage;
 import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.document.Simulation;
 import info.openrocket.core.rocketcomponent.ComponentChangeEvent;
+import info.openrocket.core.rocketcomponent.FlightConfigurableComponent;
+import info.openrocket.core.rocketcomponent.Rocket;
 import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.simulation.FlightData;
 import info.openrocket.core.util.ModID;
@@ -398,18 +400,37 @@ final class Bridge implements Link.Handler {
 			undoRestoredStamp = st != null ? st : stamp;
 			dirtyAll = true;
 		} else if (e.getSource() instanceof RocketComponent) {
-			RocketComponent c = (RocketComponent) e.getSource();
-			dirtyIds.add(c.getID().toString());
-			if (e.isTreeChange()) {
-				for (Iterator<RocketComponent> it = c.iterator(false); it.hasNext();) {
-					dirtyIds.add(it.next().getID().toString());
-				}
-			}
+			dirtyIds.addAll(changedIds(e));
 		} else {
 			dirtyAll = true;
 		}
 		scanUndoHistory();
 		localChange();
+	}
+
+	/**
+	 * Components whose saved form a change event (from a rocket component) may have changed.
+	 * The Motors & Configuration tab (motors, recovery deployment, stage separation) changes
+	 * mounts, recovery devices and stages but reports it on the rocket, so an event from the
+	 * rocket covers every component with per-configuration settings.
+	 */
+	static Set<String> changedIds(ComponentChangeEvent e) {
+		RocketComponent c = (RocketComponent) e.getSource();
+		Set<String> ids = new HashSet<>();
+		ids.add(c.getID().toString());
+		if (e.isTreeChange()) {
+			for (Iterator<RocketComponent> it = c.iterator(false); it.hasNext();) {
+				ids.add(it.next().getID().toString());
+			}
+		}
+		if (c instanceof Rocket) {
+			for (RocketComponent x : c) {
+				if (x instanceof FlightConfigurableComponent) {
+					ids.add(x.getID().toString());
+				}
+			}
+		}
+		return ids;
 	}
 
 	private void localChange() {
