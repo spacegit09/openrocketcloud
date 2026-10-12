@@ -5,7 +5,7 @@ open a rocket design, and edit it together with your team in real time. Everyone
 OpenRocket 24.12, with the same physics engine, the same windows and dialogs, and the same results.
 The only addition is that everyone's edits appear in everyone else's OpenRocket within a moment.
 
-**Live:** <https://rocketincloud.base44.app> · **About the code:**
+**Live:** <https://rocketincloud.com> · **About the code:**
 <https://spacegit09.github.io/openrocketcloud/>
 
 There are two ways to run it:
