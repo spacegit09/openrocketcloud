@@ -1,6 +1,6 @@
 # Rocket in Cloud
 
-The real [OpenRocket](https://openrocket.info) with **live sharing**: sign in with a Google account,
+The real [OpenRocket](https://openrocket.info) with **live sharing and account sync**: sign in with a Google account,
 open a rocket design, and edit it together with your team in real time. Everyone runs the genuine
 OpenRocket 24.12, with the same physics engine, the same windows and dialogs, and the same results.
 The only addition is that everyone's edits appear in everyone else's OpenRocket within a moment.
