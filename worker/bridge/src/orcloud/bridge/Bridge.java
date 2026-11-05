@@ -485,7 +485,9 @@ final class Bridge implements Link.Handler {
 			FlightData d = s.getSimulatedData();
 			if (d != null && d.getBranchCount() > 0) {
 				current.add(d);
-				needFull |= !flightData.containsKey(d);
+				// Results that came from the shared copy are never published (see below): no need to
+				// serialise them, which takes seconds per design when OpenRocket runs in a browser.
+				needFull |= !flightData.containsKey(d) && !foreignResults.contains(d);
 			}
 		}
 		flightData.keySet().retainAll(current);
@@ -588,6 +590,7 @@ final class Bridge implements Link.Handler {
 		dirtyAll = false;
 		dirtyIds.clear();
 		undoRestoredStamp = null;
+		quietTicks = 0; // the periodic snapshot is only needed after quiet periods
 		Model snap;
 		try {
 			snap = snapshot();
