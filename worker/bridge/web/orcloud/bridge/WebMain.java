@@ -9,6 +9,9 @@ import java.util.prefs.Preferences;
 
 import javax.swing.SwingUtilities;
 
+import info.openrocket.core.arch.SystemInfo;
+import info.openrocket.core.database.ComponentPresetDatabaseLoader;
+import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.Warmup;
 
@@ -54,6 +57,8 @@ public final class WebMain {
 				}
 			}
 			BrowserLink.ready();
+			// The component preset database waited for the window (see our copy of its loader).
+			ComponentPresetDatabaseLoader.loadNow();
 		});
 	}
 
@@ -61,6 +66,15 @@ public final class WebMain {
 		Preferences openrocket = Preferences.userRoot().node("OpenRocket");
 		// Save As and exports go straight to the user's downloads.
 		openrocket.put("defaultDirectory", DOWNLOADS.toString());
+		// The user's own component presets: OpenRocket's default folder, named explicitly. Left
+		// unset, OpenRocket checks that folder with File.canRead(), which under CheerpJ can wrongly
+		// fail off the UI thread, where the preset database now loads after start-up (see our copy
+		// of its loader); the load then stops with a NullPointerException.
+		File presets = new File(SystemInfo.getUserApplicationDirectory(), "Components");
+		Files.createDirectories(presets.toPath());
+		if (openrocket.get(ApplicationPreferences.USER_COMPONENT_PRESETS_KEY, null) == null) {
+			openrocket.put(ApplicationPreferences.USER_COMPONENT_PRESETS_KEY, presets.getPath());
+		}
 		// Once per browser: "Update flight estimates in design window" (Preferences > Design) off.
 		// Its background simulation makes every edit wait ~2 s under CheerpJ; anyone who turns it
 		// back on keeps that choice.

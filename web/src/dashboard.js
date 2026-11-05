@@ -208,8 +208,8 @@ async function newBlank() {
 }
 
 async function newFromExample() {
-  // OpenRocket's own example designs, read straight out of its jar.
-  const jar = new RemoteZip(JAR);
+  // OpenRocket's own example designs, read straight out of its jar (where each one is: prebuild).
+  const jar = new RemoteZip(JAR, { index: '/or/examples.json' });
   const list = h('div', { class: 'list' }, h('div', { class: 'item sub' }, 'Loading…'));
   const cancel = h('button', {}, 'Cancel');
   const { close } = modal('Start from an OpenRocket example', list, [cancel]);

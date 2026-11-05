@@ -4,7 +4,7 @@ import './style.css';
 import { currentUser, db, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
-import { startOpenRocket } from './java.js';
+import { prepareJava, startOpenRocket } from './java.js';
 import { exportOrk, fileName, saveFile } from './lib/ork.js';
 import { fromJson } from '../../server/src/model.js';
 
@@ -158,14 +158,13 @@ function connectionId() {
 async function main() {
   renderState();
   if (!designId) return ended('Design not found', 'The link is incomplete.');
+  // Fetch and start the Java runtime while the sign-in, the design and its room are looked up.
+  prepareJava(designId).catch(() => {}); // a failure is reported when OpenRocket starts
   const hub = testHub();
   me = hub ? { id: `local:${hub.user}`, email: hub.user, name: hub.name ?? hub.user } : await currentUser();
   if (!me) return signIn();
-  if (!hub) {
-    const design = await db.Design.get(designId).catch(() => null);
-    if (!design) return ended('Design not found', 'It may have been deleted, or it is not shared with you.');
-    setName(design.name);
-  }
+  // The design is looked up while its room connects and OpenRocket starts.
+  const found = hub ? null : db.Design.get(designId).catch(() => null);
 
   room = new RoomClient(designId, { connectionId: connectionId() }).connect();
   let started = false;
@@ -178,20 +177,10 @@ async function main() {
     if (started) return;
     started = true;
     if (hi.empty) return ended('This design is empty', 'It was not set up completely. Create it again from the dashboard.');
-    state = 'loading';
-    renderState();
-    startOpenRocket({
-      designId,
-      screen,
-      room,
-      onReady: () => {
-        state = 'ready';
-        renderState();
-      },
-      onExit: () => {
-        if (state !== 'ended') ended('OpenRocket closed', 'Your work is saved.');
-      },
-    }).catch((e) => ended('OpenRocket could not start', e.message));
+    if (state === 'connecting') {
+      state = 'loading';
+      renderState();
+    }
   });
   room.on('closed', () => {
     if (state === 'ready') setStatus('Reconnecting', 'wait');
@@ -203,6 +192,27 @@ async function main() {
   room.on('activity', showActivity);
   room.on('notice', (m) => toast(m.message));
   room.on('kick', (m) => ended('The design was closed', m.message));
+
+  // OpenRocket starts now rather than when the room answers: its Java start-up is the longer
+  // wait, and its bridge waits for the room by itself.
+  startOpenRocket({
+    designId,
+    screen,
+    room,
+    onReady: () => {
+      if (state === 'ended') return;
+      state = 'ready';
+      renderState();
+    },
+    onExit: () => {
+      if (state !== 'ended') ended('OpenRocket closed', 'Your work is saved.');
+    },
+  }).catch((e) => ended('OpenRocket could not start', e.message));
+  if (found) {
+    const design = await found;
+    if (!design) return ended('Design not found', 'It may have been deleted, or it is not shared with you.');
+    setName(design.name);
+  }
   setTimeout(() => {
     if (state === 'connecting') {
       showOverlay([

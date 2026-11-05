@@ -1,8 +1,9 @@
 // Copies the code shared with the Node server into the DesignRoom actor (Base44 deploys only the
-// files inside an actor's folder) and the blank-design template into the site, and checks that the
-// Java side (scripts/build-web-jars.sh) has been built.
+// files inside an actor's folder) and the blank-design template into the site, checks that the
+// Java side (scripts/build-web-jars.sh) has been built, and indexes OpenRocket's examples in it.
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { centralEntries, zipDirectory } from '../src/lib/zip.js';
 
 const web = join(import.meta.dirname, '..');
 const server = join(web, '..', 'server');
@@ -20,4 +21,11 @@ for (const f of ['OpenRocket-web.jar', 'orcloud-web.jar', 'preload.json']) {
     process.exit(1);
   }
 }
+// Where OpenRocket's example designs sit in its jar, so the dashboard's "From an example" reads
+// just the one chosen instead of the jar's whole directory (2 MB).
+const jar = readFileSync(join(web, 'public', 'or', 'OpenRocket-web.jar'));
+const dir = zipDirectory(jar);
+const examples = centralEntries(jar.subarray(dir.offset, dir.offset + dir.size), dir.count)
+  .filter((e) => e.name.startsWith('datafiles/examples/') && e.name.endsWith('.ork'));
+writeFileSync(join(web, 'public', 'or', 'examples.json'), JSON.stringify(examples));
 console.log('prebuild: shared code and templates copied');

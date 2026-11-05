@@ -156,8 +156,14 @@ export async function readZip(bytes, { maxTotal = 300 * 1024 * 1024 } = {}) {
  * entries asked for are downloaded). Used to take OpenRocket's example designs out of its jar.
  */
 export class RemoteZip {
-  constructor(url) {
+  /**
+   * `index`: optional URL of a list of some of the archive's entries, as centralEntries() gives
+   * them (scripts/prebuild.mjs writes one for OpenRocket's examples), which saves reading the
+   * archive's whole directory first.
+   */
+  constructor(url, { index = null } = {}) {
     this.url = url;
+    this.index = index;
     this.entries = null;
   }
 
@@ -170,6 +176,10 @@ export class RemoteZip {
 
   async list() {
     if (this.entries) return this.entries;
+    if (this.index) {
+      const res = await fetch(this.index).catch(() => null);
+      if (res?.ok) return (this.entries = await res.json());
+    }
     const head = await fetch(this.url, { method: 'HEAD' });
     const total = Number(head.headers.get('content-length'));
     const tailStart = Math.max(0, total - 65557);
@@ -181,6 +191,18 @@ export class RemoteZip {
   }
 
   async read(name) {
+    try {
+      return await this.readListed(name);
+    } catch (err) {
+      if (!this.index) throw err;
+      // The index may come from another build of the archive: use its real directory instead.
+      this.index = null;
+      this.entries = null;
+      return this.readListed(name);
+    }
+  }
+
+  async readListed(name) {
     const e = (await this.list()).find((x) => x.name === name);
     if (!e) throw new Error(`${name} not found`);
     const bytes = await this.range(e.local, e.local + 30 + 1024 + e.compSize);
