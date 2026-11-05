@@ -4,6 +4,7 @@ import java.awt.Frame;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.prefs.Preferences;
 
@@ -11,8 +12,11 @@ import javax.swing.SwingUtilities;
 
 import info.openrocket.core.arch.SystemInfo;
 import info.openrocket.core.database.ComponentPresetDatabaseLoader;
+import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.preferences.ApplicationPreferences;
+import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.web.StlImport;
 import orcloud.web.Warmup;
 
 /**
@@ -59,6 +63,17 @@ public final class WebMain {
 			BrowserLink.ready();
 			// The component preset database waited for the window (see our copy of its loader).
 			ComponentPresetDatabaseLoader.loadNow();
+			// Tools > Import 3D model (STL), our addition to OpenRocket's menus.
+			try {
+				BasicFrame frame = OrDoc.findFrame(f);
+				OpenRocketDocument doc = OrDoc.documentOf(frame);
+				StlImport.install(frame, doc, () -> {
+					List<String> ids = OrDoc.selectedIds(frame);
+					return ids.isEmpty() ? null : OrDoc.findComponent(doc, ids.get(0));
+				});
+			} catch (Exception e) {
+				Log.warn("3D model import unavailable: " + e);
+			}
 		});
 	}
 

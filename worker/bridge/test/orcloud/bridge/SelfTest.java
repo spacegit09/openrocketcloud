@@ -2,6 +2,9 @@ package orcloud.bridge;
 
 import java.io.File;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -16,13 +19,19 @@ import java.util.jar.JarFile;
 
 import javax.swing.SwingUtilities;
 
+import info.openrocket.core.aerodynamics.BarrowmanCalculator;
+import info.openrocket.core.aerodynamics.FlightConditions;
 import info.openrocket.core.document.OpenRocketDocument;
+import info.openrocket.core.document.Simulation;
 import info.openrocket.core.file.GeneralRocketLoader;
+import info.openrocket.core.logging.WarningSet;
+import info.openrocket.core.masscalc.MassCalculator;
 import info.openrocket.core.motor.Motor;
 import info.openrocket.core.motor.MotorConfiguration;
 import info.openrocket.core.rocketcomponent.BodyTube;
 import info.openrocket.core.rocketcomponent.ComponentChangeEvent;
 import info.openrocket.core.rocketcomponent.DeploymentConfiguration;
+import info.openrocket.core.rocketcomponent.FlightConfiguration;
 import info.openrocket.core.rocketcomponent.FlightConfigurationId;
 import info.openrocket.core.rocketcomponent.MassComponent;
 import info.openrocket.core.rocketcomponent.MotorMount;
@@ -31,7 +40,10 @@ import info.openrocket.core.rocketcomponent.RecoveryDevice;
 import info.openrocket.core.rocketcomponent.Rocket;
 import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.rocketcomponent.SymmetricComponent;
+import info.openrocket.core.util.Coordinate;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.stl.StlModel;
+import orcloud.stl.StlPart;
 
 /**
  * Checks the live-share model against real OpenRocket using the bundled example designs:
@@ -59,6 +71,13 @@ public final class SelfTest {
 					System.out.println("ERROR " + p.getFileName() + ": " + t);
 					t.printStackTrace(System.out);
 				}
+			}
+			try {
+				stlChecks(examples);
+			} catch (Throwable t) {
+				failures++;
+				System.out.println("ERROR STL import: " + t);
+				t.printStackTrace(System.out);
 			}
 		});
 		System.out.println((failures == 0 ? "SELFTEST PASS" : "SELFTEST FAIL") + " checks=" + checks + " failures=" + failures);
@@ -426,6 +445,168 @@ public final class SelfTest {
 		sent.applyAll(Model.diff(base, edited, scope));
 		check(what, sent, edited);
 		return sent;
+	}
+
+	// =================================================================== STL import (orcloud.stl)
+
+	private static void stlChecks(List<Path> examples) throws Exception {
+		System.out.println("STL import");
+		// A 10 x 20 x 30 box, binary and ASCII, the right way out and inside out, closed and open.
+		List<float[]> box = box(5, -10, 0, 10, 20, 30);
+		StlModel b = StlModel.read(binaryStl(box));
+		check("box volume, area and centroids", near(b.volume, 6000, 1e-9) && near(b.area, 2200, 1e-9) && b.closed
+				&& near(b.volumeCentroid[0], 10, 1e-9) && near(b.volumeCentroid[1], 0, 1e-9) && near(b.volumeCentroid[2], 15, 1e-9)
+				&& near(b.areaCentroid[2], 15, 1e-9));
+		StlModel ascii = StlModel.read(asciiStl(box).getBytes(StandardCharsets.US_ASCII));
+		check("ASCII STL reads like binary", near(ascii.volume, b.volume, 1e-6) && near(ascii.area, b.area, 1e-6) && ascii.closed);
+		List<float[]> inverted = new ArrayList<>();
+		for (float[] t : box) {
+			inverted.add(new float[] { t[0], t[1], t[2], t[6], t[7], t[8], t[3], t[4], t[5] });
+		}
+		StlModel inv = StlModel.read(binaryStl(inverted));
+		check("inside-out mesh gives the same volume and centroid", near(inv.volume, 6000, 1e-9) && near(inv.volumeCentroid[2], 15, 1e-9));
+		StlModel open = StlModel.read(binaryStl(box.subList(2, box.size())));
+		check("a mesh with a hole is not a closed solid", !open.closed);
+
+		// A cone (radius 20, length 100, tip at +z) and parts made from it.
+		List<float[]> cone = cone(20, 100, 256);
+		StlModel c = StlModel.read(binaryStl(cone));
+		// The 256-sided cone's exact volume: base polygon area x height / 3.
+		double exactVolume = 256 * 0.5 * 400 * Math.sin(2 * Math.PI / 256) * 100 / 3;
+		check("cone volume and centroid", near(c.volume, exactVolume, 1e-5) && near(c.volumeCentroid[2], 25, 1e-5) && c.closed);
+		StlPart part = new StlPart(c);
+		check("cone: axis and nose end guessed", part.axis == 2 && part.frontAtMax);
+		part.fill = StlPart.Fill.SOLID;
+		check("solid mass and centre of gravity", near(part.mass(), 1240 * exactVolume * 1e-9, 1e-5) && near(part.cgFromFront(), 0.075, 1e-5)
+				&& near(part.length(), 0.1, 1e-6) && near(part.radius(), 0.02, 1e-3));
+		double solid = part.mass();
+		part.fill = StlPart.Fill.PRINTED;
+		double printed = part.mass();
+		part.fill = StlPart.Fill.SHELL;
+		double shell = part.mass();
+		check("printed mass lies between shell and solid", shell < printed && printed < solid);
+		part.fill = StlPart.Fill.PRINTED;
+		part.copies = 3;
+		check("copies multiply the mass", near(part.mass(), 3 * printed, 1e-12));
+		part.copies = 1;
+		part.knownMass = 0.042;
+		check("a known mass is used as given", near(part.mass(), 0.042, 1e-12));
+		part.knownMass = Double.NaN;
+		check("an open mesh asks for a shell or a known mass", !new StlPart(open).problems().isEmpty());
+
+		// Into a real design: aerodynamics unchanged, mass added exactly, saved and loaded like any design.
+		Path p = examples.stream().filter(x -> x.getFileName().toString().startsWith("A simple model rocket")).findFirst().orElse(examples.get(0));
+		OpenRocketDocument d = new GeneralRocketLoader(p.toFile()).load();
+		FlightConfiguration conf = d.getRocket().getSelectedConfiguration();
+		FlightConditions fc = new FlightConditions(conf);
+		fc.setMach(0.3);
+		Coordinate cp0 = new BarrowmanCalculator().getCP(conf, fc, new WarningSet());
+		double cd0 = new BarrowmanCalculator().getAerodynamicForces(conf, fc, new WarningSet()).getCD();
+		double mass0 = MassCalculator.calculateLaunch(conf).getMass();
+		BodyTube tube = null;
+		NoseCone nose = null;
+		RocketComponent chute = null;
+		for (RocketComponent x : d.getRocket()) {
+			if (x instanceof BodyTube && tube == null) {
+				tube = (BodyTube) x;
+			} else if (x instanceof NoseCone && nose == null) {
+				nose = (NoseCone) x;
+			} else if (StlPart.isRecoveryItem(x) && chute == null) {
+				chute = x;
+			}
+		}
+		MassComponent added = part.addTo(tube, "Printed sled", 0.05);
+		check("new mass component adds exactly the model's mass", near(MassCalculator.calculateLaunch(conf).getMass(), mass0 + part.mass(), 1e-9));
+		check("aerodynamics unchanged by a mass component", new BarrowmanCalculator().getCP(conf, fc, new WarningSet()).equals(cp0)
+				&& new BarrowmanCalculator().getAerodynamicForces(conf, fc, new WarningSet()).getCD() == cd0);
+		check("off-centre centre of gravity recorded", added.isCGOverridden() && near(added.getOverrideCGX(), part.cgFromFront(), 1e-12));
+		part.applyTo(nose, true);
+		check("nose cone takes the model's mass and centre of gravity", nose.isMassOverridden() && near(nose.getOverrideMass(), part.mass(), 1e-12)
+				&& nose.isCGOverridden() && near(nose.getOverrideCGX(), part.cgFromFront(), 1e-12));
+		check("aerodynamics unchanged by a mass override", new BarrowmanCalculator().getCP(conf, fc, new WarningSet()).equals(cp0));
+		check("parachutes, streamers and shock cords are refused", chute != null && !StlPart.canSetMassOf(chute)
+				&& StlPart.massParentFor(chute) == chute.getParent());
+		OpenRocketDocument again = OrDoc.load(OrDoc.save(d, false));
+		MassComponent reloaded = null;
+		NoseCone reloadedNose = null;
+		for (RocketComponent x : again.getRocket()) {
+			if (x instanceof MassComponent && x.getName().equals("Printed sled")) {
+				reloaded = (MassComponent) x;
+			} else if (x instanceof NoseCone && reloadedNose == null) {
+				reloadedNose = (NoseCone) x;
+			}
+		}
+		check("saved and loaded like any design", reloaded != null && near(reloaded.getComponentMass(), added.getComponentMass(), 1e-9)
+				&& near(reloaded.getLength(), added.getLength(), 1e-9) && near(reloaded.getOverrideCGX(), added.getOverrideCGX(), 1e-9)
+				&& reloadedNose != null && near(reloadedNose.getOverrideMass(), nose.getOverrideMass(), 1e-9));
+		Simulation sim = d.getSimulations().get(0);
+		sim.simulate();
+		check("simulation runs with the imported part", sim.getSimulatedData() != null && sim.getSimulatedData().getMaxAltitude() > 0);
+	}
+
+	private static boolean near(double a, double b, double rel) {
+		return Math.abs(a - b) <= rel * Math.max(1, Math.max(Math.abs(a), Math.abs(b)));
+	}
+
+	/** Triangles of an axis-aligned box with outward normals. */
+	private static List<float[]> box(float x, float y, float z, float w, float h, float d) {
+		float[][] p = new float[8][];
+		for (int i = 0; i < 8; i++) {
+			p[i] = new float[] { x + ((i & 1) != 0 ? w : 0), y + ((i & 2) != 0 ? h : 0), z + ((i & 4) != 0 ? d : 0) };
+		}
+		int[][] faces = { { 0, 2, 3, 1 }, { 4, 5, 7, 6 }, { 0, 1, 5, 4 }, { 2, 6, 7, 3 }, { 0, 4, 6, 2 }, { 1, 3, 7, 5 } };
+		List<float[]> out = new ArrayList<>();
+		for (int[] f : faces) {
+			out.add(tri(p[f[0]], p[f[1]], p[f[2]]));
+			out.add(tri(p[f[0]], p[f[2]], p[f[3]]));
+		}
+		return out;
+	}
+
+	/** A closed cone along +z: base (radius r, n sides) at z = 0, tip at z = length. */
+	private static List<float[]> cone(float r, float length, int n) {
+		List<float[]> out = new ArrayList<>();
+		float[] tip = { 0, 0, length };
+		float[] centre = { 0, 0, 0 };
+		for (int i = 0; i < n; i++) {
+			double a0 = 2 * Math.PI * i / n;
+			double a1 = 2 * Math.PI * (i + 1) / n;
+			float[] p0 = { (float) (r * Math.cos(a0)), (float) (r * Math.sin(a0)), 0 };
+			float[] p1 = { (float) (r * Math.cos(a1)), (float) (r * Math.sin(a1)), 0 };
+			out.add(tri(p0, p1, tip));
+			out.add(tri(centre, p1, p0));
+		}
+		return out;
+	}
+
+	private static float[] tri(float[] a, float[] b, float[] c) {
+		return new float[] { a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2] };
+	}
+
+	private static byte[] binaryStl(List<float[]> tris) {
+		ByteBuffer buf = ByteBuffer.allocate(84 + 50 * tris.size()).order(ByteOrder.LITTLE_ENDIAN);
+		buf.position(80);
+		buf.putInt(tris.size());
+		for (float[] t : tris) {
+			buf.putFloat(0).putFloat(0).putFloat(0);
+			for (float v : t) {
+				buf.putFloat(v);
+			}
+			buf.putShort((short) 0);
+		}
+		return buf.array();
+	}
+
+	private static String asciiStl(List<float[]> tris) {
+		StringBuilder sb = new StringBuilder("solid test\n");
+		for (float[] t : tris) {
+			sb.append("  facet normal 0 0 0\n    outer loop\n");
+			for (int i = 0; i < 9; i += 3) {
+				sb.append("      vertex ").append(t[i]).append(' ').append(t[i + 1]).append(' ').append(t[i + 2]).append('\n');
+			}
+			sb.append("    endloop\n  endfacet\n");
+		}
+		return sb.append("endsolid test\n").toString();
 	}
 
 	@SuppressWarnings("unchecked")

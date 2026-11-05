@@ -214,6 +214,13 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
   the custom motors of all its members, so collaborators always see the same motors. Reopen
   OpenRocket to load motors added while it's open.
+- **3D models** (browser version): *Tools → Import 3D model (STL)…* turns a 3D-printed part into
+  mass and balance. An STL file is only a surface, so you tell it the file's units, which axis runs
+  along the rocket and which end faces the nose, the material, and how it was made (printed walls
+  and infill, solid, or a hollow shell; or enter a known mass). It becomes a new mass component, or
+  the mass and centre of gravity of the selected component (not parachutes, streamers or shock
+  cords). Aerodynamics still come from OpenRocket's own shapes: converting a mesh into them gave
+  drag errors of up to 21% that a finer mesh does not reduce.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
 - **Who's here**: avatars show who has the design open and which part each person has selected.
@@ -260,9 +267,9 @@ preferences such as units, which are remembered for you across sessions.
 ```
 worker/            OpenRocket session image
   Dockerfile       downloads the official jar, builds the bridge
-  bridge/src/      live-share bridge (Java 17, no dependencies besides OpenRocket)
-  bridge/web/      browser start-up and CheerpJ fixes (BrowserLink, WebMain, plugin list, ...)
-  bridge/test/     SelfTest: checks the sync model against real OpenRocket on all example designs
+  bridge/src/      live-share bridge (Java 17, no dependencies besides OpenRocket); STL reading
+  bridge/web/      browser start-up, CheerpJ fixes and the STL import dialog (BrowserLink, WebMain, ...)
+  bridge/test/     SelfTest: checks the sync model and STL import against real OpenRocket
   rootfs/          session entrypoint (Xvnc + openbox + OpenRocket), window manager config
 web/               browser version (Base44 project)
   base44/          DesignRoom actor (room.js), Design and Motor records, sign-in settings
