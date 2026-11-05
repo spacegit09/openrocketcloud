@@ -203,6 +203,10 @@
           <p>In the browser every Java thread shares one thread, and CheerpJ never switches away from a busy one. Chrome's profiler showed that OpenRocket's background flight-estimate simulation, re-run after every change, held the window for 2–3 seconds per edit. With that preference off by default (it is OpenRocket's own setting), an edit takes about 0.4 seconds; long-running simulations also pause briefly so clicks get through.</p>
         </details>
         <details>
+          <summary>Opening a design sooner</summary>
+          <p><code>web/test/perf.mjs</code> opens a design in headless Chrome and times each step. OpenRocket's own start-up took about 16 of the 21 seconds, and loading its catalogue of commercial parts (component presets) in the background took a third of that, competing with the start-up for the one thread. The catalogue now loads as soon as the window is up, or at once if a dialog needs it sooner, and a design opens in about 16 seconds. The page also downloads and starts the Java runtime while it checks the sign-in and connects to the room, and <em>From an example</em> reads just the chosen example out of the jar, found through a small index made at build time, instead of first reading the jar's 2 MB table of contents.</p>
+        </details>
+        <details>
           <summary>Real-time rooms on a key-value store</summary>
           <p>Each design room stores the design in 64 hashed buckets, each split into values under 96 KB, so an edit rewrites only what it touched. Messages over 400 KB (simulation results, decal images) travel in fragments, and the room handles events strictly one at a time so two edits never interleave. Locally, the same room code runs behind a plain WebSocket server for tests.</p>
         </details>

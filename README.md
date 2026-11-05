@@ -93,7 +93,8 @@ base44 deploy --build --yes                   # site, actor, records, Google sig
 ```
 
 Tests: `npm test` (the room and `.ork` handling) and `node test/e2e.mjs` (two headless Chrome
-windows running the real OpenRocket against a local stand-in for the actor).
+windows running the real OpenRocket against a local stand-in for the actor). `node test/perf.mjs`
+times how long a design takes to open, what it downloads, and how long an edit takes to arrive.
 
 ## Installing the self-hosted version
 

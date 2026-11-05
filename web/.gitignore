@@ -11,5 +11,6 @@ dist
 base44/actors/DesignRoom/lib/
 public/templates/
 public/or/*.jar
+public/or/examples.json
 test/out/
 test/live/actor-check.js
