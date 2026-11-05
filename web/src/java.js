@@ -1,6 +1,9 @@
 // Runs the official OpenRocket in this page with CheerpJ (Java in the browser) and connects its
 // live-share bridge (orcloud.bridge.BrowserLink in worker/bridge/web) to the design's room.
+import { h, modal } from './common.js';
+
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
+const MAX_MODEL_BYTES = 100 * 1024 * 1024;
 
 function loadScript(src) {
   return new Promise((resolve, reject) => {
@@ -12,6 +15,36 @@ function loadScript(src) {
     document.head.append(s);
   });
 }
+
+/**
+ * Lets the person choose an STL file for OpenRocket's "Import 3D model" (orcloud.web.StlImport)
+ * and hands it to Java as a file under /str/. Resolves to the file, or null if none was chosen.
+ */
+function pickModelFile() {
+  return new Promise((resolve) => {
+    const input = h('input', { type: 'file', accept: '.stl,model/stl' });
+    input.addEventListener('change', () => resolve(input.files[0] ?? null), { once: true });
+    input.addEventListener('cancel', () => resolve(null), { once: true });
+    try {
+      input.showPicker(); // allowed right after the click on the dialog's Choose button
+    } catch {
+      // Browsers open file choosers only right after a click: ask for one.
+      const choose = h('button', { class: 'primary' }, 'Choose file…');
+      const cancel = h('button', {}, 'Cancel');
+      const { dialog, close } = modal('Import 3D model (STL)', h('p', { style: 'margin:0' }, 'Choose the STL file to import.'), [cancel, choose]);
+      let choosing = false;
+      choose.onclick = () => {
+        choosing = true;
+        close();
+        input.click();
+      };
+      cancel.onclick = close;
+      dialog.addEventListener('close', () => choosing || resolve(null));
+    }
+  });
+}
+
+let modelFiles = 0;
 
 // The bridge's side of the page: events for BrowserLink.jsReceive ("o" connected, "c" + reason
 // disconnected, "m" + JSON a message from the room) and the room and callbacks of startOpenRocket.
@@ -71,6 +104,14 @@ export function prepareJava(designId) {
         async Java_orcloud_bridge_BrowserLink_jsClose() {},
         async Java_orcloud_bridge_BrowserLink_jsReady() {
           link.onReady?.();
+        },
+        async Java_orcloud_web_StlImport_jsPickStl() {
+          const file = await pickModelFile();
+          if (!file) return null;
+          if (file.size > MAX_MODEL_BYTES) return `!${file.name} is larger than 100 MB.`;
+          const path = `/str/model-${++modelFiles}.stl`;
+          window.cheerpOSAddStringFile(path, new Uint8Array(await file.arrayBuffer()));
+          return `${path}\n${file.name}`;
         },
       },
     });
