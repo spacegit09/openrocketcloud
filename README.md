@@ -222,7 +222,8 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   Preferences*. Left out are the options that conflict with the browser version (thrust-curve
   and component-preset folders, update checks, opening the last design file, importing,
   exporting or resetting all preferences, an external decal editor and OpenGL) or slow it down
-  (the two above); those stay off.
+  (the two above); those stay off. Rocket dimensions are shown in millimetres by default
+  (OpenRocket's own default is centimetres; *Default metric* gives millimetres too).
 - **3D view** (browser version): *View Type → 3D Figure, 3D Unfinished or 3D Finished* under the
   rocket figure. Drag to turn the rocket, right-drag to move the light, scroll to zoom; click a part
   to select it (shift-click adds to the selection, reaching past parts already selected), and
