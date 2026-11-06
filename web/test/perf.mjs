@@ -149,10 +149,10 @@ try {
   // Edit: add a nose cone (as e2e.mjs) and time it until the room has it. After a pause: in the
   // first seconds OpenRocket is still loading its component presets, which adding a part waits for.
   await sleep(20_000);
-  await page.mouse.click(83, 149); // the stage in OpenRocket's component tree
+  await page.mouse.click(83, 129); // the stage in OpenRocket's component tree
   await sleep(1500);
   const tClick = Date.now();
-  await page.mouse.click(520, 292); // "Nose Cone"
+  await page.mouse.click(520, 272); // "Nose Cone"
   let put = null;
   while (!put && Date.now() - tClick < 30_000) {
     put = seen.find((s) => s.m.ops.some((op) => op.op === 'put' && op.t === 'nosecone'));

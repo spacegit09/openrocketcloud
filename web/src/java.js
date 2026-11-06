@@ -2,6 +2,7 @@
 // live-share bridge (orcloud.bridge.BrowserLink in worker/bridge/web) to the design's room.
 import { h, modal } from './common.js';
 import { view3dNatives } from './view3d.js';
+import { markFileWindow } from './cj-windows.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
@@ -51,6 +52,24 @@ let modelFiles = 0;
 // disconnected, "m" + JSON a message from the room) and the room and callbacks of startOpenRocket.
 const link = { events: [], waiting: null, room: null, onReady: null };
 
+// Edits OpenRocket sent (their "seq") that the room has not confirmed yet: it confirms each batch
+// with an "ack", or by passing it on to everyone, the sender included.
+const unconfirmed = new Set();
+
+/** Asks OpenRocket to send its last edits and close (the page's Close button). */
+export function closeOpenRocket() {
+  toJava('x');
+}
+
+/** Resolves once the room has confirmed every edit OpenRocket sent, or after `timeoutMs`. */
+export function editsSaved(timeoutMs = 5000) {
+  const end = Date.now() + timeoutMs;
+  return new Promise((resolve) => {
+    const check = () => (!unconfirmed.size || Date.now() > end ? resolve(!unconfirmed.size) : setTimeout(check, 100));
+    check();
+  });
+}
+
 function toJava(event) {
   if (link.waiting) {
     const w = link.waiting;
@@ -93,6 +112,13 @@ export function prepareJava(designId) {
         Java_java_lang_reflect_Executable_getTypeAnnotationBytes0: noTypeAnnotations,
         Java_java_lang_Class_getRawTypeAnnotations: noTypeAnnotations,
         async Java_orcloud_bridge_BrowserLink_jsSend(lib, json) {
+          if (json.startsWith('{"type":"ops"')) {
+            try {
+              unconfirmed.add(JSON.parse(json).seq);
+            } catch {
+              // not an edit batch after all
+            }
+          }
           link.room.send(json);
         },
         async Java_orcloud_bridge_BrowserLink_jsReceive() {
@@ -112,6 +138,9 @@ export function prepareJava(designId) {
           const path = `/str/model-${++modelFiles}.stl`;
           window.cheerpOSAddStringFile(path, new Uint8Array(await file.arrayBuffer()));
           return `${path}\n${file.name}`;
+        },
+        async Java_orcloud_web_FileWindows_jsFileWindow(lib, x, y, w, h) {
+          markFileWindow(x, y, w, h);
         },
         ...view3dNatives,
       },
@@ -133,6 +162,8 @@ export async function startOpenRocket({ designId, screen, room, onReady, onExit 
   for (const type of ['welcome', 'ops', 'ack', 'kick', 'error']) {
     room.on(type, (msg, text) => toJava(`m${text ?? JSON.stringify(msg)}`));
   }
+  room.on('ack', (msg) => unconfirmed.delete(msg.seq));
+  room.on('ops', (msg) => msg.from === room.connectionId && unconfirmed.delete(msg.seq));
   room.on('open', () => toJava('o'));
   room.on('closed', (m) => toJava(`c${m.reason ?? ''}`));
   if (room.open) toJava('o');

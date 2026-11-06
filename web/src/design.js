@@ -4,7 +4,7 @@ import './style.css';
 import { currentUser, db, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
-import { prepareJava, startOpenRocket } from './java.js';
+import { closeOpenRocket, editsSaved, prepareJava, startOpenRocket } from './java.js';
 import { exportOrk, fileName, saveFile } from './lib/ork.js';
 import { fromJson } from '../../server/src/model.js';
 
@@ -16,12 +16,14 @@ $('#share-btn').append(icon('share'), 'Share');
 $('#download-btn').append(icon('download'));
 $('#history-btn').append(icon('history'));
 $('#fullscreen-btn').append(icon('maximize'));
+$('#close-btn').append(icon('x'));
 
 let me;
 let room;
 let role = null;
 let name = 'Rocket';
 let state = 'connecting'; // connecting -> loading -> ready | ended
+let closing = false; // the user closed the design; waiting for OpenRocket's last edits
 let members = [];
 const feed = [];
 
@@ -45,6 +47,11 @@ function setStatus(text, kind) {
 
 function renderState() {
   if (state === 'ended') return;
+  if (closing) {
+    showOverlay([h('div', { class: 'spinner' }), h('h2', {}, 'Closing'), h('p', {}, 'Saving your last changes…')]);
+    setStatus('Closing', 'wait');
+    return;
+  }
   if (state === 'ready') {
     $('#overlay').hidden = true;
     setStatus(role === 'viewer' ? 'Viewing' : 'Live', 'live');
@@ -142,6 +149,26 @@ $('#history-btn').onclick = () => editHistoryDialog(room, { canRevert: role !== 
 $('#share-btn').onclick = () => shareDialog(designId, me);
 $('#fullscreen-btn').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
 
+/**
+ * The Close button (and the back arrow): OpenRocket sends its last edits and closes, and once the
+ * room has them the page goes back to the designs (see onExit below).
+ */
+function closeDesign(e) {
+  if (e && (e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) return; // a new tab: leave it to the link
+  e?.preventDefault();
+  if (closing) return;
+  if (state !== 'ready') {
+    location.href = '/';
+    return;
+  }
+  closing = true;
+  renderState();
+  closeOpenRocket();
+  setTimeout(() => (location.href = '/'), 15_000); // in case OpenRocket does not answer
+}
+$('#close-btn').onclick = closeDesign;
+$('#back').onclick = closeDesign;
+
 // ------------------------------------------------------------------ start
 
 /** A connection id kept for this tab, so a reload or reconnect continues where it left off. */
@@ -204,8 +231,18 @@ async function main() {
       state = 'ready';
       renderState();
     },
-    onExit: () => {
-      if (state !== 'ended') ended('OpenRocket closed', 'Your work is saved.');
+    onExit: async (code) => {
+      if (state === 'ended') return;
+      if (closing || code === 0) {
+        // Closed by the user (the Close button or OpenRocket's File menu): once the room has the
+        // last edits, back to the designs.
+        closing = true;
+        renderState();
+        await editsSaved(8000);
+        location.href = '/';
+        return;
+      }
+      ended('OpenRocket closed', 'Your work is saved.');
     },
   }).catch((e) => ended('OpenRocket could not start', e.message));
   if (found) {

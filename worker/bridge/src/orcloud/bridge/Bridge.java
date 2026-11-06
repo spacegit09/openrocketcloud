@@ -63,6 +63,7 @@ final class Bridge implements Link.Handler {
 	private final CountDownLatch firstWelcome = new CountDownLatch(1);
 	private volatile Path file;
 	private volatile Model fileModel; // the shared state the opened file was written from
+	private boolean finalFlushed;
 
 	// --- event-thread state
 	private OpenRocketDocument doc;
@@ -744,8 +745,22 @@ final class Bridge implements Link.Handler {
 		conn.send(m);
 	}
 
+	/** The page's Close button: sends the last edits and ends, without OpenRocket's save prompt. */
+	@Override
+	public void onCloseRequested() {
+		SwingUtilities.invokeLater(() -> {
+			Log.info("Closing the design");
+			finalFlush();
+			System.exit(0);
+		});
+	}
+
 	/** Last-chance push of unsent edits when the JVM exits (window closed or container stop). */
-	private void finalFlush() {
+	private synchronized void finalFlush() {
+		if (finalFlushed) {
+			return;
+		}
+		finalFlushed = true;
 		try {
 			if (doc == null || expected == null || server == null) {
 				return;
