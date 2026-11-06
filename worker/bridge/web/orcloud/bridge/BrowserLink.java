@@ -7,7 +7,7 @@ import java.util.concurrent.CompletableFuture;
  * Browser build (CheerpJ): the bridge's connection runs through the page, which holds the
  * connection to the design's Base44 actor (web/src/session/java.js implements the natives).
  * The page hands over events as strings: "o" connected, "c" + reason disconnected, "m" + JSON a
- * message from the hub.
+ * message from the hub, "x" the user closes the design.
  */
 final class BrowserLink implements Link {
 	private static native void jsSend(String json);
@@ -60,6 +60,9 @@ final class BrowserLink implements Link {
 					break;
 				case 'm':
 					handler.onMessage((Map<String, Object>) Json.parse(event.substring(1)));
+					break;
+				case 'x':
+					handler.onCloseRequested();
 					break;
 				default:
 					break;

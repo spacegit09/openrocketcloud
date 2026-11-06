@@ -192,6 +192,7 @@
             <li>OpenRocket finds its plugins by scanning its own jar, which cannot run under CheerpJ; the browser build ships a plugin list computed at build time.</li>
             <li>Two Java threads setting up XML at the same moment failed at random, and so did loading runtime files while Java was running. Warming up XML on one thread and preloading the runtime files took fresh starts from 4 successes in 9 to 6 in 6.</li>
             <li>OpenRocket's 3D view draws with OpenGL through native libraries a browser cannot load; it is drawn with WebGL instead (below).</li>
+            <li>CheerpJ gives every window its own title bar: a blue one with an orange link-styled title, and an “add files” button on each. OpenRocket's main window opens without one (it is made undecorated before it is shown), so the design gets the whole page, and the page's own × closes it after OpenRocket has saved the last edits. Dialog title bars are restyled to look like a desktop window's, and the add-files button, which uploads from the user's computer, appears only on file dialogs, which Java reports to the page.</li>
           </ul>
         </details>
         <details>

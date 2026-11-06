@@ -34,6 +34,7 @@ import {
   WebGLRenderer,
   WebGLRenderTarget,
 } from 'three';
+import { findWindow } from './cj-windows.js';
 
 // OpenGL did no colour management; neither do these shaders.
 ColorManagement.enabled = false;
@@ -113,17 +114,6 @@ const WRAP = { repeat: RepeatWrapping, mirror: MirroredRepeatWrapping, clamp: Cl
 
 export function createView(id, context) {
   return new View(id, context);
-}
-
-/** The CheerpJ window element (div.cjWindow) showing the Java window with these screen bounds. */
-function findWindow(wx, wy, ww, wh) {
-  const wins = [...document.querySelectorAll('.cjWindow')].filter((d) => d.style.display !== 'none');
-  const px = (v) => Math.round(parseFloat(v));
-  return (
-    wins.find((d) => px(d.style.left) === wx && px(d.style.top) === wy && px(d.style.width) === ww && px(d.style.height) === wh) ??
-    wins.find((d) => px(d.style.width) === ww && px(d.style.height) === wh) ??
-    null
-  );
 }
 
 /** A canvas holding Java ARGB pixels. */

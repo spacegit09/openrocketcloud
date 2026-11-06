@@ -16,6 +16,7 @@ import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.web.FileWindows;
 import orcloud.web.ModelTab;
 import orcloud.web.SettingsMenu;
 import orcloud.web.StlImport;
@@ -56,29 +57,41 @@ public final class WebMain {
 
 		File f = file.toFile();
 		SwingUtilities.invokeLater(() -> {
-			bridge.attach(f);
 			for (Frame frame : Frame.getFrames()) {
 				if (frame.isVisible()) {
+					// No title bar: the page around it shows the design's name and has the Close button,
+					// so the window gets the whole screen. A frame takes this only while it has no
+					// native window. OpenRocket ends a session in its own close action, not on the
+					// "window closed" event this posts; the bridge would, so it attaches after it.
+					if (!frame.isUndecorated()) {
+						frame.dispose();
+						frame.setUndecorated(true);
+						frame.setVisible(true);
+					}
 					frame.setExtendedState(Frame.MAXIMIZED_BOTH);
 				}
 			}
-			BrowserLink.ready();
-			// The component preset database waited for the window (see our copy of its loader).
-			ComponentPresetDatabaseLoader.loadNow();
-			// Our additions to OpenRocket's menus: Settings (its preferences, before File) and Tools >
-			// Import 3D model (STL); imported models are turned on the "3D model" tab of their Edit dialog.
-			try {
-				BasicFrame frame = OrDoc.findFrame(f);
-				SettingsMenu.install(frame);
-				OpenRocketDocument doc = OrDoc.documentOf(frame);
-				StlImport.install(frame, doc, () -> {
-					List<String> ids = OrDoc.selectedIds(frame);
-					return ids.isEmpty() ? null : OrDoc.findComponent(doc, ids.get(0));
-				});
-				ModelTab.install(doc);
-			} catch (Exception e) {
-				Log.warn("3D model import unavailable: " + e);
-			}
+			SwingUtilities.invokeLater(() -> {
+				bridge.attach(f);
+				BrowserLink.ready();
+				// The component preset database waited for the window (see our copy of its loader).
+				ComponentPresetDatabaseLoader.loadNow();
+				// Our additions to OpenRocket's menus: Settings (its preferences, before File) and Tools >
+				// Import 3D model (STL); imported models are turned on the "3D model" tab of their Edit dialog.
+				FileWindows.install();
+				try {
+					BasicFrame frame = OrDoc.findFrame(f);
+					SettingsMenu.install(frame);
+					OpenRocketDocument doc = OrDoc.documentOf(frame);
+					StlImport.install(frame, doc, () -> {
+						List<String> ids = OrDoc.selectedIds(frame);
+						return ids.isEmpty() ? null : OrDoc.findComponent(doc, ids.get(0));
+					});
+					ModelTab.install(doc);
+				} catch (Exception e) {
+					Log.warn("3D model import unavailable: " + e);
+				}
+			});
 		});
 	}
 

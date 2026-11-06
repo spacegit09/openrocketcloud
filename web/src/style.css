@@ -240,3 +240,31 @@ body.design-page { height: 100vh; overflow: hidden; display: flex; flex-directio
 .steps .now { color: var(--text); font-weight: 600; }
 @media (max-width: 760px) { .activity, .hide-sm { display: none; } .title { max-width: 40vw; } }
   
+
+/* OpenRocket's dialogs: CheerpJ's title bars (blue, with orange titles styled as links) restyled
+   like OpenRocket's own light ones, keeping their 20 px height, which Java lays its windows out
+   around. Only the close button stays; the main window has no title bar at all (WebMain). */
+#screen .cjTitleBar {
+  background: #ececec !important;
+  border-bottom: 1px solid #d4d4d4;
+  box-sizing: border-box;
+  align-items: center;
+}
+#screen .cjTitleBarText {
+  color: #1f1f1f !important;
+  text-decoration: none !important;
+  font: 12px/19px -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  padding-left: 8px;
+  cursor: default;
+}
+#screen .cjTitleBar svg { border-radius: 3px; padding: 2px; margin-right: 3px; }
+#screen .cjTitleBar svg * { stroke: #505050 !important; }
+#screen .cjTitleBar svg:hover { background: #dadada; }
+#screen .cjTitleBar svg:has(line):hover { background: #e81123; }
+#screen .cjTitleBar svg:has(line):hover * { stroke: #fff !important; }
+/* CheerpJ's "add files" button only on file dialogs (orcloud.web.FileWindows), where it uploads a
+   file from this computer into /files/uploads. */
+#screen .cjTitleBar svg:has(title) { display: none; }
+#screen .cjWindow.or-files .cjTitleBar svg:has(title) { display: block; }
+/* Dialog edges: a soft outline and shadow instead of CheerpJ's black line. */
+#screen .cjWindow.cjBordered:has(> .cjTitleBar) { box-shadow: 0 0 0 1px #a9a9a9, 0 8px 28px rgba(0, 0, 0, 0.22) !important; }

@@ -14,6 +14,10 @@ interface Link {
 		void onMessage(Map<String, Object> msg);
 
 		void onClosed(String reason);
+
+		/** The page asks to close the design (its Close button): send what is left, then end. */
+		default void onCloseRequested() {
+		}
 	}
 
 	void start();
