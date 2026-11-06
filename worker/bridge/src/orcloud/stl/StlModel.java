@@ -46,6 +46,19 @@ public final class StlModel {
 		this.closed = a.area > 0 && open <= 1e-4 * a.area && Math.abs(a.volume) > 0;
 	}
 
+	/** A model from its measurements, as kept with an imported part's shape ({@link PartMesh}). */
+	public StlModel(int triangles, double volume, double area, double[] volumeCentroid, double[] areaCentroid, double[] min,
+			double[] max, boolean closed) {
+		this.triangles = triangles;
+		this.volume = volume;
+		this.area = area;
+		this.volumeCentroid = volumeCentroid.clone();
+		this.areaCentroid = areaCentroid.clone();
+		this.min = min.clone();
+		this.max = max.clone();
+		this.closed = closed;
+	}
+
 	public double size(int axis) {
 		return max[axis] - min[axis];
 	}

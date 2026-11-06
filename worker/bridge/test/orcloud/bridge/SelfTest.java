@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
@@ -646,7 +647,7 @@ public final class SelfTest {
 		mc.setName("Printed bay");
 		squarePart.addTo(tube, mc, 0.05);
 		mc.setRadialPosition(0.003);
-		mc.setRadialDirection(Math.PI / 3);
+		mc.setRadialDirection(Math.PI / 2); // a square section turned a quarter turn keeps the cylinder's extent
 		FlightConfiguration conf = d.getRocket().getSelectedConfiguration();
 		double[] cyl = partExtent(conf, mc);
 		PartMeshes.put(String.valueOf(mc.getID()), PartMesh.prepare(squareStl).place(squarePart));
@@ -674,12 +675,105 @@ public final class SelfTest {
 		Model without = OrDoc.toModel(d, new ArrayList<>(), null);
 		check("removed with its component", !without.objs.containsKey(att));
 
+		// Turning: a stored shape laid another way equals one placed that way, with the part's
+		// measurements kept for the centre of gravity; shapes kept before version 2 still read.
+		byte[] sledStl = binaryStl(box(-5, -10, 0, 10, 20, 30));
+		sledStl = concat(sledStl, box(-5, 10, 0, 10, 5, 6)); // a lug at one end, so the part is lopsided
+		StlModel sledModel = StlModel.read(sledStl);
+		PartMesh.Shape sledShape = PartMesh.prepare(sledStl);
+		StlPart base = new StlPart(sledModel);
+		base.axis = 2;
+		base.frontAtMax = false;
+		byte[] sledAtt = sledShape.place(base);
+		boolean sameTurned = true, cgKept = true;
+		for (int axis = 0; axis < 3; axis++) {
+			for (boolean front : new boolean[] { false, true }) {
+				StlPart placed = new StlPart(sledModel);
+				placed.axis = axis;
+				placed.frontAtMax = front;
+				PartMesh direct = PartMesh.decode(sledShape.place(placed));
+				PartMesh laid = PartMesh.decode(PartMesh.reorient(sledAtt, axis, front));
+				sameTurned &= Arrays.equals(direct.positions, laid.positions) && laid.axis == axis && laid.frontAtMax == front;
+				cgKept &= laid.part != null && near(laid.part.cgFromFront(), placed.cgFromFront(), 1e-9)
+						&& near(laid.part.length(), placed.length(), 1e-12) && near(laid.part.radius(), placed.radius(), 1e-12);
+			}
+		}
+		check("a shape turned onto each axis and end equals one placed that way", sameTurned);
+		check("turned shapes keep the model's measurements for size and balance", cgKept);
+		byte[] v1 = new byte[16 + sledAtt.length - 152];
+		System.arraycopy(sledAtt, 0, v1, 0, 16);
+		v1[4] = 1;
+		v1[6] &= 1;
+		v1[7] = 0;
+		System.arraycopy(sledAtt, 152, v1, 16, sledAtt.length - 152);
+		PartMesh old = PartMesh.decode(v1);
+		check("shapes kept before version 2 still read", old.part == null && Arrays.equals(old.positions, PartMesh.decode(sledAtt).positions));
+
+		// Copies keep the shape, also inside a copied tube.
+		MassComponent sled = new MassComponent();
+		sled.setName("Lopsided sled");
+		base.addTo(tube, sled, 0.02);
+		PartMeshes.put(String.valueOf(sled.getID()), sledAtt);
+		RocketComponent tubeCopy = tube.copy();
+		PartMeshes.copied(tube, tubeCopy);
+		MassComponent sledCopy = null;
+		for (RocketComponent x : tubeCopy) {
+			if (x instanceof MassComponent && x.getName().equals("Lopsided sled")) {
+				sledCopy = (MassComponent) x;
+			}
+		}
+		RocketComponent single = sled.copy();
+		PartMeshes.copied(sled, single);
+		check("copies keep the shape, also inside a copied tube", sledCopy != null && !sledCopy.getID().equals(sled.getID())
+				&& PartMeshes.get(sledCopy) != null && PartMeshes.get(single) != null
+				&& sledAtt.length == java.util.Base64.getDecoder().decode(PartMeshes.base64(String.valueOf(single.getID()))).length);
+
+		// Turned about the rocket's axis by the radial direction: a quarter turn swaps the extents across.
+		double[] e0 = partExtent(conf, sled);
+		sled.setRadialDirection(Math.PI / 2);
+		double[] e90 = partExtent(conf, sled);
+		sled.setRadialDirection(0);
+		check("the model turns about the rocket's axis with the radial direction", e0 != null && e90 != null
+				&& near(e0[4] - e0[1], e90[5] - e90[2], 1e-4) && near(e0[5] - e0[2], e90[4] - e90[1], 1e-4)
+				&& Math.abs((e0[4] - e0[1]) - (e0[5] - e0[2])) > 0.004);
+
+		// End for end: the centre of gravity moves to the other end; undo brings the shape back with it.
+		PartMesh before = PartMeshes.get(sled);
+		double cgBefore = sled.getOverrideCGX(), len = sled.getLength();
+		PartMeshes.remember(sled);
+		PartMeshes.put(String.valueOf(sled.getID()), PartMesh.reorient(sledAtt, 2, true));
+		PartMeshes.get(sled).part.fit(sled, 1);
+		PartMeshes.remember(sled);
+		boolean flipped = sled.isCGOverridden() && near(sled.getOverrideCGX(), len - cgBefore, 1e-9) && PartMeshes.get(sled).frontAtMax;
+		String after = PartMeshes.base64(String.valueOf(sled.getID()));
+		sled.setOverrideCGX(cgBefore); // as OpenRocket's undo restores the component
+		boolean undone = PartMeshes.restore(sled) && !PartMeshes.get(sled).frontAtMax && before.axis == PartMeshes.get(sled).axis;
+		sled.setOverrideCGX(len - cgBefore); // redo
+		boolean redone = PartMeshes.restore(sled) && after.equals(PartMeshes.base64(String.valueOf(sled.getID())));
+		check("end for end moves the centre of gravity; undo and redo bring the matching shape", flipped && undone && redone);
+		tube.removeChild(sled);
+
 		// 2D: the outline of a box seen from the side is its rectangle.
 		PartMesh sm = PartMesh.decode(PartMesh.prepare(squareStl).place(squarePart));
-		java.awt.Shape[] fig = sm.figure(info.openrocket.core.util.Transformation.IDENTITY, Coordinate.ZERO, 1, false);
+		java.awt.Shape[] fig = sm.figure(info.openrocket.core.util.Transformation.IDENTITY, Coordinate.ZERO, 1, 0, false);
 		java.awt.geom.Rectangle2D r = fig[1].getBounds2D();
 		check("2D outline and clickable area of the model", fig[0].getBounds2D().getWidth() > 0 && Math.abs(r.getWidth() - 0.015) < 1e-4
 				&& Math.abs(r.getHeight() - 0.005) < 1e-4 && fig[1].contains(r.getCenterX(), r.getCenterY()));
+	}
+
+	private static byte[] concat(byte[] stl, List<float[]> more) {
+		ByteBuffer in = ByteBuffer.wrap(stl).order(ByteOrder.LITTLE_ENDIAN);
+		int n = in.getInt(80);
+		List<float[]> all = new ArrayList<>();
+		for (int t = 0; t < n; t++) {
+			float[] v = new float[9];
+			for (int i = 0; i < 9; i++) {
+				v[i] = in.getFloat(84 + t * 50 + 12 + 4 * i);
+			}
+			all.add(v);
+		}
+		all.addAll(more);
+		return binaryStl(all);
 	}
 
 	/** Extent of a component's drawing in the 3D view: min x, y, z then max x, y, z (OpenRocket coordinates). */

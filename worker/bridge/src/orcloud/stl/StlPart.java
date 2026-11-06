@@ -208,13 +208,21 @@ public final class StlPart {
 
 	/** A mass component sized like the model, with its mass and, if off-centre, its centre of gravity. */
 	private void shape(MassComponent mc) {
-		mc.setLength(length());
+		fit(mc, 1);
+		mc.setComponentMass(mass());
+	}
+
+	/**
+	 * Sizes a mass component like the model `scale` times, with its centre of gravity if off-centre;
+	 * the mass is left as it is (it does not depend on how the part lies).
+	 */
+	public void fit(MassComponent mc, double scale) {
+		mc.setLength(length() * scale);
 		mc.setRadiusAutomatic(false);
 		double room = mc.getMaxParentRadius();
-		mc.setRadius(room > 0 ? Math.min(radius(), room) : radius());
-		mc.setComponentMass(mass());
-		double cg = cgFromFront();
-		boolean offCentre = Math.abs(cg - length() / 2) > 1e-4;
+		mc.setRadius(room > 0 ? Math.min(radius() * scale, room) : radius() * scale);
+		double cg = cgFromFront() * scale;
+		boolean offCentre = Math.abs(cg - length() * scale / 2) > 1e-4;
 		mc.setCGOverridden(offCentre);
 		if (offCentre) {
 			mc.setOverrideCGX(cg);

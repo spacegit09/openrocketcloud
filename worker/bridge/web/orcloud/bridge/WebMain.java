@@ -16,6 +16,7 @@ import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.web.ModelTab;
 import orcloud.web.StlImport;
 import orcloud.web.Warmup;
 
@@ -63,7 +64,8 @@ public final class WebMain {
 			BrowserLink.ready();
 			// The component preset database waited for the window (see our copy of its loader).
 			ComponentPresetDatabaseLoader.loadNow();
-			// Tools > Import 3D model (STL), our addition to OpenRocket's menus.
+			// Tools > Import 3D model (STL), our addition to OpenRocket's menus; imported models are
+			// turned on the "3D model" tab of their Edit dialog.
 			try {
 				BasicFrame frame = OrDoc.findFrame(f);
 				OpenRocketDocument doc = OrDoc.documentOf(frame);
@@ -71,6 +73,7 @@ public final class WebMain {
 					List<String> ids = OrDoc.selectedIds(frame);
 					return ids.isEmpty() ? null : OrDoc.findComponent(doc, ids.get(0));
 				});
+				ModelTab.install(doc);
 			} catch (Exception e) {
 				Log.warn("3D model import unavailable: " + e);
 			}

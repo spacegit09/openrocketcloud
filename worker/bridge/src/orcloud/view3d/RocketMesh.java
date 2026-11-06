@@ -165,13 +165,15 @@ public final class RocketMesh {
 
 	/**
 	 * Adds an imported 3D model's shape in place of OpenRocket's cylinder, at each instance of the
-	 * component and its radial position, scaled with the component's length.
+	 * component and its radial position, turned by its radial direction and scaled with its length.
 	 */
 	private void addModel(MassComponent c, PartMesh model, List<InstanceContext> instances) {
 		double s = model.length > 0 && c.getLength() > 0 ? c.getLength() / model.length : 1;
-		// Off-axis placement, which OpenRocket adds to a mass object's instances itself.
-		double ry = c.getRadialPosition() * Math.cos(c.getRadialDirection());
-		double rz = c.getRadialPosition() * Math.sin(c.getRadialDirection());
+		// Off-axis placement, which OpenRocket adds to a mass object's instances itself; the model
+		// turns about the rocket's axis with the same angle (the component's radial direction).
+		double turn = c.getRadialDirection(), cos = Math.cos(turn), sin = Math.sin(turn);
+		double ry = c.getRadialPosition() * cos;
+		double rz = c.getRadialPosition() * sin;
 		float[] pos = model.positions;
 		int[] tri = model.triangles;
 		float[] normals = model.cornerNormals();
@@ -192,9 +194,10 @@ public final class RocketMesh {
 				faceSizes[faceCount++] = 3;
 				for (int k = 0; k < 3; k++) {
 					int v = tri[t * 3 + k] * 3;
-					double x = pos[v] * s, y = ry + pos[v + 1] * s, z = rz + pos[v + 2] * s;
+					double py = pos[v + 1] * s, pz = pos[v + 2] * s;
+					double x = pos[v] * s, y = ry + py * cos - pz * sin, z = rz + py * sin + pz * cos;
 					int n = t * 9 + k * 3;
-					double nx = normals[n], ny = normals[n + 1], nz = normals[n + 2];
+					double nx = normals[n], ny = normals[n + 1] * cos - normals[n + 2] * sin, nz = normals[n + 1] * sin + normals[n + 2] * cos;
 					int out = vertexCount++ * STRIDE;
 					vertices[out] = (float) (o.x + axes[0].x * x + axes[1].x * y + axes[2].x * z);
 					vertices[out + 1] = (float) (o.y + axes[0].y * x + axes[1].y * y + axes[2].y * z);

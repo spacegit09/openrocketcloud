@@ -109,7 +109,8 @@ public class MassComponentShapes extends RocketComponentShapes {
 	
 	/**
 	 * orcloud: an imported 3D model's outline (scaled with the component's length, at its radial
-	 * position) and, invisible, the area it covers, which the figure uses for clicking; or null.
+	 * position, turned by its radial direction) and, invisible, the area it covers, which the figure
+	 * uses for clicking; or null.
 	 */
 	private static RocketComponentShapes[] modelShapes(final RocketComponent component, final Transformation transformation,
 			final boolean back) {
@@ -123,7 +124,8 @@ public class MassComponentShapes extends RocketComponentShapes {
 		final double radialAngleRadians = massObj.getRadialDirection();
 		final Coordinate offset = new Coordinate(0, radialDistance * Math.cos(radialAngleRadians),
 				radialDistance * Math.sin(radialAngleRadians));
-		final RocketComponentShapes[] shapes = RocketComponentShapes.toArray(mesh.figure(transformation, offset, scale, back), component);
+		final RocketComponentShapes[] shapes = RocketComponentShapes.toArray(
+				mesh.figure(transformation, offset, scale, radialAngleRadians, back), component);
 		shapes[1].setColor(ORColor.INVISIBLE);
 		return shapes;
 	}
