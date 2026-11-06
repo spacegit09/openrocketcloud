@@ -227,7 +227,21 @@ body.design-page { height: 100vh; overflow: hidden; display: flex; flex-directio
 .popover { position: absolute; right: 8px; top: 48px; z-index: 30; width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 8px; }
 .popover h4 { margin: 6px 8px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .popover .feed .item { font-size: 12.5px; }
-#screen { flex: 1; min-height: 0; background: #2b2f36; position: relative; overflow: hidden; }
+/* Once OpenRocket's menu bar follows the header (orcloud.web.MenuRow), its window starts under the
+   header, which lies over the menu bar: with room, the menus sit in the header row in #menu-slot
+   (src/menu-row.js), otherwise in a row of their own below. */
+.sbar { position: relative; z-index: 1; }
+#screen { flex: 1; min-height: 0; background: #2b2f36; position: relative; z-index: 0; overflow: hidden; }
+body.menu-row #screen { margin-top: -44px; }
+#menu-slot { flex: none; align-self: stretch; }
+.sbar.merged {
+  --surface: var(--or-bg); --text: var(--or-fg); --border: var(--or-line);
+  --surface-2: color-mix(in srgb, var(--or-fg) 9%, var(--or-bg));
+  --muted: color-mix(in srgb, var(--or-fg) 62%, var(--or-bg));
+  color: var(--text); background: transparent; border-bottom-color: transparent; pointer-events: none;
+}
+.sbar.merged > * { pointer-events: auto; }
+.sbar.merged > #menu-slot, .sbar.merged > .spacer, .sbar.merged > .activity { pointer-events: none; }
 #screen > div { background: #2b2f36 !important; }
 .overlay { position: absolute; inset: 44px 0 0 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 92%, transparent); z-index: 10; }
 .overlay .box { text-align: center; max-width: 420px; padding: 24px; }

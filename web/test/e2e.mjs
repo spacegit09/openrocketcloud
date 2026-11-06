@@ -96,9 +96,9 @@ try {
 
   // 2) Adding a nose cone in A's OpenRocket reaches the room (and from there B).
   const before = seen.length;
-  await a.mouse.click(83, 129); // select the stage ("Booster") in OpenRocket's component tree
+  await a.mouse.click(83, 109); // select the stage ("Booster") in OpenRocket's component tree
   await new Promise((r) => setTimeout(r, 1500));
-  await a.mouse.click(520, 272); // "Nose Cone" in the "Add new component" panel
+  await a.mouse.click(520, 252); // "Nose Cone" in the "Add new component" panel
   const t0 = Date.now();
   let put = null;
   while (!put && Date.now() - t0 < 30_000) {

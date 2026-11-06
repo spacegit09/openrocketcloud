@@ -79,7 +79,8 @@ and live sharing. Nothing runs on your own computer or server.
   simulations pause briefly so the window stays responsive, and the 3D view, which OpenRocket draws
   with OpenGL, is drawn with WebGL (`web/src/view3d-renderer.js`) from meshes made by OpenRocket's
   own OBJ exporters (`worker/bridge/src/orcloud/view3d`). The main window opens without CheerpJ's
-  title bar, and the page restyles the dialogs' title bars (`web/src/style.css`).
+  title bar, its menu bar moves into the page's top row (`MenuRow.java`, `web/src/menu-row.js`),
+  and the page restyles the dialogs' title bars (`web/src/style.css`).
 - **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
   run about 15× slower than desktop (1–4 s each), so "Update flight estimates in design window"
   and "Run out-dated simulations when you open the simulation tab" are kept off and left out of
@@ -242,9 +243,11 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   with Copy and Paste or Duplicate keep the shape. Aerodynamics still come from OpenRocket's own
   shapes: converting a mesh into them gave drag errors of up to 21% that a finer mesh does not
   reduce.
-- **Window** (browser version): OpenRocket's window fills the page, with no title bar. The × at
-  the top right of the page closes the design (your last changes are saved first) and goes back to
-  the dashboard, as does the back arrow. Dialogs have a plain title bar with only a close button, as
+- **Window** (browser version): OpenRocket's window fills the page, with no title bar, and its
+  menus (Settings, File, Edit, Tools, Help) sit in the page's top row after the design's name;
+  on a narrow screen they get a row of their own. The × at the top right of the page closes the
+  design (your last changes are saved first) and goes back to the dashboard, as does the back
+  arrow. Dialogs have a plain title bar with only a close button, as
   on the desktop; the button that adds files from your computer appears only in file dialogs (for
   example when choosing a decal image).
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
