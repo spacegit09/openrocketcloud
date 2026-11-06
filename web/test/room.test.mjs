@@ -8,6 +8,7 @@ import WebSocket from 'ws';
 import { startHub } from './hub.mjs';
 import { importOrk } from '../src/lib/ork.js';
 import { toJson } from '../../server/src/model.js';
+import { markUndone } from '../../server/src/history.js';
 
 const PORT = 8799;
 const designs = new Map([
@@ -165,6 +166,20 @@ test('edit history, undo of one person\'s changes and restore', async () => {
   a.send({ type: 'hello' });
   const w = await a.next((m) => m.type === 'welcome');
   assert.equal(w.model.objs[id].v.name, '<name>Booster</name>');
+  // The undo names the edits it took back, so the history marks them undone and offers the redo.
+  const undoneNow = (await a.request('history')).groups;
+  assert.equal(undoneNow[0].note.kind, 'undo');
+  assert.deepEqual([undoneNow[0].note.from, undoneNow[0].note.to, undoneNow[0].note.userId], [last.from, last.to, last.userId]);
+  const marked = markUndone(undoneNow, []);
+  const edit = marked.find((g) => g.from === last.from);
+  assert.equal(edit.undone.kind, 'undo');
+  const redo = await a.request('revert', { mode: 'undo', ...edit.undone.redo });
+  assert.equal(redo.applied, 1);
+  await b.next((m) => m.type === 'ops' && m.ops.some((op) => op.v?.name === '<name>Second stage</name>'));
+  const final = markUndone((await a.request('history')).groups, []);
+  assert.equal(final[0].note.kind, 'redo');
+  assert.equal(final[1].undone.kind, 'redo'); // the undo, taken back
+  assert.equal(final.find((g) => g.from === last.from).undone, undefined); // in effect again
   a.close();
   b.close();
 });

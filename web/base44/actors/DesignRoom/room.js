@@ -13,6 +13,7 @@
 // Connections are objects with an `id` and `send(message)`.
 import { applyOp, childIndex, componentName, fromJson, modelSize, toJson, validateOp, SIMS, DOC } from './lib/model.js';
 import { describeOp, groupEdits, inverseOf, isMinorOp, planRevert } from './lib/edits.js';
+import { revertNote, revertText } from './lib/history.js';
 
 const BUCKETS = 64;
 const CHUNK = 96_000; // characters per stored value
@@ -412,7 +413,7 @@ export class Room {
       this.broadcast({
         type: 'activity',
         user: { id: user.id, name: user.name, color: colorFor(user.id) },
-        text: note ? (note.kind === 'restore' ? 'restored an earlier version' : 'reverted an edit') : text,
+        text: note ? revertText(note) : text,
         at: Date.now(),
       });
     }
@@ -515,7 +516,7 @@ export class Room {
     const inverse = [];
     for (const e of chosen) inverse.push(...(await this.editInverse(e)));
     const { ops, skipped } = planRevert(this.model, inverse, mode);
-    const note = { kind: mode, name: first.user_name, at: first.at };
+    const note = revertNote(mode, first, chosen, { from, to: Number(to) || from, userId: String(userId ?? '') }, skipped);
     const applied = ops.length ? (await this.applyBatch(user, ops, { note })).length : 0;
     return { applied, skipped };
   }

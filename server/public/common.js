@@ -1,4 +1,5 @@
 // Shared helpers for the dashboard and the session page.
+import { markUndone } from './history.js';
 
 export async function api(path, { method = 'GET', body, headers = {}, raw = false } = {}) {
   const opts = { method, headers: { 'x-orcloud': '1', ...headers } };
@@ -49,6 +50,8 @@ const ICONS = {
   edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
   trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   back: '<path d="m15 18-6-6 6-6"/>',
+  undo: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
+  redo: '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
   check: '<path d="M20 6 9 17l-5-5"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   power: '<path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>',
@@ -246,24 +249,38 @@ export function editHistoryDialog(projectId) {
   const more = h('button', { hidden: true }, 'Show older edits');
   const close = h('button', { class: 'primary' }, 'Done');
   const { dialog } = modal('Edit history', [
-    h('p', { class: 'hint', style: 'margin:0' }, 'Every change to this design, newest first. Undo reverts one person\'s changes (anything changed again since is kept). Restore puts the whole design back the way it was before that change.'),
+    h('p', { class: 'hint', style: 'margin:0' }, 'Every change to this design, newest first. Undo takes back one person\'s changes (anything changed again since is kept); undone changes are marked as such and can be redone. Restore puts the whole design back the way it was before that change.'),
     list, more,
   ], [close]);
   dialog.classList.add('wide');
   close.onclick = () => dialog.close();
   let before = null;
 
-  const revert = async (g, mode) => {
-    const who = g.userName;
-    const ok = mode === 'undo'
-      ? await confirmDialog('Undo these changes?', `${who}'s changes from ${when(g.at)} will be reverted for everyone. Anything changed again since then is kept.`, 'Undo changes')
-      : await confirmDialog('Restore this version?', `The design goes back to how it was before ${who}'s change at ${when(g.at)}. Everything changed after that, by anyone, is undone for everyone. You can undo the restore afterwards.`, 'Restore');
-    if (!ok) return;
+  // Reverts in effect on the pages shown so far (see markUndone).
+  let active = [];
+
+  const QUESTIONS = {
+    undo: (g) => (g.note?.kind === 'restore'
+      ? ['Undo this restore?', `The design goes back to how it was just before ${g.userName} restored an earlier version at ${when(g.at)}. Anything changed since then is kept.`, 'Undo restore']
+      : ['Undo these changes?', `${g.userName}'s changes from ${when(g.at)} will be reverted for everyone. Anything changed again since then is kept.`, 'Undo changes']),
+    redo: (g) => (g.note?.kind === 'restore'
+      ? ['Redo this restore?', `${g.userName}'s restore from ${when(g.at)} is made again for everyone. Anything changed since it was undone is kept.`, 'Redo restore']
+      : ['Redo these changes?', `${g.userName}'s changes from ${when(g.at)} are made again for everyone. Anything changed since they were undone is kept.`, 'Redo changes']),
+    restore: (g) => ['Restore this version?', `The design goes back to how it was before ${g.userName}'s change at ${when(g.at)}. Everything changed after that, by anyone, is undone for everyone. You can undo the restore afterwards.`, 'Restore'],
+  };
+  const DONE = { undo: 'Changes undone.', redo: 'Changes redone.', restore: 'Earlier version restored.' };
+
+  /** `action`: "undo" or "redo" `g`, or "restore" the design to before it. */
+  const revert = async (g, action) => {
+    if (!(await confirmDialog(...QUESTIONS[action](g)))) return;
+    // Redo is undoing the undo that took `g` back.
+    const target = action === 'redo' ? g.undone.redo : { from: g.from, to: g.to, userId: g.userId };
     try {
-      const r = await api(`/projects/${projectId}/edits/revert`, { method: 'POST', body: { mode, from: g.from, to: g.to, userId: g.userId } });
-      if (!r.applied && r.skipped) toast('Nothing was reverted: all of it was changed again later.');
-      else if (r.skipped) toast(`Reverted. ${r.skipped} change${r.skipped > 1 ? 's were' : ' was'} kept because someone changed ${r.skipped > 1 ? 'them' : 'it'} later.`);
-      else toast(mode === 'undo' ? 'Changes undone.' : 'Earlier version restored.');
+      const r = await api(`/projects/${projectId}/edits/revert`, { method: 'POST', body: { mode: action === 'restore' ? 'restore' : 'undo', ...target } });
+      const verb = action === 'redo' ? 'redone' : 'reverted';
+      if (!r.applied && r.skipped) toast(`Nothing was ${verb}: all of it was changed again since.`);
+      else if (r.skipped) toast(`${verb[0].toUpperCase()}${verb.slice(1)}. ${r.skipped} change${r.skipped > 1 ? 's were' : ' was'} kept because someone changed ${r.skipped > 1 ? 'them' : 'it'} since.`);
+      else toast(DONE[action]);
       before = null;
       list.replaceChildren(h('p', { class: 'sub' }, 'Loading…'));
       load();
@@ -273,10 +290,13 @@ export function editHistoryDialog(projectId) {
   };
 
   const entry = (g, canRevert) => {
-    let title;
-    if (g.note?.kind === 'undo') title = `undid ${g.note.name}'s changes from ${when(g.note.at)}`;
-    else if (g.note?.kind === 'restore') title = `restored the version from before ${g.note.name}'s change at ${when(g.note.at)}`;
-    else title = '';
+    const n = g.note;
+    const owner = n?.name === g.userName ? 'their own' : `${n?.name}'s`;
+    const whose = n ? `${owner} ${n.of === 'restore' ? 'restore' : 'changes'} from ${when(n.at)}` : '';
+    let title = '';
+    if (n?.kind === 'undo') title = `undid ${whose}`;
+    else if (n?.kind === 'redo') title = `redid ${whose}`;
+    else if (n?.kind === 'restore') title = `restored the version from before ${owner} change at ${when(n.at)}`;
     const lines = g.changes.map(describeChange);
     const shown = h('ul', {}, lines.slice(0, 6).map((l) => h('li', {}, l)));
     const extra = lines.length > 6 ? h('button', { class: 'ghost link' }, `and ${lines.length - 6} more`) : null;
@@ -286,20 +306,41 @@ export function editHistoryDialog(projectId) {
         extra.remove();
       };
     }
-    const actions = canRevert ? h('div', { class: 'row' },
-      h('button', { onclick: () => revert(g, 'undo') }, icon('back'), 'Undo these changes'),
+    // Taken back by a later undo, redo or restore: marked, and offered to be redone instead.
+    const u = g.undone;
+    let state = null;
+    if (u) {
+      const label = u.kind === 'restore' ? 'Undone' : u.kind === 'redo' ? 'Redone' : u.skipped ? 'Partly undone' : 'Undone';
+      const by = u.kind === 'restore' ? `when ${u.by} restored an earlier version` : `by ${u.by}`;
+      const kept = u.kind === 'undo' && u.skipped
+        ? ` · ${u.skipped} change${u.skipped > 1 ? 's were' : ' was'} kept because ${u.skipped > 1 ? 'they were' : 'it was'} changed again`
+        : '';
+      state = h('div', { class: 'undone-note' }, h('span', { class: 'badge' }, label), ` ${by} · ${when(u.at)}${kept}`);
+    }
+    // Undo and redo entries only record a revert: the change they took back carries the buttons.
+    const record = n?.kind === 'undo' || n?.kind === 'redo';
+    const what = n?.kind === 'restore' ? 'this restore' : 'these changes';
+    let main = null;
+    if (u && u.redo && !record) main = h('button', { onclick: () => revert(g, 'redo') }, icon('redo'), `Redo ${what}`);
+    else if (!u && !record) main = h('button', { onclick: () => revert(g, 'undo') }, icon('undo'), `Undo ${what}`);
+    const actions = canRevert ? h('div', { class: 'row' }, main,
       h('button', { class: 'ghost', onclick: () => revert(g, 'restore') }, icon('history'), 'Restore to before this')) : null;
-    return h('div', { class: 'edit' },
+    return h('div', { class: u ? 'edit undone' : 'edit' },
       avatar({ name: g.userName, color: g.color }),
       h('div', { class: 'grow' },
         h('div', {}, h('b', {}, g.userName), title ? ` ${title}` : '', h('span', { class: 'sub' }, ` · ${when(g.at)} (${timeAgo(g.at)})`)),
+        state,
         lines.length ? shown : h('div', { class: 'sub' }, 'No visible changes'),
         extra, actions));
   };
 
   async function load() {
     const data = await api(`/projects/${projectId}/edits${before ? `?before=${before}` : ''}`);
-    if (!before) list.replaceChildren();
+    if (!before) {
+      list.replaceChildren();
+      active = [];
+    }
+    markUndone(data.groups, active);
     if (!data.groups.length && !list.children.length) list.append(h('p', { class: 'sub' }, 'No edits recorded yet. Changes appear here as soon as someone edits the design.'));
     list.append(...data.groups.map((g) => entry(g, data.canRevert)));
     before = data.nextBefore;

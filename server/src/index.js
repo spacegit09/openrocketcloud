@@ -25,6 +25,8 @@ app.use('/auth', authRouter());
 app.use('/api', apiRouter());
 const pub = join(import.meta.dirname, '../public');
 app.use('/novnc', express.static(join(import.meta.dirname, '../node_modules/@novnc/novnc'), { maxAge: '1d' }));
+// The edit history's bookkeeping, shared with the pages.
+app.get('/history.js', (req, res) => res.type('text/javascript').sendFile(join(import.meta.dirname, 'history.js')));
 app.use(express.static(pub, { extensions: ['html'], maxAge: 0 }));
 app.get('/p/:id', (req, res) => res.sendFile(join(pub, 'session.html')));
 
