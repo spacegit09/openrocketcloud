@@ -80,9 +80,9 @@ and live sharing. Nothing runs on your own computer or server.
   with OpenGL, is drawn with WebGL (`web/src/view3d-renderer.js`) from meshes made by OpenRocket's
   own OBJ exporters (`worker/bridge/src/orcloud/view3d`).
 - **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
-  run about 15× slower than desktop (1–4 s each); "Update flight estimates in design window"
-  (Preferences → Design) starts switched off, because its background simulation makes every edit
-  wait 1–2 s; *Save As* and exports download straight to your computer. CheerpJ's free licence is
+  run about 15× slower than desktop (1–4 s each), so "Update flight estimates in design window"
+  and "Run out-dated simulations when you open the simulation tab" are kept off and left out of
+  the settings; *Save As* and exports download straight to your computer. CheerpJ's free licence is
   for personal and non-commercial use.
 
 Build and deploy (needs Docker, Node 20+ and the Base44 CLI: `npm install -g base44`):
@@ -217,6 +217,12 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
   the custom motors of all its members, so collaborators always see the same motors. Reopen
   OpenRocket to load motors added while it's open.
+- **Settings** (browser version): the *Settings* menu, left of *File*, opens OpenRocket's
+  preferences (General, UI, Design, Simulation, Launch, Units, Materials), as does *Edit →
+  Preferences*. Left out are the options that conflict with the browser version (thrust-curve
+  and component-preset folders, update checks, opening the last design file, importing,
+  exporting or resetting all preferences, an external decal editor and OpenGL) or slow it down
+  (the two above); those stay off.
 - **3D view** (browser version): *View Type → 3D Figure, 3D Unfinished or 3D Finished* under the
   rocket figure. Drag to turn the rocket, right-drag to move the light, scroll to zoom; click a part
   to select it (shift-click adds to the selection, reaching past parts already selected), and
