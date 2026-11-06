@@ -226,8 +226,11 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   along the rocket and which end faces the nose, the material, and how it was made (printed walls
   and infill, solid, or a hollow shell; or enter a known mass). It becomes a new mass component, or
   the mass and centre of gravity of the selected component (not parachutes, streamers or shock
-  cords). Aerodynamics still come from OpenRocket's own shapes: converting a mesh into them gave
-  drag errors of up to 21% that a finer mesh does not reduce.
+  cords). A mass component made from a model is drawn as the model in the 2D and 3D views; its
+  shape is kept with the design, shared with collaborators and included in downloaded .ork files
+  (desktop OpenRocket shows its usual cylinder). Aerodynamics still come from OpenRocket's own
+  shapes: converting a mesh into them gave drag errors of up to 21% that a finer mesh does not
+  reduce.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
 - **Who's here**: avatars show who has the design open and which part each person has selected.

@@ -47,7 +47,8 @@ public final class Looks {
 		List<String> materials = new ArrayList<>();
 		StringBuilder parts = new StringBuilder();
 		for (RocketMesh.Part p : mesh.parts) {
-			String m = p.motor != null ? motor(type, p, textureId) : component(type, p, figureColor, textureId);
+			String m = p.motor != null ? motor(type, p, textureId)
+					: p.model ? model(type, p, figureColor, textureId) : component(type, p, figureColor, textureId);
 			int mi = materials.indexOf(m);
 			if (mi < 0) {
 				mi = materials.size();
@@ -113,6 +114,26 @@ public final class Looks {
 			decal = p.surface == RocketMesh.INSIDE;
 		}
 		return realistic(type, a, decal, transparent(type, outside), textureId);
+	}
+
+	/** Plastic, the look of a 3D-printed part. */
+	private static final Appearance PRINTED = new Appearance(new ORColor(232, 232, 228), 0.3);
+
+	/**
+	 * An imported 3D model's shape: coloured like any component in the figure view, printed
+	 * plastic when unfinished, painted as set in its appearance when finished (no decal: a model
+	 * has no texture coordinates). Drawn two-sided, as STL files are not always wound consistently.
+	 */
+	private static String model(int type, RocketMesh.Part p, Function<RocketComponent, ORColor> figureColor,
+			ToIntFunction<DecalImage> textureId) {
+		String m;
+		if (type == FIGURE) {
+			m = component(type, p, figureColor, textureId);
+		} else {
+			Appearance a = type == FINISHED && p.component.getAppearance() != null ? p.component.getAppearance() : PRINTED;
+			m = realistic(type, a, false, transparent(type, a), textureId);
+		}
+		return m.substring(0, m.length() - 1) + ",\"double\":true}";
 	}
 
 	private static String motor(int type, RocketMesh.Part p, ToIntFunction<DecalImage> textureId) {

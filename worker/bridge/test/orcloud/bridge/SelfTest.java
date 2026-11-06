@@ -43,6 +43,8 @@ import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.rocketcomponent.SymmetricComponent;
 import info.openrocket.core.util.Coordinate;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.stl.PartMesh;
+import orcloud.stl.PartMeshes;
 import orcloud.stl.StlModel;
 import orcloud.view3d.Looks;
 import orcloud.view3d.RocketMesh;
@@ -80,6 +82,13 @@ public final class SelfTest {
 			} catch (Throwable t) {
 				failures++;
 				System.out.println("ERROR STL import: " + t);
+				t.printStackTrace(System.out);
+			}
+			try {
+				modelShapeChecks(examples);
+			} catch (Throwable t) {
+				failures++;
+				System.out.println("ERROR imported model shapes: " + t);
 				t.printStackTrace(System.out);
 			}
 			try {
@@ -552,6 +561,147 @@ public final class SelfTest {
 		Simulation sim = d.getSimulations().get(0);
 		sim.simulate();
 		check("simulation runs with the imported part", sim.getSimulatedData() != null && sim.getSimulatedData().getMaxAltitude() > 0);
+	}
+
+	// =================================================================== imported model shapes (orcloud.stl.PartMesh)
+
+	private static void modelShapeChecks(List<Path> examples) throws Exception {
+		System.out.println("Imported model shapes");
+		// A 10 x 20 x 30 box in millimetres, placed along each axis, nose end at either end.
+		byte[] boxStl = binaryStl(box(5, -10, 0, 10, 20, 30));
+		StlModel boxModel = StlModel.read(boxStl);
+		PartMesh.Shape boxShape = PartMesh.prepare(boxStl);
+		check("box shape kept whole", boxShape.triangles == 12 && boxShape.fileTriangles == 12);
+		boolean sized = true, turned = true;
+		double[] size = { 10, 20, 30 };
+		for (int axis = 0; axis < 3; axis++) {
+			for (boolean front : new boolean[] { false, true }) {
+				StlPart part = new StlPart(boxModel);
+				part.axis = axis;
+				part.frontAtMax = front;
+				PartMesh m = PartMesh.decode(boxShape.place(part));
+				double[] lo = { 1e9, 1e9, 1e9 }, hi = { -1e9, -1e9, -1e9 };
+				for (int i = 0; i < m.positions.length; i++) {
+					lo[i % 3] = Math.min(lo[i % 3], m.positions[i]);
+					hi[i % 3] = Math.max(hi[i % 3], m.positions[i]);
+				}
+				// x from 0 to the length, centred across, in metres.
+				sized &= near(lo[0], 0, 1e-4) && near(hi[0], size[axis] / 1000, 1e-4) && near(m.length, size[axis] / 1000, 1e-9)
+						&& near(lo[1] + hi[1], 0, 1e-4) && near(lo[2] + hi[2], 0, 1e-4)
+						&& near(hi[1] - lo[1], size[(axis + 1) % 3] / 1000, 1e-4) && near(hi[2] - lo[2], size[(axis + 2) % 3] / 1000, 1e-4);
+				// Turned, never mirrored: drawn with z negated (as the 3D view does), the outward
+				// volume stays positive like the file's.
+				double vol = 0;
+				for (int t = 0; t < m.triangles.length; t += 3) {
+					double[][] q = new double[3][];
+					for (int k = 0; k < 3; k++) {
+						int v = m.triangles[t + k] * 3;
+						q[k] = new double[] { m.positions[v], m.positions[v + 1], -m.positions[v + 2] };
+					}
+					vol += (q[0][0] * (q[1][1] * q[2][2] - q[1][2] * q[2][1]) - q[0][1] * (q[1][0] * q[2][2] - q[1][2] * q[2][0])
+							+ q[0][2] * (q[1][0] * q[2][1] - q[1][1] * q[2][0])) / 6;
+				}
+				turned &= Math.abs(vol - 6e-6) < 6e-8;
+			}
+		}
+		check("placed along each axis at its size, centred", sized);
+		check("placed models are turned, never mirrored", turned);
+
+		// A large file is reduced, keeping its size.
+		byte[] coneStl = binaryStl(cone(20, 100, 20000));
+		PartMesh.Shape coneShape = PartMesh.prepare(coneStl);
+		StlPart conePart = new StlPart(StlModel.read(coneStl));
+		PartMesh cm = PartMesh.decode(coneShape.place(conePart));
+		double reach = 0;
+		for (int i = 0; i < cm.positions.length; i += 3) {
+			reach = Math.max(reach, Math.hypot(cm.positions[i + 1], cm.positions[i + 2]));
+		}
+		check("a 40,000-triangle file is reduced to at most " + PartMesh.MAX_TRIANGLES + " (" + coneShape.triangles + ")",
+				coneShape.fileTriangles == 40000 && coneShape.triangles <= PartMesh.MAX_TRIANGLES && coneShape.triangles > 1000
+						&& Math.abs(cm.length - 0.1) < 1e-4 && Math.abs(reach - 0.02) < 0.002);
+		float[] normals = cm.cornerNormals();
+		boolean unit = normals.length == cm.triangles.length * 3;
+		for (int i = 0; unit && i < normals.length; i += 3) {
+			unit = near(Math.sqrt(normals[i] * normals[i] + normals[i + 1] * normals[i + 1] + normals[i + 2] * normals[i + 2]), 1, 1e-3);
+		}
+		check("smooth corner normals", unit);
+
+		// In a design: drawn where OpenRocket's cylinder is (also off the axis), shared, outlined in 2D.
+		Path p = examples.stream().filter(x -> x.getFileName().toString().startsWith("A simple model rocket")).findFirst().orElse(examples.get(0));
+		OpenRocketDocument d = new GeneralRocketLoader(p.toFile()).load();
+		BodyTube tube = null;
+		for (RocketComponent x : d.getRocket()) {
+			if (x instanceof BodyTube) {
+				tube = (BodyTube) x;
+				break;
+			}
+		}
+		// A box as long and as wide as the cylinder made for it has the cylinder's extent.
+		byte[] squareStl = binaryStl(box(-5, -5, 0, 10, 10, 30));
+		StlPart squarePart = new StlPart(StlModel.read(squareStl));
+		squarePart.axis = 2;
+		squarePart.frontAtMax = false;
+		squarePart.unit = 0.0005;
+		MassComponent mc = new MassComponent();
+		mc.setName("Printed bay");
+		squarePart.addTo(tube, mc, 0.05);
+		mc.setRadialPosition(0.003);
+		mc.setRadialDirection(Math.PI / 3);
+		FlightConfiguration conf = d.getRocket().getSelectedConfiguration();
+		double[] cyl = partExtent(conf, mc);
+		PartMeshes.put(String.valueOf(mc.getID()), PartMesh.prepare(squareStl).place(squarePart));
+		RocketMesh withModel = RocketMesh.of(conf, ObjUtils.LevelOfDetail.NORMAL_QUALITY);
+		double[] box = partExtent(conf, mc);
+		boolean modelPart = withModel.parts.stream().anyMatch(x -> x.component == mc && x.model);
+		boolean same = cyl != null && box != null;
+		for (int k = 0; same && k < 6; k++) {
+			same = Math.abs(cyl[k] - box[k]) < 2e-4;
+		}
+		check("the model is drawn in 3D where OpenRocket's cylinder was, off the axis too", modelPart && same);
+		mc.setLength(mc.getLength() * 2);
+		double[] longer = partExtent(conf, mc);
+		check("the model scales with the component's length", longer != null && Math.abs((longer[3] - longer[0]) - 2 * (box[3] - box[0])) < 1e-4);
+
+		// Shared: the shape is an attachment of the design, and comes back on load.
+		Model shared = OrDoc.toModel(d, new ArrayList<>(), null);
+		String att = "att:" + PartMeshes.attachmentName(String.valueOf(mc.getID()));
+		boolean attached = shared.objs.containsKey(att);
+		PartMeshes.remove(String.valueOf(mc.getID()));
+		OpenRocketDocument again = OrDoc.load(shared);
+		RocketComponent back = again.getRocket().findComponent(mc.getID());
+		check("shared with the design and back on load", attached && back != null && PartMeshes.get(back) != null);
+		tube.removeChild(mc);
+		Model without = OrDoc.toModel(d, new ArrayList<>(), null);
+		check("removed with its component", !without.objs.containsKey(att));
+
+		// 2D: the outline of a box seen from the side is its rectangle.
+		PartMesh sm = PartMesh.decode(PartMesh.prepare(squareStl).place(squarePart));
+		java.awt.Shape[] fig = sm.figure(info.openrocket.core.util.Transformation.IDENTITY, Coordinate.ZERO, 1, false);
+		java.awt.geom.Rectangle2D r = fig[1].getBounds2D();
+		check("2D outline and clickable area of the model", fig[0].getBounds2D().getWidth() > 0 && Math.abs(r.getWidth() - 0.015) < 1e-4
+				&& Math.abs(r.getHeight() - 0.005) < 1e-4 && fig[1].contains(r.getCenterX(), r.getCenterY()));
+	}
+
+	/** Extent of a component's drawing in the 3D view: min x, y, z then max x, y, z (OpenRocket coordinates). */
+	private static double[] partExtent(FlightConfiguration conf, RocketComponent c) {
+		RocketMesh m = RocketMesh.of(conf, ObjUtils.LevelOfDetail.NORMAL_QUALITY);
+		double[] e = { 1e9, 1e9, 1e9, -1e9, -1e9, -1e9 };
+		boolean any = false;
+		for (RocketMesh.Part part : m.parts) {
+			if (part.component != c || part.motor != null) {
+				continue;
+			}
+			for (int v = part.firstVertex; v < part.firstVertex + part.vertexCount; v++) {
+				int o = v * RocketMesh.STRIDE;
+				double[] q = { m.vertices[o], m.vertices[o + 1], -m.vertices[o + 2] };
+				for (int k = 0; k < 3; k++) {
+					e[k] = Math.min(e[k], q[k]);
+					e[k + 3] = Math.max(e[k + 3], q[k]);
+				}
+				any = true;
+			}
+		}
+		return any ? e : null;
 	}
 
 	// =================================================================== 3D view (orcloud.view3d)

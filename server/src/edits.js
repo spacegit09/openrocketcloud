@@ -104,7 +104,7 @@ function targetName(model, id, op) {
   if (obj?.t === RAW) {
     return { 'doc:photostudio': 'Photo studio', 'doc:datatypes': 'Custom expressions', 'doc:docprefs': 'Document settings' }[id] ?? 'Design settings';
   }
-  if (obj?.t === ATT || op?.t === ATT) return 'Decal image';
+  if (obj?.t === ATT || op?.t === ATT) return id.startsWith('att:models/') ? '3D model' : 'Decal image';
   const name = componentName(model, id) ?? (op?.v?.name ? op.v.name.replace(/<[^>]+>/g, '') : null);
   const t = obj?.t ?? op?.t;
   return name ? `${typeName(t)} “${name}”` : typeName(t);

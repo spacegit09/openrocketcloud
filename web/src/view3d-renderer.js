@@ -368,7 +368,7 @@ class View {
       texMode: { value: 0 },
       uvMatrix: { value: new Matrix3() },
     };
-    const mat = new ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: !!m.transparent, side: FrontSide });
+    const mat = new ShaderMaterial({ uniforms, vertexShader, fragmentShader, transparent: !!m.transparent, side: m.double ? DoubleSide : FrontSide });
     if (m.texture) {
       const [a, b, c, d, e, f] = m.uv;
       uniforms.uvMatrix.value.set(a, b, c, d, e, f, 0, 0, 1);
