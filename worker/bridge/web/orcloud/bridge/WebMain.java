@@ -17,6 +17,7 @@ import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.FileWindows;
+import orcloud.web.MenuRow;
 import orcloud.web.ModelTab;
 import orcloud.web.SettingsMenu;
 import orcloud.web.StlImport;
@@ -73,15 +74,24 @@ public final class WebMain {
 			}
 			SwingUtilities.invokeLater(() -> {
 				bridge.attach(f);
+				BasicFrame found = null;
+				try {
+					found = OrDoc.findFrame(f);
+					// Our additions to OpenRocket's menus: Settings (its preferences, before File), and the
+					// menus moved into the page's header row, before the page shows the window.
+					SettingsMenu.install(found);
+					MenuRow.install(found);
+				} catch (Exception e) {
+					Log.warn("Menu additions unavailable: " + e);
+				}
+				BasicFrame frame = found;
 				BrowserLink.ready();
 				// The component preset database waited for the window (see our copy of its loader).
 				ComponentPresetDatabaseLoader.loadNow();
-				// Our additions to OpenRocket's menus: Settings (its preferences, before File) and Tools >
-				// Import 3D model (STL); imported models are turned on the "3D model" tab of their Edit dialog.
 				FileWindows.install();
+				// Tools > Import 3D model (STL); imported models are turned on the "3D model" tab of their
+				// Edit dialog.
 				try {
-					BasicFrame frame = OrDoc.findFrame(f);
-					SettingsMenu.install(frame);
 					OpenRocketDocument doc = OrDoc.documentOf(frame);
 					StlImport.install(frame, doc, () -> {
 						List<String> ids = OrDoc.selectedIds(frame);

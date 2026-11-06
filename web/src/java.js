@@ -3,6 +3,7 @@
 import { h, modal } from './common.js';
 import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
+import { menuRowNatives } from './menu-row.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
@@ -143,6 +144,7 @@ export function prepareJava(designId) {
           markFileWindow(x, y, w, h);
         },
         ...view3dNatives,
+        ...menuRowNatives,
       },
     });
   })();
