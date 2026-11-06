@@ -106,6 +106,17 @@ public final class WebMain {
 		openrocket.putBoolean("CheckUpdates", false);
 		openrocket.putBoolean("CheckBetaUpdates", false);
 		openrocket.putBoolean("AutoOpenLastDesign", false);
+		// Rocket dimensions in millimetres (OpenRocket's own default is centimetres): set once per
+		// browser, unless another unit than cm was already chosen; later choices are kept.
+		Preferences web = Preferences.userRoot().node("orcloud-web");
+		if (!web.getBoolean("lengthsInMm", false)) {
+			Preferences units = openrocket.node("units");
+			String length = units.get("LENGTH", null);
+			if (length == null || length.equals("cm")) {
+				units.put("LENGTH", "mm");
+			}
+			web.putBoolean("lengthsInMm", true);
+		}
 		openrocket.flush();
 	}
 }
