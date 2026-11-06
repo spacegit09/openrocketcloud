@@ -1,6 +1,7 @@
 // Runs the official OpenRocket in this page with CheerpJ (Java in the browser) and connects its
 // live-share bridge (orcloud.bridge.BrowserLink in worker/bridge/web) to the design's room.
 import { h, modal } from './common.js';
+import { view3dNatives } from './view3d.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
@@ -82,9 +83,8 @@ export function prepareJava(designId) {
       preloadResources: preload,
       clipboardMode: 'system',
       javaProperties: [
-        // No OpenGL in the browser: OpenRocket's own switch for computers without 3D.
-        'openrocket.3d.disable=true',
-        // JOGL (still loaded for the 2D figure) only knows real CPU types, not CheerpJ's.
+        // JOGL (OpenRocket's OpenGL library, for its photo studio) only knows real CPU types, not
+        // CheerpJ's. The 3D view draws with WebGL instead (view3d.js).
         'os.arch=amd64',
         `orcloud.design=${designId}`,
       ],
@@ -113,6 +113,7 @@ export function prepareJava(designId) {
           window.cheerpOSAddStringFile(path, new Uint8Array(await file.arrayBuffer()));
           return `${path}\n${file.name}`;
         },
+        ...view3dNatives,
       },
     });
   })();

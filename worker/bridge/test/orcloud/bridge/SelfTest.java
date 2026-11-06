@@ -23,6 +23,7 @@ import info.openrocket.core.aerodynamics.BarrowmanCalculator;
 import info.openrocket.core.aerodynamics.FlightConditions;
 import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.document.Simulation;
+import info.openrocket.core.file.wavefrontobj.ObjUtils;
 import info.openrocket.core.file.GeneralRocketLoader;
 import info.openrocket.core.logging.WarningSet;
 import info.openrocket.core.masscalc.MassCalculator;
@@ -43,6 +44,8 @@ import info.openrocket.core.rocketcomponent.SymmetricComponent;
 import info.openrocket.core.util.Coordinate;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.stl.StlModel;
+import orcloud.view3d.Looks;
+import orcloud.view3d.RocketMesh;
 import orcloud.stl.StlPart;
 
 /**
@@ -77,6 +80,13 @@ public final class SelfTest {
 			} catch (Throwable t) {
 				failures++;
 				System.out.println("ERROR STL import: " + t);
+				t.printStackTrace(System.out);
+			}
+			try {
+				view3dChecks(examples);
+			} catch (Throwable t) {
+				failures++;
+				System.out.println("ERROR 3D view: " + t);
 				t.printStackTrace(System.out);
 			}
 		});
@@ -542,6 +552,108 @@ public final class SelfTest {
 		Simulation sim = d.getSimulations().get(0);
 		sim.simulate();
 		check("simulation runs with the imported part", sim.getSimulatedData() != null && sim.getSimulatedData().getMaxAltitude() > 0);
+	}
+
+	// =================================================================== 3D view (orcloud.view3d)
+
+	private static void view3dChecks(List<Path> examples) throws Exception {
+		System.out.println("3D view");
+		int designs = 0, complete = 0, inBounds = 0, faces = 0, agree = 0, withNormals = 0, looksOk = 0, textured = 0;
+		List<String> problems = new ArrayList<>();
+		for (Path p : examples) {
+			OpenRocketDocument d = new GeneralRocketLoader(p.toFile()).load();
+			FlightConfiguration conf = d.getRocket().getSelectedConfiguration();
+			RocketMesh m = RocketMesh.of(conf, ObjUtils.LevelOfDetail.NORMAL_QUALITY);
+			designs++;
+			problems.addAll(m.problems);
+			// Every visible part with a shape is drawn.
+			Set<RocketComponent> drawn = new HashSet<>();
+			for (RocketMesh.Part part : m.parts) {
+				drawn.add(part.component);
+			}
+			boolean all = m.problems.isEmpty() && m.faceCount > 0;
+			for (RocketComponent c : d.getRocket()) {
+				if (!(c instanceof info.openrocket.core.rocketcomponent.ComponentAssembly) && conf.isComponentActive(c) && c.isVisible()
+						&& !drawn.contains(c)) {
+					all = false;
+					problems.add(p.getFileName() + ": " + c.getName() + " (" + c.getClass().getSimpleName() + ") not drawn");
+				}
+			}
+			complete += all ? 1 : 0;
+			// Everything lies within the configuration's extent (z is negated in the mesh).
+			double tol = 0.02 * Math.max(m.bounds.span().x, 0.01) + 0.002;
+			boolean inside = true;
+			for (int i = 0; i < m.vertexCount; i++) {
+				int o = i * RocketMesh.STRIDE;
+				double x = m.vertices[o], y = m.vertices[o + 1], z = -m.vertices[o + 2];
+				if (x < m.bounds.min.x - tol || x > m.bounds.max.x + tol || y < m.bounds.min.y - tol || y > m.bounds.max.y + tol
+						|| z < m.bounds.min.z - tol || z > m.bounds.max.z + tol) {
+					inside = false;
+					break;
+				}
+			}
+			inBounds += inside ? 1 : 0;
+			if (!inside) {
+				problems.add(p.getFileName() + ": mesh outside the rocket's extent");
+			}
+			// How often the winding agrees with the exporter's normals (the page orients each face).
+			int v = 0;
+			for (int f = 0; f < m.faceCount; f++) {
+				int k = m.faceSizes[f];
+				double nx = 0, ny = 0, nz = 0, gx = 0, gy = 0, gz = 0;
+				for (int i = 0; i < k; i++) {
+					int a = (v + i) * RocketMesh.STRIDE, b = (v + (i + 1) % k) * RocketMesh.STRIDE;
+					float[] q = m.vertices;
+					nx += (q[a + 1] - q[b + 1]) * (q[a + 2] + q[b + 2]);
+					ny += (q[a + 2] - q[b + 2]) * (q[a] + q[b]);
+					nz += (q[a] - q[b]) * (q[a + 1] + q[b + 1]);
+					gx += q[a + 3];
+					gy += q[a + 4];
+					gz += q[a + 5];
+				}
+				faces++;
+				if (!Double.isNaN(gx)) {
+					withNormals++;
+					agree += nx * gx + ny * gy + nz * gz >= 0 ? 1 : 0;
+				}
+				v += k;
+			}
+			// The looks of the three view types.
+			List<RocketComponent> comps = Looks.components(m);
+			int[] decals = { 0 };
+			boolean ok = true;
+			for (int type : new int[] { Looks.FIGURE, Looks.UNFINISHED, Looks.FINISHED }) {
+				String json = Looks.json(m, type, comps, c -> new info.openrocket.core.util.ORColor(0, 0, 200), img -> ++decals[0]);
+				ok &= !json.contains("NaN") && !json.contains("Infinity") && json.split("\\],\\[", -1).length == m.parts.size();
+			}
+			looksOk += ok ? 1 : 0;
+			textured += decals[0] > 0 ? 1 : 0;
+		}
+		for (String pr : problems) {
+			System.out.println("  note " + pr);
+		}
+		System.out.println("  note faces " + faces + ", exporter normals on " + withNormals + ", winding agrees on " + agree);
+		check("every visible part of every example is drawn (" + complete + "/" + designs + ")", complete == designs);
+		check("meshes lie within the rockets' extents (" + inBounds + "/" + designs + ")", inBounds == designs);
+		check("looks of all three view types (" + looksOk + "/" + designs + ")", looksOk == designs);
+		check("unfinished views have OpenRocket's textures (" + textured + "/" + designs + ")", textured == designs);
+
+		// Inside, outside and ends of a body tube; see-through tubes in the figure view.
+		Path simple = examples.stream().filter(x -> x.getFileName().toString().startsWith("A simple model rocket")).findFirst().orElse(examples.get(0));
+		OpenRocketDocument d = new GeneralRocketLoader(simple.toFile()).load();
+		RocketMesh m = RocketMesh.of(d.getRocket().getSelectedConfiguration(), ObjUtils.LevelOfDetail.NORMAL_QUALITY);
+		Set<Integer> tubeSurfaces = new HashSet<>();
+		boolean motor = false;
+		for (RocketMesh.Part part : m.parts) {
+			if (part.component instanceof BodyTube && part.motor == null) {
+				tubeSurfaces.add(part.surface);
+			}
+			motor |= part.motor != null;
+		}
+		check("body tube split into outside, inside and ends", tubeSurfaces.size() == 3);
+		check("the motor is drawn", motor);
+		String figure = Looks.json(m, Looks.FIGURE, Looks.components(m), c -> new info.openrocket.core.util.ORColor(0, 0, 200), img -> 1);
+		check("figure view shows body tubes see-through", figure.contains("\"transparent\":true"));
 	}
 
 	private static boolean near(double a, double b, double rel) {

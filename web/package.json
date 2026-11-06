@@ -11,7 +11,8 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.53"
+    "@base44/sdk": "^0.8.53",
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@base44/vite-plugin": "^1.0.30",
