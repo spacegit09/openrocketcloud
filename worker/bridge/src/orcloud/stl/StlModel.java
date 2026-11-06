@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.function.Consumer;
 
 /**
  * A 3D model read from an STL file (binary or ASCII), reduced to what mass and balance need: the
@@ -52,6 +53,15 @@ public final class StlModel {
 	/** Reads binary or ASCII STL. */
 	public static StlModel read(byte[] data) throws IOException {
 		Accumulator acc = new Accumulator();
+		triangles(data, acc::add);
+		if (acc.count == 0) {
+			throw new IOException("The file contains no triangles.");
+		}
+		return new StlModel(acc);
+	}
+
+	/** Hands each triangle of a binary or ASCII STL file to `sink` as x, y, z of its three corners (one reused array). */
+	public static void triangles(byte[] data, Consumer<double[]> sink) throws IOException {
 		if (isBinary(data)) {
 			ByteBuffer b = ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN);
 			long count = Integer.toUnsignedLong(b.getInt(80));
@@ -61,15 +71,11 @@ public final class StlModel {
 				for (int i = 0; i < 9; i++) {
 					v[i] = b.getFloat(off + 4 * i);
 				}
-				acc.add(v);
+				sink.accept(v);
 			}
 		} else {
-			readAscii(data, acc);
+			readAscii(data, sink);
 		}
-		if (acc.count == 0) {
-			throw new IOException("The file contains no triangles.");
-		}
-		return new StlModel(acc);
 	}
 
 	private static boolean isBinary(byte[] data) throws IOException {
@@ -95,7 +101,7 @@ public final class StlModel {
 		throw new IOException("This is not an STL file.");
 	}
 
-	private static void readAscii(byte[] data, Accumulator acc) throws IOException {
+	private static void readAscii(byte[] data, Consumer<double[]> sink) throws IOException {
 		double[] v = new double[9];
 		int n = 0;
 		int i = 0;
@@ -128,7 +134,7 @@ public final class StlModel {
 				}
 			}
 			if (++n == 3) {
-				acc.add(v);
+				sink.accept(v);
 				n = 0;
 			}
 		}

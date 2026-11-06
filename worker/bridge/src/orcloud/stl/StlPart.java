@@ -177,11 +177,16 @@ public final class StlPart {
 	public MassComponent addTo(RocketComponent parent, String name, double offset) {
 		MassComponent mc = new MassComponent();
 		mc.setName(name);
+		addTo(parent, mc, offset);
+		return mc;
+	}
+
+	/** Adds `mc`, a new mass component, sized and weighted as the model, `offset` metres below the top of `parent`. */
+	public void addTo(RocketComponent parent, MassComponent mc, double offset) {
 		parent.addChild(mc);
 		mc.setAxialMethod(AxialMethod.TOP);
 		mc.setAxialOffset(offset);
 		shape(mc);
-		return mc;
 	}
 
 	/** Gives a component the model's mass and (optionally) centre of gravity. */

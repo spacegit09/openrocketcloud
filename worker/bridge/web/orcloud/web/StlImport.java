@@ -31,6 +31,7 @@ import info.openrocket.core.database.Databases;
 import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.material.Material;
 import info.openrocket.core.rocketcomponent.BodyTube;
+import info.openrocket.core.rocketcomponent.ComponentChangeEvent;
 import info.openrocket.core.rocketcomponent.InnerTube;
 import info.openrocket.core.rocketcomponent.MassComponent;
 import info.openrocket.core.rocketcomponent.RocketComponent;
@@ -39,6 +40,8 @@ import info.openrocket.core.unit.Unit;
 import info.openrocket.core.unit.UnitGroup;
 import info.openrocket.swing.gui.main.BasicFrame;
 import net.miginfocom.swing.MigLayout;
+import orcloud.stl.PartMesh;
+import orcloud.stl.PartMeshes;
 import orcloud.stl.StlModel;
 import orcloud.stl.StlPart;
 
@@ -48,7 +51,8 @@ import orcloud.stl.StlPart;
  * part is made) and the model then gives either a new mass component or the mass and centre of
  * gravity of the selected component, both standard OpenRocket data. Aerodynamics keep coming from
  * OpenRocket's own component shapes (see {@link StlPart}). Parachutes, streamers and shock cords
- * are not modelled from files.
+ * are not modelled from files. A mass component made from a model is drawn as the model, in the 2D
+ * and 3D views ({@link PartMeshes}): its shape is kept with the design.
  *
  * The dialog is not modal, like OpenRocket's component dialogs: CheerpJ updates the screen when a
  * click has been handled, which a modal dialog delays until it closes. The file is chosen from
@@ -111,6 +115,7 @@ public final class StlImport {
 		private final RocketComponent target;
 		private final RocketComponent parent;
 		private StlPart part;
+		private PartMesh.Shape shape; // the model's shape for drawing; null if it could not be prepared
 		private String baseName;
 
 		private final JButton choose = new JButton("Choose STL file...");
@@ -189,7 +194,7 @@ public final class StlImport {
 			pane.add(result);
 			problems.setForeground(new Color(0xC0, 0x30, 0x20));
 			pane.add(problems, "skip, hidemode 3");
-			JLabel note = new JLabel("<html>OpenRocket computes aerodynamics from its own component shapes; the model sets mass and balance only.</html>");
+			JLabel note = new JLabel("<html>OpenRocket computes aerodynamics from its own component shapes; the model sets mass and balance only. A new mass component is drawn as the model.</html>");
 			note.setFont(note.getFont().deriveFont(note.getFont().getSize2D() - 1f));
 			note.setForeground(Color.GRAY);
 			pane.add(note, "span, growx, wmin 10");
@@ -262,8 +267,16 @@ public final class StlImport {
 				String[] parts = picked.split("\n", 2);
 				String name = parts.length > 1 ? parts[1] : "model.stl";
 				try {
-					StlModel model = StlModel.read(Files.readAllBytes(Path.of(parts[0])));
-					SwingUtilities.invokeLater(() -> load(name, model));
+					byte[] data = Files.readAllBytes(Path.of(parts[0]));
+					StlModel model = StlModel.read(data);
+					PartMesh.Shape prepared;
+					try {
+						prepared = PartMesh.prepare(data);
+					} catch (Exception | OutOfMemoryError e) {
+						prepared = null; // still imported, drawn as OpenRocket's cylinder
+					}
+					PartMesh.Shape s = prepared;
+					SwingUtilities.invokeLater(() -> load(name, model, s));
 				} catch (Exception e) {
 					SwingUtilities.invokeLater(() -> failed("Could not read " + name + ": " + e.getMessage()));
 				}
@@ -275,17 +288,21 @@ public final class StlImport {
 		private void failed(String message) {
 			choose.setEnabled(true);
 			part = null;
+			shape = null;
 			file.setText(message);
 			update();
 		}
 
-		private void load(String name, StlModel model) {
+		private void load(String name, StlModel model, PartMesh.Shape shape) {
 			choose.setEnabled(true);
 			choose.setText("Choose another...");
 			baseName = name.replaceAll("(?i)\\.stl$", "");
 			part = new StlPart(model);
+			this.shape = shape;
 			file.setText(name + ": " + String.format(Locale.ROOT, "%,d", model.triangles) + " triangles, "
-					+ (model.closed ? "a closed solid" : "an open surface (not watertight)"));
+					+ (model.closed ? "a closed solid" : "an open surface (not watertight)")
+					+ (shape != null && shape.triangles < shape.fileTriangles
+							? String.format(Locale.ROOT, "; drawn with %,d", shape.triangles) : ""));
 			int guessedAxis = part.axis;
 			boolean guessedFront = part.frontAtMax;
 			axis.setSelectedIndex(guessedAxis);
@@ -375,11 +392,30 @@ public final class StlImport {
 			}
 			doc.addUndoPosition(TITLE);
 			if (addNew.isSelected()) {
-				part.addTo(parent, baseName, ((Number) offset.getValue()).doubleValue() / 1000);
+				// The shape is registered under the new component's id before the component is added, so
+				// the live-share bridge sends both together.
+				MassComponent mc = new MassComponent();
+				mc.setName(baseName);
+				keepShape(mc);
+				part.addTo(parent, mc, ((Number) offset.getValue()).doubleValue() / 1000);
 			} else {
+				if (target instanceof MassComponent) {
+					keepShape(target);
+				}
 				part.applyTo(target, setCg.isSelected());
+				// Redraw (and share) the new shape even if the size did not change.
+				target.fireComponentChangeEvent(ComponentChangeEvent.GRAPHIC_CHANGE);
 			}
 			dispose();
+		}
+
+		/** The mass component is drawn as the model from now on (or as a cylinder if it has none). */
+		private void keepShape(RocketComponent c) {
+			if (shape != null) {
+				PartMeshes.put(String.valueOf(c.getID()), shape.place(part));
+			} else {
+				PartMeshes.remove(String.valueOf(c.getID()));
+			}
 		}
 
 		private static String dim(double v) {

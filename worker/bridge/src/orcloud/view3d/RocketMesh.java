@@ -29,6 +29,7 @@ import info.openrocket.core.rocketcomponent.FinSet;
 import info.openrocket.core.rocketcomponent.FlightConfiguration;
 import info.openrocket.core.rocketcomponent.InstanceContext;
 import info.openrocket.core.rocketcomponent.LaunchLug;
+import info.openrocket.core.rocketcomponent.MassComponent;
 import info.openrocket.core.rocketcomponent.MassObject;
 import info.openrocket.core.rocketcomponent.MotorMount;
 import info.openrocket.core.rocketcomponent.RailButton;
@@ -39,6 +40,8 @@ import info.openrocket.core.rocketcomponent.Transition;
 import info.openrocket.core.rocketcomponent.TubeFinSet;
 import info.openrocket.core.util.BoundingBox;
 import info.openrocket.core.util.Coordinate;
+import orcloud.stl.PartMesh;
+import orcloud.stl.PartMeshes;
 
 /**
  * The rocket of a flight configuration as polygon meshes, for the browser's 3D view. OpenRocket's
@@ -62,13 +65,17 @@ public final class RocketMesh {
 		/** The motor, or null for a component. */
 		public final Motor motor;
 		public final int surface;
+		/** Whether this is an imported 3D model's own shape (see {@link PartMeshes}). */
+		public final boolean model;
 		/** Faces [firstFace, firstFace + faceCount) and their vertices from firstVertex on. */
 		public final int firstFace, faceCount, firstVertex, vertexCount;
 
-		Part(RocketComponent component, Motor motor, int surface, int firstFace, int faceCount, int firstVertex, int vertexCount) {
+		Part(RocketComponent component, Motor motor, int surface, boolean model, int firstFace, int faceCount, int firstVertex,
+				int vertexCount) {
 			this.component = component;
 			this.motor = motor;
 			this.surface = surface;
+			this.model = model;
 			this.firstFace = firstFace;
 			this.faceCount = faceCount;
 			this.firstVertex = firstVertex;
@@ -103,6 +110,11 @@ public final class RocketMesh {
 				continue;
 			}
 			try {
+				PartMesh model = PartMeshes.get(c);
+				if (model != null) {
+					m.addModel((MassComponent) c, model, instances);
+					continue;
+				}
 				DefaultObj obj = new DefaultObj();
 				RocketComponentExporter<?> exporter = exporter(obj, config, c, lod, warnings);
 				if (exporter == null) {
@@ -151,6 +163,52 @@ public final class RocketMesh {
 		return null;
 	}
 
+	/**
+	 * Adds an imported 3D model's shape in place of OpenRocket's cylinder, at each instance of the
+	 * component and its radial position, scaled with the component's length.
+	 */
+	private void addModel(MassComponent c, PartMesh model, List<InstanceContext> instances) {
+		double s = model.length > 0 && c.getLength() > 0 ? c.getLength() / model.length : 1;
+		// Off-axis placement, which OpenRocket adds to a mass object's instances itself.
+		double ry = c.getRadialPosition() * Math.cos(c.getRadialDirection());
+		double rz = c.getRadialPosition() * Math.sin(c.getRadialDirection());
+		float[] pos = model.positions;
+		int[] tri = model.triangles;
+		float[] normals = model.cornerNormals();
+		int tc = tri.length / 3;
+		int firstFace = faceCount, firstVertex = vertexCount;
+		for (InstanceContext context : instances) {
+			// The instance's transformation as a matrix: origin and the images of the unit axes.
+			Coordinate o = context.transform.transform(Coordinate.ZERO);
+			Coordinate[] axes = { context.transform.linearTransform(new Coordinate(1, 0, 0)),
+					context.transform.linearTransform(new Coordinate(0, 1, 0)), context.transform.linearTransform(new Coordinate(0, 0, 1)) };
+			if (faceCount + tc > faceSizes.length) {
+				faceSizes = Arrays.copyOf(faceSizes, Math.max(faceSizes.length * 2, faceCount + tc));
+			}
+			if ((vertexCount + tc * 3) * STRIDE > vertices.length) {
+				vertices = Arrays.copyOf(vertices, Math.max(vertices.length * 2, (vertexCount + tc * 3) * STRIDE));
+			}
+			for (int t = 0; t < tc; t++) {
+				faceSizes[faceCount++] = 3;
+				for (int k = 0; k < 3; k++) {
+					int v = tri[t * 3 + k] * 3;
+					double x = pos[v] * s, y = ry + pos[v + 1] * s, z = rz + pos[v + 2] * s;
+					int n = t * 9 + k * 3;
+					double nx = normals[n], ny = normals[n + 1], nz = normals[n + 2];
+					int out = vertexCount++ * STRIDE;
+					vertices[out] = (float) (o.x + axes[0].x * x + axes[1].x * y + axes[2].x * z);
+					vertices[out + 1] = (float) (o.y + axes[0].y * x + axes[1].y * y + axes[2].y * z);
+					vertices[out + 2] = (float) -(o.z + axes[0].z * x + axes[1].z * y + axes[2].z * z);
+					vertices[out + 3] = (float) (axes[0].x * nx + axes[1].x * ny + axes[2].x * nz);
+					vertices[out + 4] = (float) (axes[0].y * nx + axes[1].y * ny + axes[2].y * nz);
+					vertices[out + 5] = (float) -(axes[0].z * nx + axes[1].z * ny + axes[2].z * nz);
+					vertices[out + 6] = vertices[out + 7] = 0;
+				}
+			}
+		}
+		parts.add(new Part(c, null, OUTSIDE, true, firstFace, faceCount - firstFace, firstVertex, vertexCount - firstVertex));
+	}
+
 	/** Tubes and shells around their own axis, which have an inside surface. */
 	private static boolean hasInside(RocketComponent c) {
 		return c instanceof SymmetricComponent || c instanceof RingComponent || c instanceof LaunchLug;
@@ -189,7 +247,7 @@ public final class RocketMesh {
 					addFace(obj, obj.getFace(f));
 				}
 			}
-			parts.add(new Part(c, motor, s, firstFace, faceCount - firstFace, firstVertex, vertexCount - firstVertex));
+			parts.add(new Part(c, motor, s, false, firstFace, faceCount - firstFace, firstVertex, vertexCount - firstVertex));
 		}
 	}
 

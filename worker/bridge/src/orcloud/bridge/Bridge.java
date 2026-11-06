@@ -37,6 +37,7 @@ import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.simulation.FlightData;
 import info.openrocket.core.util.ModID;
 import info.openrocket.swing.gui.main.BasicFrame;
+import orcloud.stl.PartMeshes;
 
 /**
  * The live-share engine. All document and model state is confined to the Swing event
@@ -169,6 +170,7 @@ final class Bridge implements Link.Handler {
 			String name = String.valueOf(msg.getOrDefault("name", "Rocket"));
 			String safe = name.replaceAll("[^\\p{L}\\p{N} ._()-]", "_").trim();
 			Path p = workDir.resolve((safe.isEmpty() ? "Rocket" : safe) + ".ork");
+			OrDoc.adoptPartMeshes(m); // before OpenRocket opens the file, so the first snapshot keeps them
 			OrDoc.writeOrk(m, p);
 			writeMotors(msg.get("motors"));
 			fileModel = m.copy();
@@ -785,6 +787,21 @@ final class Bridge implements Link.Handler {
 		applyToDocument(expected, target);
 	}
 
+	/**
+	 * Shapes of imported 3D models that someone else removed are forgotten here too, or the next
+	 * snapshot would send them back (new and changed ones are registered when the design loads).
+	 */
+	private static void dropRemovedPartMeshes(Model cur, Model target) {
+		for (String id : cur.objs.keySet()) {
+			if (id.startsWith("att:") && !target.objs.containsKey(id)) {
+				String component = PartMeshes.componentId(id.substring(4));
+				if (component != null) {
+					PartMeshes.remove(component);
+				}
+			}
+		}
+	}
+
 	private static final class Plan {
 		boolean reloadRocket;
 		boolean sims;
@@ -860,6 +877,7 @@ final class Bridge implements Link.Handler {
 	}
 
 	private void applyToDocument(Model cur, Model target) {
+		dropRemovedPartMeshes(cur, target);
 		Plan plan = plan(cur, target);
 		if (plan.empty()) {
 			expected = target;

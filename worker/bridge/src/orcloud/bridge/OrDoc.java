@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -55,6 +56,7 @@ import info.openrocket.core.startup.jij.ConfigurableStreamHandlerFactory;
 import info.openrocket.core.util.BuildProperties;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.gui.main.componenttree.ComponentTreeModel;
+import orcloud.stl.PartMeshes;
 
 /**
  * Everything that touches OpenRocket internals lives here. The application itself runs
@@ -138,6 +140,7 @@ final class OrDoc {
 	 * because OpenRocket reads decals lazily from the container file it was loaded from.
 	 */
 	static OpenRocketDocument load(Model m) throws Exception {
+		adoptPartMeshes(m);
 		Map<String, byte[]> atts = m.attachments();
 		if (atts.isEmpty()) {
 			return load(m.toXml());
@@ -213,7 +216,7 @@ final class OrDoc {
 		if (decalCache != null) {
 			decalCache.keySet().retainAll(used);
 		}
-		int pos = 1000;
+		Map<String, String> atts = new TreeMap<>(); // entry name -> base64, numbered in name order
 		for (DecalImage img : used) {
 			String data = decalCache == null ? null : decalCache.get(img);
 			if (data == null) {
@@ -227,13 +230,38 @@ final class OrDoc {
 					decalCache.put(img, data);
 				}
 			}
+			atts.put(img.getName(), data);
+		}
+		// Shapes of imported 3D models, for the components still in the design.
+		for (RocketComponent c : doc.getRocket()) {
+			String id = String.valueOf(c.getID());
+			String data = PartMeshes.base64(id);
+			if (data != null) {
+				atts.put(PartMeshes.attachmentName(id), data);
+			}
+		}
+		int pos = 1000;
+		for (Map.Entry<String, String> e : atts.entrySet()) {
 			Model.Obj a = new Model.Obj(Model.ATT, Model.DOC, pos++);
 			a.v.put(Model.ATTRS, "");
 			a.k.add("data");
-			a.v.put("data", data);
-			m.objs.put("att:" + img.getName(), a);
+			a.v.put("data", e.getValue());
+			m.objs.put("att:" + e.getKey(), a);
 		}
 		return m;
+	}
+
+	/** Registers the shapes of imported 3D models stored in a shared design. */
+	static void adoptPartMeshes(Model m) {
+		for (Map.Entry<String, Model.Obj> e : m.objs.entrySet()) {
+			if (Model.ATT.equals(e.getValue().t) && e.getKey().startsWith("att:")) {
+				String id = PartMeshes.componentId(e.getKey().substring(4));
+				String data = e.getValue().v.get("data");
+				if (id != null && data != null) {
+					PartMeshes.putBase64(id, data);
+				}
+			}
+		}
 	}
 
 	private static void addDecal(Set<DecalImage> used, Appearance ap) {
