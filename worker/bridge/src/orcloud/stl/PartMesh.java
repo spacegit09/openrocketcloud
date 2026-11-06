@@ -22,7 +22,8 @@ import info.openrocket.core.util.Transformation;
  * how the file sits in the rocket (its axis, nose end and units, as chosen when importing).
  *
  * Decoded, positions are in the part's own frame in metres: x from the nose-side end aft, y and z
- * across, centred on the part's axis, turned (not mirrored) from the file's orientation.
+ * across, centred on the part's axis, turned (not mirrored) from the file's orientation and by the
+ * part's own turn about its axis.
  */
 public final class PartMesh {
 	public static final int MAX_TRIANGLES = 30_000;
@@ -55,7 +56,7 @@ public final class PartMesh {
 				b.u8(x);
 			}
 			b.u8(VERSION).u8(part.axis).u8((part.frontAtMax ? 1 : 0) | (m.closed ? 2 : 0)).u8(part.fill.ordinal());
-			b.f64(part.unit).f64(0).f64(part.wall).f64(part.infill).f64(m.volume).f64(m.area);
+			b.f64(part.unit).f64(0 /* turn */).f64(part.wall).f64(part.infill).f64(m.volume).f64(m.area);
 			for (double[] v : new double[][] { m.volumeCentroid, m.areaCentroid, m.min, m.max }) {
 				for (double x : v) {
 					b.f64(x);
@@ -74,18 +75,46 @@ public final class PartMesh {
 	/** How the file lies in the rocket: its axis along the rocket, and whether its high end faces the nose. */
 	public final int axis;
 	public final boolean frontAtMax;
+	/** The model's turn about its own axis (radians), already applied to the positions. */
+	public final double turn;
 	/** The model as a rocket part (measurements, units, how it is made), or null for shapes kept before version 2. */
 	public final StlPart part;
 	private float[] cornerNormals;
 	private int[] edges;
 
-	private PartMesh(float[] positions, int[] triangles, double length, int axis, boolean frontAtMax, StlPart part) {
+	private PartMesh(float[] positions, int[] triangles, double length, int axis, boolean frontAtMax, double turn, StlPart part) {
 		this.positions = positions;
 		this.triangles = triangles;
 		this.length = length;
 		this.axis = axis;
 		this.frontAtMax = frontAtMax;
+		this.turn = turn;
 		this.part = part;
+	}
+
+	/**
+	 * The same shape turned about its own axis (the line along the rocket through the middle of its
+	 * cross-section) by `turn` radians from how it was placed. Shapes kept before version 2 are
+	 * rewritten as version 2, without the measurements they never had.
+	 */
+	public static byte[] turned(byte[] attachment, double turn) throws IOException {
+		int version = attachment.length >= HEADER_1 && Arrays.equals(Arrays.copyOf(attachment, 4), MAGIC) ? attachment[4] : -1;
+		byte[] out;
+		if (version == 1) {
+			out = new byte[HEADER_2 + attachment.length - HEADER_1];
+			System.arraycopy(attachment, 0, out, 0, 16);
+			out[4] = VERSION;
+			out[7] = (byte) 0xFF; // no measurements
+			System.arraycopy(attachment, HEADER_1, out, HEADER_2, attachment.length - HEADER_1);
+		} else if (version == 2 && attachment.length >= HEADER_2) {
+			out = attachment.clone();
+		} else {
+			throw new IOException("Not a 3D model");
+		}
+		Bytes b = new Bytes(out);
+		b.p = 16;
+		b.f64(Math.IEEEremainder(turn, 2 * Math.PI));
+		return out;
 	}
 
 	/** The same shape lying another way in the rocket: along the file's `axis`, its high end to the nose if `frontAtMax`. */
@@ -253,8 +282,11 @@ public final class PartMesh {
 			throw new IOException("Damaged 3D model");
 		}
 		StlPart part = null;
+		double turn = version >= 2 ? h.f64() : 0;
+		if (!Double.isFinite(turn)) {
+			throw new IOException("Damaged 3D model");
+		}
 		if (version >= 2 && (data[7] & 0xFF) < FILLS.length) {
-			h.f64(); // reserved
 			double wall = h.f64(), infill = h.f64(), volume = h.f64(), area = h.f64();
 			double[][] v = new double[4][3];
 			for (double[] x : v) {
@@ -307,6 +339,7 @@ public final class PartMesh {
 		// OpenRocket's axes are left-handed, so z = -c keeps the file's right-handed shape.
 		int a = axis, bAxis = (axis + 1) % 3, cAxis = (axis + 2) % 3;
 		double cb = (min[bAxis] + max[bAxis]) / 2, cc = (min[cAxis] + max[cAxis]) / 2;
+		double cos = Math.cos(turn), sin = Math.sin(turn);
 		float[] pos = new float[vc * 3];
 		double[] p = new double[3];
 		for (int v = 0; v < vc; v++) {
@@ -314,8 +347,9 @@ public final class PartMesh {
 				p[k] = min[k] + b.u16() / 65535.0 * (max[k] - min[k]);
 			}
 			pos[v * 3] = (float) ((front ? max[a] - p[a] : p[a] - min[a]) * unit);
-			pos[v * 3 + 1] = (float) ((front ? -1 : 1) * (p[bAxis] - cb) * unit);
-			pos[v * 3 + 2] = (float) (-(p[cAxis] - cc) * unit);
+			double y = (front ? -1 : 1) * (p[bAxis] - cb) * unit, z = -(p[cAxis] - cc) * unit;
+			pos[v * 3 + 1] = (float) (y * cos - z * sin);
+			pos[v * 3 + 2] = (float) (y * sin + z * cos);
 		}
 		int[] tri = new int[tc * 3];
 		for (int i = 0; i < tc * 3; i++) {
@@ -324,7 +358,7 @@ public final class PartMesh {
 				throw new IOException("Damaged 3D model");
 			}
 		}
-		return new PartMesh(pos, tri, (max[a] - min[a]) * unit, axis, front, part);
+		return new PartMesh(pos, tri, (max[a] - min[a]) * unit, axis, front, turn, part);
 	}
 
 	// ------------------------------------------------------------------ drawing
@@ -432,7 +466,8 @@ public final class PartMesh {
 	 * @param t      the figure's transformation of the component
 	 * @param offset where the part's axis starts, in the component's frame
 	 * @param scale  the part's size relative to the model
-	 * @param turn   the part's turn about the rocket's axis (radians; the component's radial direction)
+	 * @param turn   the part's turn about the rocket's axis (radians; the component's radial direction),
+	 *               with `offset` already at that angle
 	 */
 	public java.awt.Shape[] figure(Transformation t, Coordinate offset, double scale, double turn, boolean back) {
 		int vc = positions.length / 3, tc = triangles.length / 3;

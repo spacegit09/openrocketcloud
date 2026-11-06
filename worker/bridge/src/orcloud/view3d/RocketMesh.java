@@ -165,12 +165,13 @@ public final class RocketMesh {
 
 	/**
 	 * Adds an imported 3D model's shape in place of OpenRocket's cylinder, at each instance of the
-	 * component and its radial position, turned by its radial direction and scaled with its length.
+	 * component and its radial position, turned about the rocket's axis by its radial direction and
+	 * scaled with its length.
 	 */
 	private void addModel(MassComponent c, PartMesh model, List<InstanceContext> instances) {
 		double s = model.length > 0 && c.getLength() > 0 ? c.getLength() / model.length : 1;
-		// Off-axis placement, which OpenRocket adds to a mass object's instances itself; the model
-		// turns about the rocket's axis with the same angle (the component's radial direction).
+		// Off-axis placement, which OpenRocket adds to a mass object's instances itself. Its radial
+		// direction turns the part about the rocket's axis, so the model turns with it.
 		double turn = c.getRadialDirection(), cos = Math.cos(turn), sin = Math.sin(turn);
 		double ry = c.getRadialPosition() * cos;
 		double rz = c.getRadialPosition() * sin;

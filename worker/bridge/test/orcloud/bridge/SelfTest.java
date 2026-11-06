@@ -728,30 +728,66 @@ public final class SelfTest {
 				&& PartMeshes.get(sledCopy) != null && PartMeshes.get(single) != null
 				&& sledAtt.length == java.util.Base64.getDecoder().decode(PartMeshes.base64(String.valueOf(single.getID()))).length);
 
-		// Turned about the rocket's axis by the radial direction: a quarter turn swaps the extents across.
+		// Turned about its own axis: a quarter turn swaps the extents across, about the same centre.
+		// Turned about the rocket's axis (the radial direction): off the axis, the part goes round the
+		// rocket and turns with it, as one rigid piece.
 		double[] e0 = partExtent(conf, sled);
+		sled.setRadialPosition(0.004);
+		double[] eOff = partExtent(conf, sled);
 		sled.setRadialDirection(Math.PI / 2);
-		double[] e90 = partExtent(conf, sled);
+		double[] eRocket = partExtent(conf, sled);
 		sled.setRadialDirection(0);
-		check("the model turns about the rocket's axis with the radial direction", e0 != null && e90 != null
-				&& near(e0[4] - e0[1], e90[5] - e90[2], 1e-4) && near(e0[5] - e0[2], e90[4] - e90[1], 1e-4)
-				&& Math.abs((e0[4] - e0[1]) - (e0[5] - e0[2])) > 0.004);
-
-		// End for end: the centre of gravity moves to the other end; undo brings the shape back with it.
-		PartMesh before = PartMeshes.get(sled);
-		double cgBefore = sled.getOverrideCGX(), len = sled.getLength();
-		PartMeshes.remember(sled);
-		PartMeshes.put(String.valueOf(sled.getID()), PartMesh.reorient(sledAtt, 2, true));
-		PartMeshes.get(sled).part.fit(sled, 1);
-		PartMeshes.remember(sled);
-		boolean flipped = sled.isCGOverridden() && near(sled.getOverrideCGX(), len - cgBefore, 1e-9) && PartMeshes.get(sled).frontAtMax;
-		String after = PartMeshes.base64(String.valueOf(sled.getID()));
-		sled.setOverrideCGX(cgBefore); // as OpenRocket's undo restores the component
-		boolean undone = PartMeshes.restore(sled) && !PartMeshes.get(sled).frontAtMax && before.axis == PartMeshes.get(sled).axis;
-		sled.setOverrideCGX(len - cgBefore); // redo
-		boolean redone = PartMeshes.restore(sled) && after.equals(PartMeshes.base64(String.valueOf(sled.getID())));
-		check("end for end moves the centre of gravity; undo and redo bring the matching shape", flipped && undone && redone);
+		sled.setRadialPosition(0);
+		PartMeshes.put(String.valueOf(sled.getID()), PartMesh.turned(sledAtt, Math.PI / 2));
+		double[] e90 = partExtent(conf, sled);
+		boolean swapped = e0 != null && e90 != null && near(e0[4] - e0[1], e90[5] - e90[2], 1e-4) && near(e0[5] - e0[2], e90[4] - e90[1], 1e-4)
+				&& Math.abs((e0[4] - e0[1]) - (e0[5] - e0[2])) > 0.004 && near(e0[1] + e0[4], e90[1] + e90[4], 1e-4)
+				&& near(e0[2] + e0[5], e90[2] + e90[5], 1e-4) && PartMeshes.get(sled).turn == Math.PI / 2;
+		check("the model turns about its own axis", swapped);
+		// A quarter turn about the rocket's axis takes (y, z) to (-z, y).
+		check("turned about the rocket's axis as one piece", eOff != null && eRocket != null && near(eRocket[1], -eOff[5], 1e-4)
+				&& near(eRocket[4], -eOff[2], 1e-4) && near(eRocket[2], eOff[1], 1e-4) && near(eRocket[5], eOff[4], 1e-4)
+				&& near(eOff[1] + eOff[4], e0[1] + e0[4] + 0.008, 1e-4));
+		PartMeshes.put(String.valueOf(sled.getID()), sledAtt);
 		tube.removeChild(sled);
+
+		// Undo and redo bring back the shapes with OpenRocket's own undo states: a turn and an end for
+		// end turn (which moves the centre of gravity), then the import itself.
+		d.clearUndo();
+		Set<String> redrawn = new HashSet<>();
+		orcloud.stl.PartMeshUndo.install(d, redrawn::addAll);
+		d.addUndoPosition("Import");
+		MassComponent undoPart = new MassComponent();
+		undoPart.setName("Undo sled");
+		String uid = String.valueOf(undoPart.getID());
+		PartMeshes.put(uid, sledAtt);
+		base.addTo(tube, undoPart, 0.03);
+		double cg0 = undoPart.getOverrideCGX(), len0 = undoPart.getLength();
+		d.addUndoPosition("Turn");
+		PartMeshes.put(uid, PartMesh.reorient(PartMesh.turned(sledAtt, Math.PI / 2), 2, true));
+		PartMeshes.get(undoPart).part.fit(undoPart, 1);
+		undoPart.fireComponentChangeEvent(ComponentChangeEvent.GRAPHIC_CHANGE);
+		String turnedData = PartMeshes.base64(uid);
+		boolean flippedCg = near(undoPart.getOverrideCGX(), len0 - cg0, 1e-9);
+		java.util.function.Supplier<RocketComponent> live = () -> d.getRocket().findComponent(undoPart.getID());
+		String plain = java.util.Base64.getEncoder().encodeToString(sledAtt);
+		d.undo();
+		boolean undo1 = plain.equals(PartMeshes.base64(uid)) && live.get() != null && redrawn.contains(uid);
+		d.redo();
+		boolean redo1 = turnedData.equals(PartMeshes.base64(uid));
+		d.undo();
+		d.undo();
+		boolean undo2 = live.get() == null && PartMeshes.base64(uid) == null;
+		d.redo();
+		boolean redo2 = live.get() != null && plain.equals(PartMeshes.base64(uid));
+		d.redo();
+		boolean redo3 = turnedData.equals(PartMeshes.base64(uid)) && near(((MassComponent) live.get()).getOverrideCGX(), len0 - cg0, 1e-9);
+		check("undo and redo bring back the matching shape (" + undo1 + redo1 + undo2 + redo2 + redo3 + ")",
+				flippedCg && undo1 && redo1 && undo2 && redo2 && redo3);
+		RocketComponent stale = live.get();
+		if (stale != null) {
+			stale.getParent().removeChild(stale);
+		}
 
 		// 2D: the outline of a box seen from the side is its rectangle.
 		PartMesh sm = PartMesh.decode(PartMesh.prepare(squareStl).place(squarePart));

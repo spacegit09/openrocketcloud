@@ -796,7 +796,7 @@ final class Bridge implements Link.Handler {
 			if (id.startsWith("att:") && !target.objs.containsKey(id)) {
 				String component = PartMeshes.componentId(id.substring(4));
 				if (component != null) {
-					PartMeshes.remove(component);
+					PartMeshes.drop(component);
 				}
 			}
 		}
