@@ -26,8 +26,11 @@ import info.openrocket.core.util.Transformation;
  */
 public final class PartMesh {
 	public static final int MAX_TRIANGLES = 30_000;
-	private static final int VERSION = 1;
+	private static final int VERSION = 2;
 	private static final byte[] MAGIC = { 'O', 'R', 'C', 'M' };
+	/** Header sizes: version 1 had the placement only; version 2 adds the model's measurements. */
+	private static final int HEADER_1 = 16, HEADER_2 = 152;
+	private static final StlPart.Fill[] FILLS = StlPart.Fill.values();
 
 	/** An STL file reduced for display, in the file's own coordinates; prepared once per file. */
 	public static final class Shape {
@@ -41,13 +44,23 @@ public final class PartMesh {
 			this.triangles = triangles;
 		}
 
-		/** The attachment for this shape placed as `part` says: its axis, nose end and units. */
+		/**
+		 * The attachment for this shape placed as `part` says (its axis, nose end and units), with the
+		 * model's measurements and how it is made, so the part can be turned later.
+		 */
 		public byte[] place(StlPart part) {
-			Bytes b = new Bytes(16 + payload.length);
-			for (byte m : MAGIC) {
-				b.u8(m);
+			StlModel m = part.model;
+			Bytes b = new Bytes(HEADER_2 + payload.length);
+			for (byte x : MAGIC) {
+				b.u8(x);
 			}
-			b.u8(VERSION).u8(part.axis).u8(part.frontAtMax ? 1 : 0).u8(0).f64(part.unit);
+			b.u8(VERSION).u8(part.axis).u8((part.frontAtMax ? 1 : 0) | (m.closed ? 2 : 0)).u8(part.fill.ordinal());
+			b.f64(part.unit).f64(0).f64(part.wall).f64(part.infill).f64(m.volume).f64(m.area);
+			for (double[] v : new double[][] { m.volumeCentroid, m.areaCentroid, m.min, m.max }) {
+				for (double x : v) {
+					b.f64(x);
+				}
+			}
 			System.arraycopy(payload, 0, b.a, b.p, payload.length);
 			return b.a;
 		}
@@ -58,13 +71,32 @@ public final class PartMesh {
 	public final int[] triangles;
 	/** The part's length along x. */
 	public final double length;
+	/** How the file lies in the rocket: its axis along the rocket, and whether its high end faces the nose. */
+	public final int axis;
+	public final boolean frontAtMax;
+	/** The model as a rocket part (measurements, units, how it is made), or null for shapes kept before version 2. */
+	public final StlPart part;
 	private float[] cornerNormals;
 	private int[] edges;
 
-	private PartMesh(float[] positions, int[] triangles, double length) {
+	private PartMesh(float[] positions, int[] triangles, double length, int axis, boolean frontAtMax, StlPart part) {
 		this.positions = positions;
 		this.triangles = triangles;
 		this.length = length;
+		this.axis = axis;
+		this.frontAtMax = frontAtMax;
+		this.part = part;
+	}
+
+	/** The same shape lying another way in the rocket: along the file's `axis`, its high end to the nose if `frontAtMax`. */
+	public static byte[] reorient(byte[] attachment, int axis, boolean frontAtMax) throws IOException {
+		if (attachment.length < HEADER_1 || !Arrays.equals(Arrays.copyOf(attachment, 4), MAGIC) || axis < 0 || axis > 2) {
+			throw new IOException("Not a 3D model");
+		}
+		byte[] out = attachment.clone();
+		out[5] = (byte) axis;
+		out[6] = (byte) ((out[6] & ~1) | (frontAtMax ? 1 : 0));
+		return out;
 	}
 
 	// ------------------------------------------------------------------ preparing
@@ -207,8 +239,10 @@ public final class PartMesh {
 	// ------------------------------------------------------------------ reading
 
 	public static PartMesh decode(byte[] data) throws IOException {
-		if (data.length < 16 || !Arrays.equals(Arrays.copyOf(data, 4), MAGIC) || data[4] != VERSION) {
-			throw new IOException("Not a 3D model of this version");
+		int version = data.length >= HEADER_1 && Arrays.equals(Arrays.copyOf(data, 4), MAGIC) ? data[4] : -1;
+		int header = version == 1 ? HEADER_1 : version == 2 ? HEADER_2 : -1;
+		if (header < 0 || data.length < header) {
+			throw new IOException("Not a 3D model of a known version");
 		}
 		int axis = data[5];
 		boolean front = (data[6] & 1) != 0;
@@ -218,8 +252,26 @@ public final class PartMesh {
 		if (axis < 0 || axis > 2 || !(unit > 0)) {
 			throw new IOException("Damaged 3D model");
 		}
+		StlPart part = null;
+		if (version >= 2 && (data[7] & 0xFF) < FILLS.length) {
+			h.f64(); // reserved
+			double wall = h.f64(), infill = h.f64(), volume = h.f64(), area = h.f64();
+			double[][] v = new double[4][3];
+			for (double[] x : v) {
+				for (int k = 0; k < 3; k++) {
+					x[k] = h.f64();
+				}
+			}
+			part = new StlPart(new StlModel(0, volume, area, v[0], v[1], v[2], v[3], (data[6] & 2) != 0));
+			part.unit = unit;
+			part.axis = axis;
+			part.frontAtMax = front;
+			part.fill = FILLS[data[7] & 0xFF];
+			part.wall = wall;
+			part.infill = infill;
+		}
 		Inflater inf = new Inflater();
-		inf.setInput(data, 16, data.length - 16);
+		inf.setInput(data, header, data.length - header);
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		byte[] buf = new byte[1 << 16];
 		try {
@@ -272,7 +324,7 @@ public final class PartMesh {
 				throw new IOException("Damaged 3D model");
 			}
 		}
-		return new PartMesh(pos, tri, (max[a] - min[a]) * unit);
+		return new PartMesh(pos, tri, (max[a] - min[a]) * unit, axis, front, part);
 	}
 
 	// ------------------------------------------------------------------ drawing
@@ -380,13 +432,16 @@ public final class PartMesh {
 	 * @param t      the figure's transformation of the component
 	 * @param offset where the part's axis starts, in the component's frame
 	 * @param scale  the part's size relative to the model
+	 * @param turn   the part's turn about the rocket's axis (radians; the component's radial direction)
 	 */
-	public java.awt.Shape[] figure(Transformation t, Coordinate offset, double scale, boolean back) {
+	public java.awt.Shape[] figure(Transformation t, Coordinate offset, double scale, double turn, boolean back) {
 		int vc = positions.length / 3, tc = triangles.length / 3;
 		double[] sx = new double[vc], sy = new double[vc];
+		double cos = Math.cos(turn), sin = Math.sin(turn);
 		for (int v = 0; v < vc; v++) {
-			Coordinate c = t.transform(new Coordinate(offset.x + positions[v * 3] * scale, offset.y + positions[v * 3 + 1] * scale,
-					offset.z + positions[v * 3 + 2] * scale));
+			double y = positions[v * 3 + 1] * scale, z = positions[v * 3 + 2] * scale;
+			Coordinate c = t.transform(new Coordinate(offset.x + positions[v * 3] * scale, offset.y + y * cos - z * sin,
+					offset.z + y * sin + z * cos));
 			sx[v] = back ? c.z : c.x;
 			sy[v] = c.y;
 		}
