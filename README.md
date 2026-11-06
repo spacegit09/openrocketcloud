@@ -213,8 +213,9 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
 - **Edit history** (clock button in the session, or ⋯ on a design): who changed what and when,
   e.g. "Nose cone · Length: 10 cm → 14 cm". **Undo these changes** reverts one person's edit,
   keeping anything changed again since; **Restore to before this** puts the whole design back to
-  that moment. Reverts are shared live and can themselves be undone. OpenRocket's automatic
-  simulation re-runs are not listed.
+  that moment. Reverts are shared live. Changes taken back are marked *Undone* (or *Partly undone*,
+  when some of them were changed again) and crossed out, and offer **Redo these changes** instead;
+  a restore offers **Undo this restore**. OpenRocket's automatic simulation re-runs are not listed.
 - **Motors** (dashboard): upload custom motor files (`.eng` RASP or `.rse` RockSim). They appear in
   OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
   the custom motors of all its members, so collaborators always see the same motors. Reopen

@@ -6,6 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { projects, history, motors, edits } from './db.js';
 import { sessionFileName } from './motors.js';
 import { describeOp, inverseOf, isMinorOp, planRevert } from './edits.js';
+import { revertNote, revertText } from './history.js';
 import { fromJson, toJson, applyOp, validateOp, componentName, modelSize, SIMS, DOC } from './model.js';
 import { publish } from './events.js';
 
@@ -300,7 +301,7 @@ function applyBatch(r, user, ops, { clientId = null, seq = 0, note = null } = {}
     publish(r.id, {
       type: 'activity',
       user: { id: user.id, name: user.name, color: colorFor(user.id) },
-      text: note ? (note.kind === 'restore' ? 'restored an earlier version' : 'reverted an edit') : text,
+      text: note ? revertText(note) : text,
       at: Date.now(),
     });
   }
@@ -329,9 +330,7 @@ export function revertEdits(projectId, user, { mode, from, to, userId }) {
   }
   if (!chosen.length) throw new RevertError('Nothing to revert.');
   const { ops, skipped } = planRevert(r.model, chosen.flatMap((e) => JSON.parse(e.inverse)), mode);
-  const note = mode === 'restore'
-    ? { kind: 'restore', name: first.user_name, at: first.at }
-    : { kind: 'undo', name: first.user_name, at: first.at };
+  const note = revertNote(mode, first, chosen, { from, to, userId }, skipped);
   const applied = ops.length ? applyBatch(r, user, ops, { note }).length : 0;
   return { applied, skipped };
 }

@@ -9,6 +9,7 @@ dist
 .types/
 # Generated (scripts/prebuild.mjs, scripts/build-web-jars.sh)
 base44/actors/DesignRoom/lib/
+src/lib/history.js
 public/templates/
 public/or/*.jar
 public/or/examples.json

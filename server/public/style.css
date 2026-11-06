@@ -203,4 +203,7 @@ dialog.wide { width: min(680px, calc(100vw - 32px)); }
 .edit ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 13px; }
 .edit .row { gap: 6px; flex-wrap: wrap; }
 .edit .row button { padding: 5px 10px; font-size: 13px; }
+.edit.undone ul { color: var(--muted); text-decoration: line-through; }
+.edit .undone-note { color: var(--muted); font-size: 12.5px; }
+.edit .undone-note .badge { color: var(--text); }
 button.link { padding: 0; color: var(--accent); justify-self: start; font-size: 13px; }
