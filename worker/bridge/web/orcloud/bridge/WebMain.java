@@ -17,6 +17,7 @@ import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.ModelTab;
+import orcloud.web.SettingsMenu;
 import orcloud.web.StlImport;
 import orcloud.web.Warmup;
 
@@ -64,10 +65,11 @@ public final class WebMain {
 			BrowserLink.ready();
 			// The component preset database waited for the window (see our copy of its loader).
 			ComponentPresetDatabaseLoader.loadNow();
-			// Tools > Import 3D model (STL), our addition to OpenRocket's menus; imported models are
-			// turned on the "3D model" tab of their Edit dialog.
+			// Our additions to OpenRocket's menus: Settings (its preferences, before File) and Tools >
+			// Import 3D model (STL); imported models are turned on the "3D model" tab of their Edit dialog.
 			try {
 				BasicFrame frame = OrDoc.findFrame(f);
+				SettingsMenu.install(frame);
 				OpenRocketDocument doc = OrDoc.documentOf(frame);
 				StlImport.install(frame, doc, () -> {
 					List<String> ids = OrDoc.selectedIds(frame);
@@ -93,14 +95,17 @@ public final class WebMain {
 		if (openrocket.get(ApplicationPreferences.USER_COMPONENT_PRESETS_KEY, null) == null) {
 			openrocket.put(ApplicationPreferences.USER_COMPONENT_PRESETS_KEY, presets.getPath());
 		}
-		// Once per browser: "Update flight estimates in design window" (Preferences > Design) off.
-		// Its background simulation makes every edit wait ~2 s under CheerpJ; anyone who turns it
-		// back on keeps that choice.
-		Preferences web = Preferences.userRoot().node("orcloud-web");
-		if (!web.getBoolean("browserDefaultsApplied", false)) {
-			openrocket.putBoolean("backgroundFlight", false);
-			web.putBoolean("browserDefaultsApplied", true);
-		}
+		// Preferences the browser version leaves out (see our copies of its panels) stay off. Two slow
+		// it down: "Update flight estimates in design window" (a background simulation that makes
+		// every edit wait ~2 s under CheerpJ) and "Run out-dated simulations when you open the
+		// simulation tab" (1-4 s per simulation). Two conflict with it: checking for OpenRocket
+		// updates (the site is updated instead) and opening the last design file (the page opens
+		// the shared design).
+		openrocket.putBoolean("backgroundFlight", false);
+		openrocket.putBoolean(ApplicationPreferences.AUTO_RUN_SIMULATIONS, false);
+		openrocket.putBoolean("CheckUpdates", false);
+		openrocket.putBoolean("CheckBetaUpdates", false);
+		openrocket.putBoolean("AutoOpenLastDesign", false);
 		openrocket.flush();
 	}
 }
