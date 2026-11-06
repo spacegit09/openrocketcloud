@@ -14,7 +14,8 @@ There are two ways to run it:
   browser, and Base44 hosts the site, sign-in and live sharing. No server of your own. See
   [Browser version on Base44](#browser-version-on-base44-no-server).
 - **Self-hosted with Docker**: each person gets OpenRocket on your server, streamed to their
-  browser. Full desktop speed and the 3D view. Most of this README covers this version.
+  browser. Full desktop speed, and Photo Studio (which needs OpenGL). Most of this README covers
+  this version.
 
 ## How the self-hosted version works
 
@@ -74,9 +75,11 @@ and live sharing. Nothing runs on your own computer or server.
   `DesignRoom` Base44 actor, which runs the same merge and edit-history code as the Node hub
   (`web/base44/actors/DesignRoom/room.js`, using `server/src/model.js` and `edits.js`).
 - **Browser fixes** (`worker/bridge/web`): Java's XML setup is warmed up on one thread, the plugin
-  list is precomputed (OpenRocket's class-path scanner cannot run under CheerpJ), and running
-  simulations pause briefly so the window stays responsive.
-- **Limits:** no 3D view (no OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
+  list is precomputed (OpenRocket's class-path scanner cannot run under CheerpJ), running
+  simulations pause briefly so the window stays responsive, and the 3D view, which OpenRocket draws
+  with OpenGL, is drawn with WebGL (`web/src/view3d-renderer.js`) from meshes made by OpenRocket's
+  own OBJ exporters (`worker/bridge/src/orcloud/view3d`).
+- **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
   run about 15× slower than desktop (1–4 s each); "Update flight estimates in design window"
   (Preferences → Design) starts switched off, because its background simulation makes every edit
   wait 1–2 s; *Save As* and exports download straight to your computer. CheerpJ's free licence is
@@ -214,6 +217,10 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
   the custom motors of all its members, so collaborators always see the same motors. Reopen
   OpenRocket to load motors added while it's open.
+- **3D view** (browser version): *View Type → 3D Figure, 3D Unfinished or 3D Finished* under the
+  rocket figure. Drag to turn the rocket, right-drag to move the light, scroll to zoom; click a part
+  to select it (shift-click adds to the selection, reaching past parts already selected), and
+  double-click to edit it.
 - **3D models** (browser version): *Tools → Import 3D model (STL)…* turns a 3D-printed part into
   mass and balance. An STL file is only a surface, so you tell it the file's units, which axis runs
   along the rocket and which end faces the nose, the material, and how it was made (printed walls
