@@ -99,6 +99,7 @@ function card(p) {
     return b;
   };
   menu.append(
+    item('copy', 'Duplicate', () => duplicate(p)),
     item('history', 'Edit history', () => editHistoryDialog(p.id)),
     item('download', 'Saved copies', () => historyDialog(p)),
     ...(p.role !== 'viewer' ? [item('edit', 'Rename', () => rename(p))] : []),
@@ -205,6 +206,29 @@ async function newFromExample() {
   const cancel = h('button', {}, 'Cancel');
   const { close } = modal('Start from an OpenRocket example', examples.length ? list : h('p', {}, 'No examples are installed on this server.'), [cancel]);
   cancel.onclick = close;
+}
+
+/** "Name (copy)", or "Name (copy 2)" and so on when you already have one by that name. */
+function copyName(name, taken) {
+  const base = name.replace(/ \(copy(?: \d+)?\)$/, '');
+  let n = `${base} (copy)`;
+  for (let i = 2; taken.has(n); i++) n = `${base} (copy ${i})`;
+  return n;
+}
+
+const COPY_NOTE = 'Name of the copy. It is yours alone: the people this design is shared with do not get it.';
+
+/** A copy of the design as it is now, for you alone (its edit history and saved copies stay behind). */
+async function duplicate(p) {
+  const name = await promptDialog('Duplicate design', COPY_NOTE, copyName(p.name, new Set(projects.map((x) => x.name))), 'Duplicate');
+  if (!name) return;
+  try {
+    await api(`/projects/${p.id}/duplicate`, { method: 'POST', body: { name } });
+    toast(`Created “${name}”`);
+    load();
+  } catch (e) {
+    toast(e.message);
+  }
 }
 
 async function rename(p) {

@@ -94,6 +94,7 @@ function card(d) {
     return b;
   };
   menu.append(
+    item('copy', 'Duplicate', () => duplicate(d)),
     item('history', 'Edit history', () => historyFor(d, role)),
     item('download', 'Saved copies', () => savedCopies(d)),
     ...(role === 'owner' ? [item('edit', 'Rename', () => rename(d))] : []),
@@ -166,8 +167,8 @@ function setupNewMenu() {
   });
 }
 
-/** Creates the Design record, hands the content to its room, and opens it. */
-async function createDesign(name, model) {
+/** Creates the Design record (yours, shared with no one), hands the content to its room, and opens it. */
+async function createDesign(name, model, { open = true } = {}) {
   toast('Creating the design…');
   const d = await db.Design.create({
     name,
@@ -184,7 +185,7 @@ async function createDesign(name, model) {
     await db.Design.delete(d.id).catch(() => {});
     throw e;
   }
-  location.href = `/design.html?id=${d.id}`;
+  if (open) location.href = `/design.html?id=${d.id}`;
 }
 
 async function uploadDesign(file) {
@@ -239,6 +240,30 @@ async function newFromExample() {
 }
 
 // ------------------------------------------------------------------ actions
+
+/** "Name (copy)", or "Name (copy 2)" and so on when you already have one by that name. */
+function copyName(name, taken) {
+  const base = name.replace(/ \(copy(?: \d+)?\)$/, '');
+  let n = `${base} (copy)`;
+  for (let i = 2; taken.has(n); i++) n = `${base} (copy ${i})`;
+  return n;
+}
+
+const COPY_NOTE = 'Name of the copy. It is yours alone: the people this design is shared with do not get it.';
+
+/** A copy of the design as it is now, for you alone (its edit history and saved copies stay behind). */
+async function duplicate(d) {
+  const name = await promptDialog('Duplicate design', COPY_NOTE, copyName(d.name, new Set(designs.map((x) => x.name))), 'Duplicate');
+  if (!name) return;
+  try {
+    const { model } = await withRoom(d.id, (room) => room.request('export'));
+    await createDesign(name, fromJson(model), { open: false });
+    toast(`Created “${name}”`);
+    load();
+  } catch (e) {
+    toast(e.message);
+  }
+}
 
 async function download(d) {
   toast('Preparing the download…');

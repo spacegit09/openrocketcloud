@@ -78,6 +78,12 @@ export function apiRouter() {
     }
   });
 
+  // A copy of the design as it is now, for the person asking alone (any role may: anyone with
+  // access can download it anyway). Its edit history and saved copies stay with the original.
+  api.post('/projects/:id/duplicate', access(), express.json(), (req, res) => {
+    create(req, res, req.body?.name || `${req.project.name} (copy)`, currentModel(req.project.id).model);
+  });
+
   api.post('/projects/import', express.raw({ type: () => true, limit: `${config.maxUploadMb}mb` }), (req, res) => {
     let name = 'Imported rocket';
     try {

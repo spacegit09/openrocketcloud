@@ -208,6 +208,8 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   designs, or upload an `.ork` file (drag and drop works too).
 - **Share**: invite people by their Google email as *Can edit* or *Can view*. Viewers see every
   change live and can click around, but nothing they change is shared; it snaps back.
+- **Duplicate** (⋯ on a design): a copy of the design as it is now, owned by you and shared with
+  no one, whatever your role on the original (its edit history and saved copies stay behind).
 - **Saving** is continuous. **Download .ork** gives a file that opens in desktop OpenRocket.
   **Saved copies** keeps a downloadable copy every 10 minutes while people are editing.
 - **Edit history** (clock button in the session, or ⋯ on a design): who changed what and when,
