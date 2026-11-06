@@ -400,13 +400,9 @@ public final class StlImport {
 				part.addTo(parent, mc, ((Number) offset.getValue()).doubleValue() / 1000);
 			} else {
 				if (target instanceof MassComponent) {
-					PartMeshes.remember((MassComponent) target); // so undo brings back the previous shape
 					keepShape(target);
 				}
 				part.applyTo(target, setCg.isSelected());
-				if (target instanceof MassComponent) {
-					PartMeshes.remember((MassComponent) target);
-				}
 				// Redraw (and share) the new shape even if the size did not change.
 				target.fireComponentChangeEvent(ComponentChangeEvent.GRAPHIC_CHANGE);
 			}

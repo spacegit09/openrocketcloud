@@ -109,8 +109,8 @@ public class MassComponentShapes extends RocketComponentShapes {
 	
 	/**
 	 * orcloud: an imported 3D model's outline (scaled with the component's length, at its radial
-	 * position, turned by its radial direction) and, invisible, the area it covers, which the figure
-	 * uses for clicking; or null.
+	 * position and turned about the rocket's axis by its radial direction) and, invisible, the area it
+	 * covers, which the figure uses for clicking; or null.
 	 */
 	private static RocketComponentShapes[] modelShapes(final RocketComponent component, final Transformation transformation,
 			final boolean back) {

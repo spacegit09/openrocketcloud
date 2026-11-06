@@ -258,7 +258,7 @@ final class OrDoc {
 				String id = PartMeshes.componentId(e.getKey().substring(4));
 				String data = e.getValue().v.get("data");
 				if (id != null && data != null) {
-					PartMeshes.putBase64(id, data);
+					PartMeshes.adopt(id, data);
 				}
 			}
 		}
