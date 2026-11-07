@@ -4,6 +4,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import javax.swing.SwingUtilities;
+
 import com.google.inject.Guice;
 
 import info.openrocket.core.plugin.PluginModule;
@@ -13,13 +15,14 @@ import info.openrocket.core.document.Simulation;
 import info.openrocket.core.file.GeneralRocketLoader;
 import info.openrocket.swing.startup.GuiModule;
 import orcloud.flight.FlightTables;
+import orcloud.web.Preview;
 import orcloud.web.Warmup;
 
 /**
  * The launch planner's OpenRocket (web/src/flight/openrocket.js, through CheerpJ's library mode):
  * OpenRocket's core without its windows, the design's simulations, and the flight tables for one
  * of them ({@link FlightTables}). The page writes the design (.ork) and its custom motor files
- * under /str/ first.
+ * under /str/ first. The dashboard uses it too, for the designs' previews ({@link Preview}).
  */
 public final class FlightLab {
 	private static boolean started;
@@ -101,6 +104,30 @@ public final class FlightLab {
 		} catch (Throwable e) {
 			Log.warn("Could not read the design: " + e);
 			e.printStackTrace();
+			return "{\"error\":" + quote(String.valueOf(e.getMessage() != null ? e.getMessage() : e)) + "}";
+		}
+	}
+
+	/** The design's preview (see orcloud.web.Preview), or { error }. */
+	public static String preview(String path, String motors) {
+		try {
+			start(motors);
+			OpenRocketDocument doc = new GeneralRocketLoader(new File(path)).load();
+			String[] out = new String[1];
+			Exception[] failed = new Exception[1];
+			SwingUtilities.invokeAndWait(() -> {
+				try {
+					out[0] = Preview.of(doc.getRocket());
+				} catch (Exception e) {
+					failed[0] = e;
+				}
+			});
+			if (failed[0] != null) {
+				throw failed[0];
+			}
+			return out[0] != null ? out[0] : "{\"error\":\"The drawing is too large.\"}";
+		} catch (Throwable e) {
+			Log.warn("Could not draw the design: " + e);
 			return "{\"error\":" + quote(String.valueOf(e.getMessage() != null ? e.getMessage() : e)) + "}";
 		}
 	}

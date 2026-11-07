@@ -5,6 +5,7 @@ import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
 import { latestPlacement, menuRowNatives } from './menu-row.js';
 import { labNatives } from './flight/lab-natives.js';
+import { CLASSPATH } from './lib/jars.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
@@ -61,6 +62,14 @@ const unconfirmed = new Set();
 /** Asks OpenRocket to send its last edits and close (the page's Close button). */
 export function closeOpenRocket() {
   toJava('x');
+}
+
+// The room keeping OpenRocket's latest drawing of the design (its card's preview).
+let previewSaving = Promise.resolve();
+
+/** Resolves once the room has kept OpenRocket's latest drawing of the design, or after `timeoutMs`. */
+export function previewSaved(timeoutMs = 5000) {
+  return Promise.race([previewSaving, new Promise((r) => setTimeout(r, timeoutMs))]);
 }
 
 /** Resolves once the room has confirmed every edit OpenRocket sent, or after `timeoutMs`. */
@@ -144,7 +153,7 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
         },
         async Java_orcloud_web_Preview_jsPreview(lib, json) {
           // OpenRocket's drawing of the design, for its card on the dashboard (kept by the room).
-          link.room?.send({ type: 'preview', preview: json });
+          if (link.room) previewSaving = link.room.request('preview', { preview: json }, 20_000).catch(() => {});
         },
         async Java_orcloud_web_FileWindows_jsFileWindow(lib, x, y, w, h) {
           markFileWindow(x, y, w, h);
@@ -178,6 +187,6 @@ export async function startOpenRocket({ designId, screen, room, onReady, onExit 
   if (room.open) toJava('o');
 
   window.cheerpjCreateDisplay(-1, -1, screen);
-  const code = await window.cheerpjRunMain('orcloud.bridge.WebMain', '/app/or/orcloud-web.jar:/app/or/OpenRocket-web.jar');
+  const code = await window.cheerpjRunMain('orcloud.bridge.WebMain', CLASSPATH);
   onExit?.(code);
 }

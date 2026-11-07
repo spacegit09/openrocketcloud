@@ -32,7 +32,8 @@ import info.openrocket.swing.gui.util.SwingPreferences;
  * side view, the shapes its design window draws (taken from a RocketFigure of the rocket) and the
  * motors of the selected configuration, as SVG paths in millimetres (the format is described in
  * server/src/preview.js). Made a while after the design opens, and again a few seconds after each
- * change; the page passes it to the design's room, which keeps it on the design's record.
+ * change; the page passes it to the design's room, which keeps it on the design's record. The
+ * dashboard draws the designs that have none yet with {@link #of} (orcloud.bridge.FlightLab).
  */
 public final class Preview {
 	/** After the design opens: once start-up (the component presets) is done with. */
@@ -93,13 +94,23 @@ public final class Preview {
 		}
 	}
 
+	/** The rocket's preview (JSON), or null if it is too large to keep (on the UI thread). */
+	public static String of(Rocket rocket) throws ReflectiveOperationException {
+		return new Preview(rocket).compose();
+	}
+
+	private String compose() throws ReflectiveOperationException {
+		String json = json(1);
+		if (json.length() > MAX_CHARS) {
+			json = json(0); // whole millimetres
+		}
+		return json.length() <= MAX_CHARS ? json : null;
+	}
+
 	private void send() {
 		try {
-			String json = json(1);
-			if (json.length() > MAX_CHARS) {
-				json = json(0); // whole millimetres
-			}
-			if (json.length() <= MAX_CHARS && !json.equals(sent)) {
+			String json = compose();
+			if (json != null && !json.equals(sent)) {
 				sent = json;
 				jsPreview(json);
 			}

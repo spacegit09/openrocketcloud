@@ -11,6 +11,7 @@ dist
 base44/actors/DesignRoom/lib/
 src/lib/history.js
 src/lib/preview.js
+src/lib/jars.js
 public/templates/
 public/or/*.jar
 public/or/examples.json

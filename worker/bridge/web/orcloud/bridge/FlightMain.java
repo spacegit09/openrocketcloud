@@ -6,8 +6,9 @@ import java.util.Map;
  * The launch planner's OpenRocket as a program (cheerpjRunMain), the way the design page runs
  * OpenRocket: it answers the page's requests one at a time ({@link FlightLab}). Requests and
  * replies are JSON, through the natives in web/src/flight/lab-natives.js: { id, op: "simulations",
- * path, motors } and { id, op: "tables", path, index }. (CheerpJ's library mode, calling Java from
- * the page directly, failed at random while OpenRocket started.)
+ * path, motors }, { id, op: "tables", path, index } and { id, op: "preview", path, motors } (a
+ * design's preview, for the dashboard). (CheerpJ's library mode, calling Java from the page
+ * directly, failed at random while OpenRocket started.)
  */
 public final class FlightMain {
 	private FlightMain() {
@@ -37,6 +38,9 @@ public final class FlightMain {
 					break;
 				case "tables":
 					out = FlightLab.tables(path, ((Number) req.get("index")).intValue());
+					break;
+				case "preview":
+					out = FlightLab.preview(path, (String) req.get("motors"));
 					break;
 				default:
 					out = "{\"error\":\"Unknown request.\"}";

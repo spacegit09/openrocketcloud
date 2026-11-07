@@ -1,14 +1,13 @@
 // The launch planner's OpenRocket: the official OpenRocket core in this page through CheerpJ,
 // without its windows (orcloud.bridge.FlightMain and FlightLab in worker/bridge/web), run as a
 // program the way the design page runs OpenRocket. It reads a design and computes the flight
-// tables the engine (engine.js) flies with.
+// tables the engine (engine.js) flies with. The dashboard uses it to draw designs' previews.
 import { prepareJava } from '../java.js';
 import { withRoom } from '../room-client.js';
 import { exportOrk } from '../lib/ork.js';
 import { fromJson } from '../../../server/src/model.js';
 import { labRequest } from './lab-natives.js';
-
-const CLASSPATH = '/app/or/orcloud-web.jar:/app/or/OpenRocket-web.jar';
+import { CLASSPATH } from '../lib/jars.js';
 let running = null;
 let files = 0;
 
@@ -49,6 +48,33 @@ async function ask(msg) {
   return reply;
 }
 
+/** Writes the design (.ork) and the custom motor files for OpenRocket: { path, motors }. */
+async function writeDesign(model, motors) {
+  const path = `/str/planner-${++files}.ork`;
+  window.cheerpOSAddStringFile(path, await exportOrk(fromJson(model)));
+  const names = new Set();
+  for (const m of motors) {
+    const name = String(m.name).replace(/[^A-Za-z0-9._-]/g, '_');
+    if (!/\.(eng|rse)$/i.test(name) || typeof m.content !== 'string') continue;
+    // CheerpJ's /str/ files cannot be in folders.
+    window.cheerpOSAddStringFile(`/str/planner-motor-${name}`, new TextEncoder().encode(m.content));
+    names.add(name);
+  }
+  return { path, motors: [...names].join('|') };
+}
+
+/**
+ * OpenRocket's drawing of a design for its card (server/src/preview.js), as JSON text. Custom
+ * motors are read once, with the first design drawn in the page.
+ */
+export async function drawInOpenRocket({ model, motors }) {
+  await startOpenRocket('dashboard');
+  const text = await labRequest({ op: 'preview', ...(await writeDesign(model, motors)) });
+  const reply = JSON.parse(text);
+  if (reply?.error) throw new Error(reply.error);
+  return text;
+}
+
 /**
  * Opens a design in OpenRocket: { simulations: [{ name, configuration }], tables(index) } where
  * tables() resolves to the flight tables of that simulation. Custom motors are read once, with
@@ -56,19 +82,10 @@ async function ask(msg) {
  */
 export async function openInOpenRocket(designId, { model, motors }) {
   await startOpenRocket(designId);
-  const path = `/str/planner-${++files}.ork`;
-  window.cheerpOSAddStringFile(path, await exportOrk(fromJson(model)));
-  const names = [];
-  for (const m of motors) {
-    const name = String(m.name).replace(/[^A-Za-z0-9._-]/g, '_');
-    if (!/\.(eng|rse)$/i.test(name) || typeof m.content !== 'string') continue;
-    // CheerpJ's /str/ files cannot be in folders.
-    window.cheerpOSAddStringFile(`/str/planner-motor-${name}`, new TextEncoder().encode(m.content));
-    names.push(name);
-  }
+  const { path, motors: names } = await writeDesign(model, motors);
   let simulations;
   try {
-    simulations = await ask({ op: 'simulations', path, motors: names.join('|') });
+    simulations = await ask({ op: 'simulations', path, motors: names });
   } catch (e) {
     throw new Error(`OpenRocket could not read the design: ${e.message}`);
   }

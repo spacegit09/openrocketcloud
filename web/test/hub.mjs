@@ -30,9 +30,11 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
       },
       motors: async () => motors,
       touch: async () => {},
-      preview: async (preview) => {
+      preview: async (preview, { onlyIfMissing = false } = {}) => {
         const d = designs.get(designId);
-        if (d) d.preview = preview;
+        if (!d || (onlyIfMissing && d.preview != null)) return false;
+        d.preview = preview;
+        return true;
       },
     });
     s = { room, conns, store, started: room.start() };
