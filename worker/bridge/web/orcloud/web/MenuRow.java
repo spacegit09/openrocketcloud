@@ -45,6 +45,9 @@ public final class MenuRow {
 	/** The menus show at `placement` now. */
 	private static native void jsPlaced(String placement);
 
+	/** The menus are drawn: the header can show them. */
+	private static native void jsShow();
+
 	public static void install(JFrame frame) {
 		bar = frame.getJMenuBar();
 		if (bar == null) {
@@ -72,6 +75,23 @@ public final class MenuRow {
 		}, "menu-row");
 		t.setDaemon(true);
 		t.start();
+	}
+
+	/**
+	 * Lets the header show the menus, once they are drawn: on the UI thread, after the last
+	 * placement's redraw.
+	 */
+	public static void show() {
+		if (bar != null) {
+			jsShow();
+		}
+	}
+
+	/** Places the menus at `placement` now, if it is not null (on the UI thread). */
+	public static void placeNow(String placement) {
+		if (bar != null && placement != null) {
+			place(placement);
+		}
 	}
 
 	private static void place(String placement) {

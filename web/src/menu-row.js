@@ -12,6 +12,8 @@ const MIN_TITLE = 120; // the design's name keeps at least this much room (px), 
 
 let menus = null; // { width, background, foreground, line } from Java
 let sent = '';
+let inRow = false; // Java has placed the menus in the header row
+let shown = false; // Java has drawn the menus where the page shows them (it sets them up early)
 const queue = [];
 let waiting = null;
 
@@ -33,13 +35,32 @@ function placement() {
   return `${Math.round(slot.getBoundingClientRect().left - $('#screen').getBoundingClientRect().left)},${height}`;
 }
 
+// The header takes the menu bar's look, and lets clicks through to it, once Java shows the menus.
+function setInRow(on) {
+  inRow = on;
+  $('.sbar').classList.toggle('merged', inRow && shown);
+}
+
+/**
+ * The menus' placement now, if it changed since Java placed them (the header's status changes as the
+ * page shows OpenRocket's window), for Java to apply at once; or null.
+ */
+export function latestPlacement() {
+  if (!menus) return null;
+  const p = placement();
+  if (p === sent) return null;
+  sent = p;
+  if (p.startsWith('-1')) setInRow(false);
+  return p;
+}
+
 function update() {
   if (!menus) return;
   const p = placement();
   if (p === sent) return;
   sent = p;
   // Out of the header row: the header covers the window again at once, then Java moves the menus.
-  if (p.startsWith('-1')) $('.sbar').classList.remove('merged');
+  if (p.startsWith('-1')) setInRow(false);
   if (waiting) {
     const w = waiting;
     waiting = null;
@@ -79,8 +100,12 @@ export const menuRowNatives = {
   async Java_orcloud_web_MenuRow_jsNextPlace() {
     return queue.length ? queue.shift() : new Promise((resolve) => (waiting = resolve));
   },
+  async Java_orcloud_web_MenuRow_jsShow() {
+    shown = true;
+    setInRow(inRow);
+  },
   async Java_orcloud_web_MenuRow_jsPlaced(lib, p) {
     // Into the header row once Java has made room, so the header never covers OpenRocket's content.
-    if (p === sent) $('.sbar').classList.toggle('merged', !p.startsWith('-1'));
+    if (p === sent) setInRow(!p.startsWith('-1'));
   },
 };

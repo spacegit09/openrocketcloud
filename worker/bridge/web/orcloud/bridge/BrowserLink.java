@@ -20,10 +20,11 @@ final class BrowserLink implements Link {
 	private static native void jsClose();
 
 	/** Tells the page that OpenRocket is open with the shared design. */
-	private static native void jsReady();
+	private static native String jsReady();
 
-	static void ready() {
-		jsReady();
+	/** Returns the page's latest placement for OpenRocket's menus (see orcloud.web.MenuRow), or null. */
+	static String ready() {
+		return jsReady();
 	}
 
 	private final Link.Handler handler;

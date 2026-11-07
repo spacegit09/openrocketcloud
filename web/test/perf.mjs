@@ -152,7 +152,7 @@ try {
   await page.mouse.click(83, 109); // the stage in OpenRocket's component tree
   await sleep(1500);
   const tClick = Date.now();
-  await page.mouse.click(520, 252); // "Nose Cone"
+  await page.mouse.click(476, 258); // "Nose Cone"
   let put = null;
   while (!put && Date.now() - tClick < 30_000) {
     put = seen.find((s) => s.m.ops.some((op) => op.op === 'put' && op.t === 'nosecone'));
