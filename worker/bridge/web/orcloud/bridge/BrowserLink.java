@@ -3,6 +3,10 @@ package orcloud.bridge;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import javax.swing.SwingUtilities;
+
+import orcloud.web.Preview;
+
 /**
  * Browser build (CheerpJ): the bridge's connection runs through the page, which holds the
  * connection to the design's Base44 actor (web/src/session/java.js implements the natives).
@@ -63,6 +67,8 @@ final class BrowserLink implements Link {
 					handler.onMessage((Map<String, Object>) Json.parse(event.substring(1)));
 					break;
 				case 'x':
+					// The card's drawing first, if it is waiting on the last edits.
+					SwingUtilities.invokeLater(Preview::flush);
 					handler.onCloseRequested();
 					break;
 				default:

@@ -24,6 +24,7 @@ import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.FileWindows;
 import orcloud.web.MenuRow;
 import orcloud.web.ModelTab;
+import orcloud.web.Preview;
 import orcloud.web.SettingsMenu;
 import orcloud.web.StlImport;
 import orcloud.web.Warmup;
@@ -162,6 +163,12 @@ public final class WebMain {
 			ModelTab.install(doc);
 		} catch (Exception e) {
 			Log.warn("3D model import unavailable: " + e);
+		}
+		// The design's preview for its card on the dashboard.
+		try {
+			Preview.install(OrDoc.documentOf(frame));
+		} catch (Exception e) {
+			Log.warn("Design preview unavailable: " + e);
 		}
 	}
 

@@ -30,6 +30,10 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
       },
       motors: async () => motors,
       touch: async () => {},
+      preview: async (preview) => {
+        const d = designs.get(designId);
+        if (d) d.preview = preview;
+      },
     });
     s = { room, conns, store, started: room.start() };
     sessions.set(designId, s);

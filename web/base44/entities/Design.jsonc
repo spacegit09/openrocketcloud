@@ -25,7 +25,11 @@
       "items": { "type": "string" }
     },
     "version": { "type": "integer" },
-    "edited_at": { "type": "string", "format": "date-time" }
+    "edited_at": { "type": "string", "format": "date-time" },
+    "preview": {
+      "type": "string",
+      "description": "OpenRocket's side view of the rocket for the design's card (JSON; see server/src/preview.js)"
+    }
   },
   "required": ["name", "owner_email"],
   "rls": {

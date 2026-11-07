@@ -10,6 +10,7 @@ import { exportOrk, fileName, importOrk, saveFile } from './lib/ork.js';
 import { RemoteZip } from './lib/zip.js';
 import { fromJson, toJson } from '../../server/src/model.js';
 import { readMotorFile } from '../../server/src/motors.js';
+import { previewSvg } from './card-preview.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
@@ -118,7 +119,10 @@ function card(d) {
   shareBtn.onclick = () => shareDialog(d.id, me, () => load());
   const dl = h('button', { class: 'ghost', title: 'Download .ork' }, icon('download'));
   dl.onclick = () => download(d);
-  const thumb = h('div', { class: 'thumb', html: ROCKET_SVG });
+  // OpenRocket's drawing of the rocket once the design has been open since previews began; until
+  // then a generic rocket.
+  const drawing = d.preview ? previewSvg(d.preview) : null;
+  const thumb = drawing ? h('div', { class: 'thumb' }, drawing) : h('div', { class: 'thumb', html: ROCKET_SVG });
   thumb.onclick = open;
   const people = 1 + (d.members?.length ?? 0);
   return h('article', { class: 'card' },
