@@ -3,7 +3,7 @@
 import { h, modal } from './common.js';
 import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
-import { menuRowNatives } from './menu-row.js';
+import { latestPlacement, menuRowNatives } from './menu-row.js';
 import { labNatives } from './flight/lab-natives.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
@@ -132,6 +132,7 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
         async Java_orcloud_bridge_BrowserLink_jsClose() {},
         async Java_orcloud_bridge_BrowserLink_jsReady() {
           link.onReady?.();
+          return latestPlacement();
         },
         async Java_orcloud_web_StlImport_jsPickStl() {
           const file = await pickModelFile();
