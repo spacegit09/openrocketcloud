@@ -12,10 +12,11 @@ import { fromJson, toJson } from '../../server/src/model.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { previewSvg } from './card-preview.js';
 import { fillPreviews } from './fill-previews.js';
+import { OPENROCKET_JAR } from './lib/jars.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
-const JAR = '/or/OpenRocket-web.jar';
+const JAR = OPENROCKET_JAR;
 let me = null;
 let designs = [];
 
