@@ -10,7 +10,9 @@
 //   access(user)       -> { role: 'owner' | 'editor' | 'viewer', name } for this design, or null
 //   motors()           -> [{ name, content }] custom motors of everyone the design is shared with
 //   touch(info)        records { version } on the design's listing (best effort)
-//   preview(text)      keeps OpenRocket's drawing of the design on its listing (best effort)
+//   preview(text, { onlyIfMissing })
+//                      keeps OpenRocket's drawing of the design on its listing (only if it has none,
+//                      with onlyIfMissing); resolves to whether it did
 // Connections are objects with an `id` and `send(message)`.
 import { applyOp, childIndex, componentName, fromJson, modelSize, toJson, validateOp, SIMS, DOC } from './lib/model.js';
 import { describeOp, groupEdits, inverseOf, isMinorOp, planRevert } from './lib/edits.js';
@@ -295,17 +297,20 @@ export class Room {
   }
 
   /**
-   * OpenRocket's drawing of the design (server/src/preview.js), from someone who can edit it: kept
-   * on the design's listing for its card, when it changed (cleared for an empty rocket).
+   * OpenRocket's drawing of the design (server/src/preview.js), kept on the design's listing for
+   * its card when it changed (cleared for an empty rocket). It comes from OpenRocket on the design
+   * page, or from the dashboard for a design that has none yet; someone who can only view the
+   * design may fill in a missing one, not change one. Returns whether it is kept.
    */
   async preview(c, text) {
-    if (c.role === 'viewer' || !this.model) return;
+    if (!this.model) return false;
     const clean = cleanPreview(text);
-    if (!clean) return;
+    if (!clean) return false;
     const json = clean.s.length ? JSON.stringify(clean) : '';
-    if (json === this.lastPreview) return;
-    this.lastPreview = json;
-    await Promise.resolve(this.env.preview?.(json)).catch(() => {});
+    if (json === this.lastPreview) return true;
+    const kept = await Promise.resolve(this.env.preview?.(json, { onlyIfMissing: c.role === 'viewer' })).catch(() => false);
+    if (kept) this.lastPreview = json;
+    return Boolean(kept);
   }
 
   async welcome(conn, c) {
@@ -461,6 +466,8 @@ export class Room {
           return reply(await this.revert(c.user, msg));
         case 'snapshots':
           return reply((this.meta?.snaps ?? []).slice().reverse().map((s) => ({ version: s.version, createdAt: s.at })));
+        case 'preview':
+          return reply({ kept: await this.preview(c, msg.preview) });
         case 'snapshot': {
           const model = this.meta ? await this.readSnapshot(Number(msg.version)) : null;
           return model ? reply({ model, version: Number(msg.version) }) : fail('That saved copy no longer exists.');

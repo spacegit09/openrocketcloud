@@ -31,4 +31,6 @@ docker run --rm -v "$root":/w -w /w -e JAR="web/.cache/OpenRocket-$ver.jar" ecli
   java -cp "$JAR:$classes" orcloud.web.PluginIndex > "$classes/orcloud/plugins.txt"
   jar cf web/public/or/orcloud-web.jar -C "$classes" .
   echo "orcloud-web.jar: $(wc -l < "$classes/orcloud/plugins.txt") plugins"'
-ls -la "$out"/*.jar | awk '{printf "  %-20s %6.1f MB\n", $9, $5/1e6}' | sed "s#$out/##"
+ls -la "$out"/OpenRocket-web.jar "$out"/orcloud-web.jar | awk '{printf "  %-20s %6.1f MB\n", $9, $5/1e6}' | sed "s#$out/##"
+# The copy the pages load, named after its contents (web/scripts/prebuild.mjs).
+(cd "$root/web" && node scripts/prebuild.mjs > /dev/null)

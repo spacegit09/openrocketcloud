@@ -4,7 +4,7 @@ import './style.css';
 import { currentUser, db, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
-import { closeOpenRocket, editsSaved, prepareJava, startOpenRocket } from './java.js';
+import { closeOpenRocket, editsSaved, previewSaved, prepareJava, startOpenRocket } from './java.js';
 import { exportOrk, fileName, saveFile } from './lib/ork.js';
 import { fromJson } from '../../server/src/model.js';
 
@@ -237,10 +237,11 @@ async function main() {
       if (state === 'ended') return;
       if (closing || code === 0) {
         // Closed by the user (the Close button or OpenRocket's File menu): once the room has the
-        // last edits, back to the designs.
+        // last edits, and the drawing for the design's card, back to the designs.
         closing = true;
         renderState();
         await editsSaved(8000);
+        await previewSaved(5000);
         location.href = '/';
         return;
       }

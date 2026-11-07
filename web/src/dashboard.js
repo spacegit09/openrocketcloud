@@ -11,6 +11,7 @@ import { RemoteZip } from './lib/zip.js';
 import { fromJson, toJson } from '../../server/src/model.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { previewSvg } from './card-preview.js';
+import { fillPreviews } from './fill-previews.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
@@ -71,6 +72,13 @@ const editedAt = (d) => Date.parse(d.edited_at ?? d.updated_date ?? d.created_da
 async function load() {
   designs = (await db.Design.list('-updated_date', 500)).sort((a, b) => editedAt(b) - editedAt(a));
   render();
+  // Designs without OpenRocket's drawing yet get one in the background, card by card.
+  setTimeout(() => fillPreviews(designs, (d, json) => {
+    d.preview = json;
+    const drawing = previewSvg(json);
+    const thumb = document.querySelector(`.card[data-id="${CSS.escape(d.id)}"] .thumb`);
+    if (drawing && thumb) thumb.replaceChildren(drawing);
+  }), 1000);
 }
 
 function render() {
@@ -119,13 +127,12 @@ function card(d) {
   shareBtn.onclick = () => shareDialog(d.id, me, () => load());
   const dl = h('button', { class: 'ghost', title: 'Download .ork' }, icon('download'));
   dl.onclick = () => download(d);
-  // OpenRocket's drawing of the rocket once the design has been open since previews began; until
-  // then a generic rocket.
+  // OpenRocket's drawing of the rocket; until it has one (see fillPreviews), a generic rocket.
   const drawing = d.preview ? previewSvg(d.preview) : null;
   const thumb = drawing ? h('div', { class: 'thumb' }, drawing) : h('div', { class: 'thumb', html: ROCKET_SVG });
   thumb.onclick = open;
   const people = 1 + (d.members?.length ?? 0);
-  return h('article', { class: 'card' },
+  return h('article', { class: 'card', 'data-id': d.id },
     thumb,
     h('div', { class: 'body', onclick: open },
       h('h3', { title: d.name }, d.name),
