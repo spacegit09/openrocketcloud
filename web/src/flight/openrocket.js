@@ -62,7 +62,8 @@ export async function openInOpenRocket(designId, { model, motors }) {
   for (const m of motors) {
     const name = String(m.name).replace(/[^A-Za-z0-9._-]/g, '_');
     if (!/\.(eng|rse)$/i.test(name) || typeof m.content !== 'string') continue;
-    window.cheerpOSAddStringFile(`/str/planner-motors/${name}`, new TextEncoder().encode(m.content));
+    // CheerpJ's /str/ files cannot be in folders.
+    window.cheerpOSAddStringFile(`/str/planner-motor-${name}`, new TextEncoder().encode(m.content));
     names.push(name);
   }
   let simulations;

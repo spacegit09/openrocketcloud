@@ -1,7 +1,6 @@
 package orcloud.bridge;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -33,7 +32,7 @@ public final class FlightLab {
 
 	/**
 	 * Starts OpenRocket's core once, with the custom motors named in `motors` ("|"-separated file
-	 * names under /str/planner-motors/), set up as for a design session (see Bridge).
+	 * names; the files are /str/planner-motor-NAME), set up as for a design session (see Bridge).
 	 */
 	private static synchronized void start(String motors) throws Exception {
 		if (started) {
@@ -57,8 +56,14 @@ public final class FlightLab {
 		if (motors != null) {
 			for (String name : motors.split("\\|")) {
 				String safe = name.replaceAll("[^A-Za-z0-9._-]", "_");
-				if (safe.matches("(?i).*\\.(eng|rse)")) {
-					Files.writeString(dir.resolve(safe), Files.readString(Path.of("/str/planner-motors", name), StandardCharsets.UTF_8));
+				if (!safe.matches("(?i).*\\.(eng|rse)")) {
+					continue;
+				}
+				// CheerpJ's /str/ files sit at the top level (no folders there); bytes as they came.
+				try {
+					Files.write(dir.resolve(safe), Files.readAllBytes(Path.of("/str/planner-motor-" + safe)));
+				} catch (Exception e) {
+					Log.warn("Skipping custom motor " + safe + ": " + e);
 				}
 			}
 		}
