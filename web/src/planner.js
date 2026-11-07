@@ -8,7 +8,7 @@ import { $, h, avatar, icon, toast, modal, confirmDialog, promptDialog, timeAgo 
 import { fetchDesign, openInOpenRocket } from './flight/openrocket.js';
 import { environment, fly } from './flight/engine.js';
 import { DEFAULT_SPREAD, ensembleWinds, groundFunction, landingStats, runStudy, variations } from './flight/montecarlo.js';
-import { deleteFlight, listFlights, openFlight, saveFlight } from './flight/saved.js';
+import { deleteFlight, listFlights, openFlight, saveFlight, updateFlight } from './flight/saved.js';
 import { elevation, groundGrid } from './flight/terrain.js';
 import { createMap } from './flight/map.js';
 
@@ -48,7 +48,8 @@ function updateRunButton() {
 
 // ------------------------------------------------------------------ the rocket
 
-async function chooseDesign(id, simulation = 0) {
+/** Opens a design in OpenRocket; `keepLaunch` keeps the form's rail (a saved flight's). */
+async function chooseDesign(id, simulation = 0, { keepLaunch = false } = {}) {
   if (!id) return;
   const url = new URL(location.href);
   url.searchParams.set('id', id);
@@ -74,13 +75,13 @@ async function chooseDesign(id, simulation = 0) {
     $('#sim').disabled = false;
     const index = simulation < sims.length ? simulation : 0;
     $('#sim').value = String(index);
-    await chooseSimulation(index);
+    await chooseSimulation(index, { keepLaunch });
   } catch (e) {
     status(e.message, 'error');
   }
 }
 
-async function chooseSimulation(index) {
+async function chooseSimulation(index, { keepLaunch = false } = {}) {
   tables = null;
   updateRunButton();
   status('Preparing the flight in OpenRocket…', 'busy');
@@ -92,9 +93,12 @@ async function chooseSimulation(index) {
   }
   const l = tables.launch;
   if (!$('#lat').value || !$('#lon').value) setSite(l.latitude, l.longitude);
-  $('#rail').value = +l.rodLength.toFixed(2);
-  $('#rail-angle').value = Math.round(l.rodAngle / deg);
-  $('#rail-dir').value = Math.round(l.rodDirection / deg);
+  // The simulation's launch rail, unless the form has a saved flight's.
+  if (!keepLaunch) {
+    $('#rail').value = +l.rodLength.toFixed(2);
+    $('#rail-angle').value = Math.round(l.rodAngle / deg);
+    $('#rail-dir').value = Math.round(l.rodDirection / deg);
+  }
   updateLaunch();
   const or = tables.openrocket;
   const lines = [h('div', {}, h('b', {}, tables.configuration || 'No motor'), ` · OpenRocket's own simulation: apogee ${Math.round(or.apogee)} m, top speed ${speed(or.maxVelocity)}`)];
@@ -159,6 +163,10 @@ const localInput = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d
 
 const windMode = () => document.querySelector('input[name="wind-mode"]:checked')?.value ?? 'ensemble';
 let current = null; // the study on show: { ...settings, wind, ensemble, nominal, results }
+let currentStats = null;
+let savedAs = null; // the saved flight (SavedFlight record) the study on show is, or null
+let basedOn = null; // the saved flight the study on show was flown again from (with changes), or null
+let edited = false; // the settings changed since the study on show was flown or opened
 
 async function run() {
   if (busy || !tables) return;
@@ -242,7 +250,14 @@ async function run() {
         landingNorth: nominal.landingNorth, flightTime: nominal.flightTime, maxVelocity: nominal.maxVelocity, groundHitVelocity: nominal.groundHitVelocity },
       results,
     };
-    await show(current, { saved: null });
+    // Flown again from a saved flight: it can be saved over that one, or as a new flight.
+    basedOn = savedAs ?? basedOn;
+    savedAs = null;
+    edited = false;
+    const url = new URL(location.href);
+    url.searchParams.delete('flight');
+    history.replaceState(null, '', url.href);
+    await show(current);
   } catch (e) {
     progress(null);
     toast(e.message);
@@ -262,20 +277,17 @@ function headline(study, stats) {
   return `95% of ${stats.count} flights land inside ${dist(2 * e95.a)} by ${dist(2 * e95.b)}, centred ${dist(Math.hypot(...stats.mean))} ${compass(bearingOf(...stats.mean))} of the pad; apogee ${Math.round(study.nominal.apogee)} m.`;
 }
 
-/** Shows a study (just flown, or `saved`: the SavedFlight record it was opened from). */
-async function show(study, { saved }) {
+/** Shows a study, just flown or opened from a saved flight (`savedAs`). */
+async function show(study) {
   const { nominal, results, wind, ensemble, rail } = study;
   const stats = landingStats(results);
+  currentStats = stats;
   const e95 = stats.ellipses.find((e) => e.p === 0.95);
   const centre = Math.hypot(...stats.mean);
   const landedFar = results.filter((r) => r && r.landed === false).length;
   const lost = results.filter((r) => !r).length;
   const when = new Date(study.when);
-  const lines = [];
-  if (saved) {
-    lines.push(h('div', { class: 'saved-note' }, h('b', {}, saved.name),
-      h('span', { class: 'hint' }, ` · saved ${new Date(saved.created_date).toLocaleString()}. These are the results as saved; run it again for the latest forecast.`)));
-  }
+  const lines = [h('div', { id: 'saved-note' })];
   lines.push(
     h('h3', {}, 'Where it lands'),
     h('p', { class: 'headline' },
@@ -291,11 +303,7 @@ async function show(study, { saved }) {
   for (const note of study.notes ?? []) lines.push(h('p', { class: 'warn' }, note));
   if (landedFar) lines.push(h('p', { class: 'warn' }, `${landedFar} flights were still in the air after 20 minutes and are left out.`));
   if (lost) lines.push(h('p', { class: 'warn' }, `${lost} flights took too long to compute and are left out.`));
-  if (!saved) {
-    const save = h('button', { class: 'wide' }, 'Save this flight');
-    save.onclick = () => saveCurrent(stats);
-    lines.push(save);
-  }
+  lines.push(h('div', { id: 'save-area' }));
 
   // The winds the rocket flies through, with the ensemble's spread at each height.
   const top = Math.max(300, nominal.apogee * 1.15);
@@ -319,6 +327,7 @@ async function show(study, { saved }) {
     h('p', { class: 'hint' }, `${study.design.name} · ${study.simulation.name ?? 'simulation'} (${study.simulation.configuration ?? ''}). Launch site ${Math.round(study.site.altitude)} m above sea level; rail ${rail.length} m, tilted ${Math.round(rail.angle / deg)}° toward ${Math.round(rail.direction / deg)}°.`),
   );
   $('#results').replaceChildren(...lines);
+  renderSave();
   $('#results').hidden = false;
   $('#results').scrollIntoView({ behavior: 'smooth', block: 'start' });
   const m = await mapReady;
@@ -330,26 +339,79 @@ async function show(study, { saved }) {
 
 // ------------------------------------------------------------------ saved flights
 
-async function saveCurrent(stats) {
+/**
+ * Where the results say how they are saved: the saved flight they are (and whether the settings
+ * changed since), or the ways to save them: over the saved flight they were flown again from, or as
+ * a new flight.
+ */
+function renderSave() {
+  const note = $('#saved-note');
+  const area = $('#save-area');
+  if (!note || !area) return;
+  note.replaceChildren();
+  area.replaceChildren();
+  if (savedAs) {
+    const at = new Date(savedAs.updated_date ?? savedAs.created_date).toLocaleString();
+    note.append(h('div', { class: `saved-note${edited ? ' changed' : ''}` }, h('b', {}, savedAs.name),
+      h('span', { class: 'hint' }, edited
+        ? ` · saved ${at}. You changed the settings: these are still the saved results. Run the simulation again to see the new ones, then save them to this flight.`
+        : ` · saved ${at}. These are the results as saved; run it again for the latest forecast.`)));
+    return;
+  }
+  if (basedOn) {
+    const update = h('button', { class: 'primary' }, 'Save changes');
+    const asNew = h('button', {}, 'Save as a new flight');
+    update.onclick = () => saveCurrent({ over: basedOn });
+    asNew.onclick = () => saveCurrent({});
+    area.append(h('p', { class: 'hint save-from' }, 'Flown again from your saved flight ', h('b', {}, `“${basedOn.name}”`), '.'),
+      h('div', { class: 'save-row' }, update, asNew));
+  } else {
+    const save = h('button', { class: 'wide' }, 'Save this flight');
+    save.onclick = () => saveCurrent({});
+    area.append(save);
+  }
+  if (edited) area.append(h('p', { class: 'hint' }, 'You changed the settings since this was flown: saving keeps these results, flown with the settings before.'));
+}
+
+/** The settings changed: the results on show are not theirs any more. */
+function markEdited() {
+  if (!current || edited) return;
+  edited = true;
+  renderSave();
+}
+
+/** Saves the study on show: `over` a saved flight (keeping its name), or as a new one. */
+async function saveCurrent({ over = null }) {
   if (!current) return;
-  const when = new Date(current.when);
-  const name = await promptDialog('Save this flight', 'Name', `${current.design.name} · ${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'Save');
-  if (!name) return;
+  let name = over?.name;
+  if (!over) {
+    const when = new Date(current.when);
+    name = await promptDialog('Save this flight', 'Name', `${current.design.name} · ${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'Save');
+    if (!name) return;
+  }
+  for (const b of document.querySelectorAll('#save-area button')) b.disabled = true;
   try {
-    const record = await saveFlight(name, current, headline(current, stats), me);
-    toast('Saved. Open it any time from Saved flights.');
+    const summary = headline(current, currentStats);
+    const record = over ? await updateFlight(over, current, summary) : await saveFlight(name, current, summary, me);
+    savedAs = { ...over, ...record, name: record?.name ?? name };
+    basedOn = null;
+    toast(over ? `Saved the changes to “${savedAs.name}”.` : 'Saved. Open it any time from Saved flights.');
     const url = new URL(location.href);
-    url.searchParams.set('flight', record.id);
+    url.searchParams.set('flight', savedAs.id);
     history.replaceState(null, '', url.href);
   } catch (e) {
     toast(`Could not save the flight: ${e.message}`);
   }
+  renderSave();
 }
 
 async function openSaved(recordOrId) {
   try {
     const { record, study } = await openFlight(recordOrId);
     current = study;
+    savedAs = record;
+    basedOn = null;
+    edited = false;
     // The form as it was, to run it again with the latest forecast.
     $('#lat').value = study.site.lat.toFixed(5);
     $('#lon').value = study.site.lon.toFixed(5);
@@ -366,11 +428,19 @@ async function openSaved(recordOrId) {
     url.searchParams.set('flight', record.id);
     url.searchParams.set('id', study.design.id);
     history.replaceState(null, '', url.href);
-    await show(study, { saved: record });
-    // OpenRocket opens the design in the background, so the flight can be run again.
-    if (study.design.id && $('#design').value !== study.design.id) {
-      $('#design').value = study.design.id;
-      chooseDesign(study.design.id, study.simulation.index);
+    await show(study);
+    // OpenRocket opens the design (and simulation) in the background, so the flight can be flown
+    // again, with the saved settings.
+    const id = study.design.id;
+    const index = study.simulation.index ?? 0;
+    if (id) {
+      $('#design').value = id;
+      if (opened?.id !== id) {
+        chooseDesign(id, index, { keepLaunch: true });
+      } else if (!tables || $('#sim').value !== String(index)) {
+        $('#sim').value = String(index);
+        chooseSimulation(index, { keepLaunch: true });
+      }
     }
   } catch (e) {
     toast(e.message);
@@ -399,7 +469,7 @@ async function savedDialog() {
       };
       return h('div', { class: 'item' },
         h('div', { class: 'grow' }, h('div', {}, h('b', {}, f.name)),
-          h('div', { class: 'sub' }, `${f.design_name ?? ''} · launch ${f.launch_time ? new Date(f.launch_time).toLocaleString() : ''} · saved ${timeAgo(f.created_date)}`),
+          h('div', { class: 'sub' }, `${f.design_name ?? ''} · launch ${f.launch_time ? new Date(f.launch_time).toLocaleString() : ''} · saved ${timeAgo(f.updated_date ?? f.created_date)}`),
           f.summary ? h('div', { class: 'sub' }, f.summary) : null),
         open, del);
     }) : [h('div', { class: 'item sub' }, 'No saved flights yet. Run a simulation, then press Save this flight.')]));
@@ -421,7 +491,10 @@ async function main() {
   $('#planner').hidden = false;
 
   mapReady = createMap($('#map'), { arcgisKey: import.meta.env.VITE_ARCGIS_API_KEY });
-  mapReady.then((m) => m.onPick((lat, lon) => setSite(lat, lon, { fromMap: true }))).catch((e) => toast(e.message));
+  mapReady.then((m) => m.onPick((lat, lon) => {
+    setSite(lat, lon, { fromMap: true });
+    markEdited();
+  })).catch((e) => toast(e.message));
 
   const now = new Date();
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours() + 1);
@@ -453,11 +526,18 @@ async function main() {
   }
   $('#locate').onclick = () => {
     if (!navigator.geolocation) return toast('This browser cannot tell where you are.');
-    navigator.geolocation.getCurrentPosition((p) => setSite(p.coords.latitude, p.coords.longitude), () => toast('Could not get your location.'));
+    navigator.geolocation.getCurrentPosition((p) => {
+      setSite(p.coords.latitude, p.coords.longitude);
+      markEdited();
+    }, () => toast('Could not get your location.'));
   };
   $('#design').onchange = () => chooseDesign($('#design').value);
   $('#sim').onchange = () => chooseSimulation($('#sim').value);
   $('#run').onclick = run;
+  // Any change to the settings (not to the results) means the results on show are not theirs.
+  $('.plan-panel').addEventListener('change', (e) => {
+    if (!e.target.closest('#results')) markEdited();
+  });
   $('#replay').onclick = () => mapReady.then((m) => m.replay(1));
 
   try {
