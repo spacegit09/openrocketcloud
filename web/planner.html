@@ -18,7 +18,10 @@
 
   <div class="planner" id="planner" hidden>
     <aside class="plan-panel">
-      <p class="plan-intro">Real-life launch simulation: your OpenRocket design flown hundreds of times in the forecast winds for your launch site, showing where it is likely to land.</p>
+      <div class="plan-top">
+        <p class="plan-intro">Real-life launch simulation: your OpenRocket design flown hundreds of times in the forecast winds for your launch site, showing where it is likely to land.</p>
+        <button class="ghost" id="saved-btn" type="button">Saved flights</button>
+      </div>
 
       <section class="plan-step">
         <h3><span>1</span> Rocket</h3>
@@ -45,12 +48,22 @@
 
       <section class="plan-step">
         <h3><span>3</span> Monte Carlo</h3>
+        <fieldset class="wind-mode">
+          <legend>Wind uncertainty</legend>
+          <label class="choice"><input type="radio" name="wind-mode" value="ensemble" checked>
+            <span><b>Ensemble forecast (NOAA GEFS)</b> <em>recommended</em>
+              <small>NOAA runs its forecast 31 times from slightly different starting points. Each flight flies in one of those forecasts, so the landing area is wide when they disagree and tight when they agree: it shows how sure the weather really is for your launch.</small></span></label>
+          <label class="choice"><input type="radio" name="wind-mode" value="spread">
+            <span><b>Forecast with a fixed spread</b>
+              <small>Every flight flies in the main forecast (NOAA GFS), with the wind’s speed and direction varied by the amounts set below. The same margin every day, whatever the weather.</small></span></label>
+        </fieldset>
         <label>Number of flights<select id="runs"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
         <details class="spread">
           <summary>How much things vary (one standard deviation)</summary>
           <div class="two">
-            <label>Wind speed (%)<input data-spread="windSpeed" data-scale="100" type="number" step="1" min="0"></label>
-            <label>Wind direction (°)<input data-spread="windDirection" type="number" step="1" min="0"></label>
+            <label>Wind speed (%)<input data-spread="windSpeed" data-scale="100" data-wind type="number" step="1" min="0"></label>
+            <label>Wind direction (°)<input data-spread="windDirection" data-wind type="number" step="1" min="0"></label>
+            <p class="hint" id="wind-spread-note" hidden>With the ensemble forecast, the wind varies as the 31 forecasts do; the two wind settings apply to the fixed spread.</p>
             <label>Motor impulse (%)<input data-spread="thrust" data-scale="100" type="number" step="0.5" min="0"></label>
             <label>Drag (%)<input data-spread="drag" data-scale="100" type="number" step="0.5" min="0"></label>
             <label>Mass (%)<input data-spread="mass" data-scale="100" type="number" step="0.5" min="0"></label>

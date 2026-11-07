@@ -14,8 +14,9 @@ self.onmessage = ({ data }) => {
     }
     if (data.type === 'run') {
       const results = data.jobs.map(({ i, v }) => {
+        const levels = v.windSet >= 0 && setup.windSets?.[v.windSet] ? setup.windSets[v.windSet] : setup.levels;
         const env = environment({
-          wind: varyWind(setup.levels, v.windScale, v.windTurn),
+          wind: varyWind(levels, v.windScale, v.windTurn),
           air: setup.air,
           latitude: setup.latitude,
           altitude: setup.altitude,

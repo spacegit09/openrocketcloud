@@ -89,9 +89,12 @@ and live sharing. Nothing runs on your own computer or server.
   OpenRocket's flight simulation (`engine.js`: six degrees of freedom on the way up, OpenRocket's
   parachute descent) flies those tables about 1,000 times faster, in Web Workers; on OpenRocket's
   single-stage example designs it matches OpenRocket's apogee within 0.5% and its landing point
-  within 10 m (`scripts/test.sh` checks this). Winds and air come from NOAA's GFS forecast
-  (public domain) through the `gfsWinds` backend function, which reads a small area from NOMADS
-  and decodes it (`grib2.js`); ground heights from the Terrain Tiles on AWS Open Data; the map is
+  within 10 m (`scripts/test.sh` checks this). Winds and air come from NOAA's GFS forecast and
+  its GEFS ensemble (both public domain) through the `gfsWinds` backend function, which reads a
+  small area from NOMADS and decodes it (`grib2.js`); the ensemble's files have few heights, so
+  each member's wind is the GFS wind shifted at every height by that member's difference from the
+  members' average (`ensembleWinds`). Saved flights are SavedFlight records (gzip-compressed,
+  about 10 KB for 500 flights); ground heights from the Terrain Tiles on AWS Open Data; the map is
   CesiumJS with Esri World Imagery (set `VITE_ARCGIS_API_KEY` in `web/.env` to your ArcGIS
   Location Platform key, restricted to your site's addresses).
 - **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
@@ -272,11 +275,17 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
 - **Launch Planner** (browser version; *Launch planner* on the dashboard, *Plan a launch* in a
   design's ⋯ menu, or the target button in a design's header): a real-life launch simulation.
   Choose a design and one of its simulations, the launch site (click the map) and time (up to 16
-  days ahead), and the rail; the planner flies it hundreds of times in NOAA's GFS forecast winds for
-  that place and time, varying the wind, motor, drag, mass, parachutes, rail aim and ejection delay,
-  and shows on a satellite map where 50%, 95% and 99% of flights land, with the flight path, a
-  replay, apogee and the forecast winds. Landings meet the real ground. Single-stage rockets only
-  for now; predictions, not a substitute for the range safety officer.
+  days ahead), and the rail; the planner flies it hundreds of times in NOAA's forecast winds for
+  that place and time, varying the motor, drag, mass, parachutes, rail aim and ejection delay, and
+  shows on a satellite map where 50%, 95% and 99% of flights land, with the launch direction (the
+  rail and an arrow the way it leans), the flight path, a replay, apogee and the forecast winds. The wind varies one of two ways: the **ensemble forecast** (NOAA
+  GEFS, the default): each flight flies in one of NOAA's 31 forecasts run from slightly different
+  starting points, so the landing area is as wide as the weather is uncertain that day; or the
+  **forecast with a fixed spread** (NOAA GFS with its speed and direction varied by set amounts),
+  the same margin every day. Landings meet the real ground. **Save this flight** keeps a study
+  (settings, forecast and results) to open again later from *Saved flights*, or by its link; only
+  you see your saved flights. Single-stage rockets only for now; predictions, not a substitute for
+  the range safety officer.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
 - **Who's here**: avatars show who has the design open and which part each person has selected.

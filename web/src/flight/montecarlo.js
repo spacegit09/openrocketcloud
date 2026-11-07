@@ -33,16 +33,18 @@ export function randomSource(seed = 1) {
 
 /**
  * The conditions of `n` flights; the first is the forecast as it is (the nominal flight). Each:
- * { windScale, windTurn (rad), thrustScale, dragScale, massScale, recoveryScale, rodAngle,
- * rodDirection (rad), ejectionDelta (s) }.
+ * { windScale, windTurn (rad), windSet, thrustScale, dragScale, massScale, recoveryScale, rodAngle,
+ * rodDirection (rad), ejectionDelta (s) }. With `windSets` (an ensemble's wind profiles, see
+ * ensembleWinds) the flights take turns with them instead of a varied wind; windSet is -1 for the
+ * forecast as it is.
  */
-export function variations(n, spread, rail, seed = 1) {
+export function variations(n, spread, rail, seed = 1, { windSets = 0 } = {}) {
   const r = randomSource(seed);
   const out = [];
   const deg = Math.PI / 180;
   for (let i = 0; i < n; i++) {
     if (i === 0) {
-      out.push({ windScale: 1, windTurn: 0, thrustScale: 1, dragScale: 1, massScale: 1, recoveryScale: 1, rodAngle: rail.angle,
+      out.push({ windScale: 1, windTurn: 0, windSet: -1, thrustScale: 1, dragScale: 1, massScale: 1, recoveryScale: 1, rodAngle: rail.angle,
         rodDirection: rail.direction, ejectionDelta: 0 });
       continue;
     }
@@ -51,9 +53,10 @@ export function variations(n, spread, rail, seed = 1) {
     const e = Math.tan(spread.railAim * deg);
     const v = [d[0] + r.normal() * e, d[1] + r.normal() * e, d[2]];
     const len = Math.hypot(...v);
+    const windScale = Math.max(0, 1 + r.normal() * spread.windSpeed);
+    const windTurn = r.normal() * spread.windDirection * deg;
     out.push({
-      windScale: Math.max(0, 1 + r.normal() * spread.windSpeed),
-      windTurn: r.normal() * spread.windDirection * deg,
+      ...(windSets > 0 ? { windScale: 1, windTurn: 0, windSet: (i - 1) % windSets } : { windScale, windTurn, windSet: -1 }),
       thrustScale: Math.max(0.5, 1 + r.normal() * spread.thrust),
       dragScale: Math.max(0.5, 1 + r.normal() * spread.drag),
       massScale: Math.max(0.5, 1 + r.normal() * spread.mass),
@@ -64,6 +67,43 @@ export function variations(n, spread, rail, seed = 1) {
     });
   }
   return out;
+}
+
+/** The wind (u, v) of a profile at a height above the ground, linear between levels, constant beyond. */
+export function windAt(levels, h) {
+  const n = levels.length;
+  if (h <= levels[0].agl) return [levels[0].u, levels[0].v];
+  if (h >= levels[n - 1].agl) return [levels[n - 1].u, levels[n - 1].v];
+  let k = 1;
+  while (levels[k].agl < h) k++;
+  const a = levels[k - 1];
+  const b = levels[k];
+  const f = (h - a.agl) / (b.agl - a.agl);
+  return [a.u + (b.u - a.u) * f, a.v + (b.v - a.v) * f];
+}
+
+/**
+ * Wind profiles for an ensemble study, one per member: the detailed forecast `levels` (GFS, with
+ * many heights near the ground) shifted at every height by how that ensemble member's wind differs
+ * there from the members' average. The members' files have few heights, so this keeps the
+ * forecast's detail and the members' spread. Temperature and pressure stay the forecast's.
+ */
+export function ensembleWinds(levels, members) {
+  if (!members?.length) return [];
+  const mean = levels.map((l) => {
+    let u = 0;
+    let v = 0;
+    for (const m of members) {
+      const w = windAt(m.levels, l.agl);
+      u += w[0];
+      v += w[1];
+    }
+    return [u / members.length, v / members.length];
+  });
+  return members.map((m) => levels.map((l, k) => {
+    const w = windAt(m.levels, l.agl);
+    return { ...l, u: l.u + w[0] - mean[k][0], v: l.v + w[1] - mean[k][1] };
+  }));
 }
 
 /** Wind profile levels with the wind turned (clockwise, rad) and scaled. */
@@ -160,8 +200,8 @@ export function ellipsePoints(center, { a, b, angle }, count = 72) {
 }
 
 /**
- * Flies the study in Web Workers: `setup` { tables, levels, air, latitude, altitude, ground,
- * coriolis } and the flights' `conditions` (from variations()). Calls onProgress(done, total) and
+ * Flies the study in Web Workers: `setup` { tables, levels, windSets, air, latitude, altitude,
+ * ground, coriolis } and the flights' `conditions` (from variations()). Calls onProgress(done, total) and
  * resolves to the results in the conditions' order. A batch that takes far too long (a worker
  * starved or stuck) is given up: its flights' results stay empty and its worker is replaced.
  */

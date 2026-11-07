@@ -57,8 +57,7 @@ class NotPublished extends Error {}
 
 const cache = new Map(); // url -> { at, profile }
 
-async function profileFor(cycle, hour, lat, lon, fetchFn) {
-  const url = filterUrl(cycle, hour, lat, lon);
+async function profileFor(cycle, hour, lat, lon, fetchFn, url = filterUrl(cycle, hour, lat, lon), ground = null) {
   const hit = cache.get(url);
   if (hit && Date.now() - hit.at < 6 * HOUR) return hit.profile;
   const res = await fetchFn(url, { headers: { 'user-agent': 'RocketInCloud/1.0 (launch planner)' }, signal: AbortSignal.timeout(20_000) })
@@ -72,7 +71,7 @@ async function profileFor(cycle, hour, lat, lon, fetchFn) {
     if (res.status === 404 || !grib) throw new NotPublished(`${url} is not available`);
     throw new Error(`NOAA's server answered ${res.status}.`);
   }
-  const profile = profileAt(readGrib2(bytes), lat, lon);
+  const profile = profileAt(readGrib2(bytes), lat, lon, { ground });
   if (cache.size > 500) cache.clear();
   cache.set(url, { at: Date.now(), profile });
   return profile;
@@ -111,4 +110,86 @@ export async function gfsProfile({ lat, lon, time, now = new Date(), fetch: fetc
     }
   }
   throw new Error('That launch time is too far in the past for the forecast.');
+}
+
+// ------------------------------------------------------------------ the ensemble (GEFS)
+
+const GEFS_FILTER = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gefs_atmos_0p50a.pl';
+export const GEFS_MEMBERS = 31; // the control run (gec00) and 30 perturbed runs (gep01-gep30)
+export const GEFS_PRESSURE_LEVELS = [1000, 925, 850, 700, 500, 400, 300, 250, 200, 100, 50, 10];
+
+/** The forecast hours an ensemble run has: every 3 hours to 240, then every 6 hours to 384. */
+export function gefsHasHour(h) {
+  return h >= 0 && h <= MAX_HOURS && (h <= 240 ? h % 3 === 0 : h % 6 === 0);
+}
+
+/** The ensemble's forecast hour nearest `time` in the run starting at `cycle`, or null. */
+export function gefsHour(cycle, time) {
+  const h = (time - cycle) / HOUR;
+  if (h < -1.5 || h > MAX_HOURS + 1.5) return null;
+  let best = null;
+  for (let k = 0; k <= MAX_HOURS; k += 3) {
+    if (gefsHasHour(k) && (best === null || Math.abs(k - h) < Math.abs(best - h))) best = k;
+  }
+  return best;
+}
+
+export function gefsUrl(cycle, member, hour, lat, lon) {
+  const day = `${cycle.getUTCFullYear()}${pad(cycle.getUTCMonth() + 1)}${pad(cycle.getUTCDate())}`;
+  const hh = pad(cycle.getUTCHours());
+  const name = member === 0 ? 'gec00' : `gep${pad(member)}`;
+  const q = new URLSearchParams({
+    dir: `/gefs.${day}/${hh}/atmos/pgrb2ap5`,
+    file: `${name}.t${hh}z.pgrb2a.0p50.f${String(hour).padStart(3, '0')}`,
+    var_UGRD: 'on', var_VGRD: 'on', var_HGT: 'on', var_TMP: 'on', lev_10_m_above_ground: 'on',
+  });
+  for (const p of GEFS_PRESSURE_LEVELS) q.set(`lev_${p}_mb`, 'on');
+  q.set('subregion', '');
+  q.set('toplat', (lat + 0.75).toFixed(2));
+  q.set('bottomlat', (lat - 0.75).toFixed(2));
+  q.set('leftlon', (lon - 0.75).toFixed(2));
+  q.set('rightlon', (lon + 0.75).toFixed(2));
+  return `${GEFS_FILTER}?${q}`;
+}
+
+/** Runs `jobs` (functions returning promises) at most `limit` at a time; failures resolve to null. */
+async function pool(jobs, limit) {
+  const out = new Array(jobs.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < jobs.length) {
+      const k = next++;
+      out[k] = await jobs[k]().catch(() => null);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+  return out;
+}
+
+/**
+ * NOAA's ensemble forecast (GEFS, 0.5°, 31 runs from slightly different starting points) for a
+ * launch: { model, run, valid (the forecast hour nearest the launch time), members: [{ member,
+ * levels }] } with levels as in profileAt, heights above `ground` (the GFS ground height there).
+ */
+export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), fetch: fetchFn = fetch }) {
+  let missing = 0;
+  for (const cycle of recentCycles(now, 12)) {
+    const hour = gefsHour(cycle, time);
+    if (hour === null) {
+      if (time < cycle) continue;
+      throw new Error('Ensemble forecasts reach 16 days ahead: choose an earlier launch time.');
+    }
+    const get = (m) => profileFor(cycle, hour, lat, lon, fetchFn, gefsUrl(cycle, m, hour, lat, lon), ground);
+    try {
+      await get(0); // the control run first: is this run published yet?
+    } catch (e) {
+      if (!(e instanceof NotPublished) || ++missing > 4) throw e instanceof NotPublished ? new Error('No ensemble forecast is available right now.') : e;
+      continue;
+    }
+    const profiles = await pool(Array.from({ length: GEFS_MEMBERS }, (_, m) => () => get(m)), 8);
+    const members = profiles.map((p, m) => (p ? { member: m, levels: p.levels } : null)).filter(Boolean);
+    if (members.length < 20) throw new Error("NOAA's ensemble forecast did not come through. Try again in a moment.");
+    return { model: 'NOAA GEFS 0.5°', run: cycle.toISOString(), valid: new Date(cycle.getTime() + hour * HOUR).toISOString(), members };
+  }
+  throw new Error('That launch time is too far in the past for the ensemble forecast.');
 }
