@@ -16,18 +16,18 @@
     }
     .sbar .logo { width: 24px; height: 24px; display: block; }
     .title { font-weight: 650; font-size: 14.5px; max-width: 28vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
+    .pill { font-size: 12px; padding: 2px 9px; border-radius: var(--radius-sm); display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
     .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
     .pill.live { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
     .pill.wait { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
     .pill.off { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
     .activity { color: var(--muted); font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1; transition: opacity .4s; }
     .activity b { color: var(--text); font-weight: 600; }
-    .people { display: flex; align-items: center; cursor: pointer; padding: 2px 4px; border-radius: 8px; }
+    .people { display: flex; align-items: center; cursor: pointer; padding: 2px 4px; border-radius: var(--radius-sm); }
     .people:hover { background: var(--surface-2); }
     .people .avatar { width: 26px; height: 26px; }
     .people .avatar + .avatar { margin-left: -7px; }
-    .popover { position: absolute; right: 8px; top: 48px; z-index: 30; width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); padding: 8px; }
+    .popover { position: absolute; right: 8px; top: 48px; z-index: 30; width: 320px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 8px; }
     .popover h4 { margin: 6px 8px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
     .popover .feed .item { font-size: 12.5px; }
     #screen { flex: 1; min-height: 0; background: #2b2f36; position: relative; overflow: hidden; }
