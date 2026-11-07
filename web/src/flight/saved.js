@@ -18,22 +18,29 @@ async function gunzipBase64(b64) {
   return new Response(stream).text();
 }
 
-/** Saves a study under `name`; the record's summary line is `summary`. */
-export async function saveFlight(name, study, summary, me) {
-  return db.SavedFlight.create({
-    owner_email: me.email,
-    name,
+async function fields(study, summary) {
+  return {
     design_id: study.design.id,
     design_name: study.design.name,
     launch_time: study.when,
     summary,
     data: await gzipBase64(JSON.stringify(packStudy(study))),
-  });
+  };
 }
 
-/** Your saved flights, newest first. */
+/** Saves a study under `name`; the record's summary line is `summary`. */
+export async function saveFlight(name, study, summary, me) {
+  return db.SavedFlight.create({ owner_email: me.email, name, ...(await fields(study, summary)) });
+}
+
+/** Saves a study over a saved flight (`record`), keeping its name. */
+export async function updateFlight(record, study, summary) {
+  return db.SavedFlight.update(record.id, await fields(study, summary));
+}
+
+/** Your saved flights, the latest saved first. */
 export async function listFlights() {
-  return db.SavedFlight.list('-created_date', 200);
+  return db.SavedFlight.list('-updated_date', 200);
 }
 
 export async function openFlight(record) {
