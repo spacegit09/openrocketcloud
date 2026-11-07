@@ -39,6 +39,7 @@
       <span class="spacer"></span>
       <input class="search" id="search" type="search" placeholder="Search designs" aria-label="Search designs">
       <input type="file" id="file" accept=".ork,.zip,.xml" hidden>
+      <a class="btn" href="/planner.html" title="Real-life launch simulation: forecast winds and where your rocket will land"><span data-icon="target"></span>Launch planner</a>
       <button id="motors-btn" title="Custom motors for OpenRocket's motor selector"><span data-icon="flame"></span>Motors</button>
       <div class="menu-wrap">
         <button class="primary" id="new-btn"><span data-icon="plus"></span>New design</button>
@@ -56,6 +57,12 @@
       <p>Create a new rocket, start from an example, or upload an .ork file.</p>
     </div>
   </main>
+
+  <footer class="site-foot">
+    <a href="https://cheerpj.com" target="_blank" rel="noopener">Built with CheerpJ</a>
+    <span>·</span>
+    <span>Runs <a href="https://openrocket.info" target="_blank" rel="noopener">OpenRocket</a> © the OpenRocket team (GPL-3.0); not affiliated with the OpenRocket project.</span>
+  </footer>
 
   <script type="module" src="/src/dashboard.js"></script>
 </body>

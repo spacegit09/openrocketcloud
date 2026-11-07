@@ -94,6 +94,7 @@ function card(d) {
     return b;
   };
   menu.append(
+    item('target', 'Plan a launch', () => { location.href = `/planner.html?id=${encodeURIComponent(d.id)}`; }),
     item('copy', 'Duplicate', () => duplicate(d)),
     item('history', 'Edit history', () => historyFor(d, role)),
     item('download', 'Saved copies', () => savedCopies(d)),

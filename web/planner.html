@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Launch Planner — Rocket in Cloud</title>
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="preload" href="https://cjrtnc.leaningtech.com/4.3/loader.js" as="script">
+</head>
+<body class="planner-page">
+  <header class="topbar">
+    <a class="brand" href="/"><img class="logo" src="/logo.png" alt="">Rocket in Cloud</a>
+    <span class="crumb">Launch Planner</span>
+    <span class="spacer"></span>
+    <span class="me" id="me" hidden></span>
+  </header>
+
+  <div class="planner" id="planner" hidden>
+    <aside class="plan-panel">
+      <p class="plan-intro">Real-life launch simulation: your OpenRocket design flown hundreds of times in the forecast winds for your launch site, showing where it is likely to land.</p>
+
+      <section class="plan-step">
+        <h3><span>1</span> Rocket</h3>
+        <label>Design<select id="design"><option value="">Loading…</option></select></label>
+        <label>Simulation<select id="sim" disabled><option>Choose a design</option></select></label>
+        <div class="plan-status" id="rocket-status"></div>
+      </section>
+
+      <section class="plan-step">
+        <h3><span>2</span> Launch site and time</h3>
+        <div class="two">
+          <label>Latitude<input id="lat" type="number" step="0.00001" min="-89" max="89"></label>
+          <label>Longitude<input id="lon" type="number" step="0.00001" min="-180" max="180"></label>
+        </div>
+        <div class="row hint"><span class="grow">Click the map to move the launch pad.</span><button class="ghost link" id="locate" type="button">Use my location</button></div>
+        <label>Launch time (your time zone)<input id="when" type="datetime-local"></label>
+        <div class="two">
+          <label>Rail length (m)<input id="rail" type="number" step="0.1" min="0"></label>
+          <label>Rail angle (°)<input id="rail-angle" type="number" step="1" min="0" max="30"></label>
+        </div>
+        <label class="check"><input type="checkbox" id="into-wind" checked>Tilt the rail into the wind</label>
+        <label id="rail-dir-row" hidden>Rail tilts toward (° from north)<input id="rail-dir" type="number" step="1" min="0" max="360"></label>
+      </section>
+
+      <section class="plan-step">
+        <h3><span>3</span> Monte Carlo</h3>
+        <label>Number of flights<select id="runs"><option>200</option><option selected>500</option><option>1000</option><option>2000</option></select></label>
+        <details class="spread">
+          <summary>How much things vary (one standard deviation)</summary>
+          <div class="two">
+            <label>Wind speed (%)<input data-spread="windSpeed" data-scale="100" type="number" step="1" min="0"></label>
+            <label>Wind direction (°)<input data-spread="windDirection" type="number" step="1" min="0"></label>
+            <label>Motor impulse (%)<input data-spread="thrust" data-scale="100" type="number" step="0.5" min="0"></label>
+            <label>Drag (%)<input data-spread="drag" data-scale="100" type="number" step="0.5" min="0"></label>
+            <label>Mass (%)<input data-spread="mass" data-scale="100" type="number" step="0.5" min="0"></label>
+            <label>Parachute drag (%)<input data-spread="recovery" data-scale="100" type="number" step="0.5" min="0"></label>
+            <label>Rail aim (°)<input data-spread="railAim" type="number" step="0.1" min="0"></label>
+            <label>Ejection delay (s)<input data-spread="ejection" type="number" step="0.1" min="0"></label>
+          </div>
+        </details>
+        <button class="primary wide" id="run" disabled>Run simulation</button>
+        <div class="progress" id="progress" hidden><div class="bar"></div><span class="hint" id="progress-text"></span></div>
+      </section>
+
+      <section class="plan-results" id="results" hidden></section>
+
+      <p class="hint plan-credits">Predictions, not guarantees: follow your range safety officer. Winds: NOAA GFS forecast. Imagery: Esri, Maxar, Earthstar Geographics and the GIS user community. Terrain: Terrain Tiles on AWS Open Data (SRTM, GMTED2010, ETOPO1 and others). Physics: OpenRocket 24.12. <a href="https://cheerpj.com" target="_blank" rel="noopener">Built with CheerpJ</a>.</p>
+    </aside>
+    <section class="plan-map" id="map">
+      <div class="map-tools"><button id="replay" hidden>Replay flight</button></div>
+    </section>
+  </div>
+
+  <main class="page" id="signed-out" hidden>
+    <h2>Launch Planner</h2>
+    <p>Sign in on the <a href="/">home page</a> to plan a launch with your designs.</p>
+  </main>
+
+  <script type="module" src="/src/planner.js"></script>
+</body>
+</html>

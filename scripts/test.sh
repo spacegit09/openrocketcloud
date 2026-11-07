@@ -2,7 +2,8 @@
 # Runs all tests:
 #  1. the live-share self-test against the real OpenRocket 24.12 (all bundled example designs),
 #     inside the worker image on a virtual display; it also writes Java model fixtures;
-#  2. the server tests, including Java/Node parity on those fixtures.
+#  2. the launch planner's flight engine against OpenRocket, and its weather decoding;
+#  3. the server tests, including Java/Node parity on those fixtures.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export ORC_IMAGES="${ORC_IMAGES:-orcloud}" # test the locally built images
@@ -23,5 +24,12 @@ docker run --rm -e ORC_VNC_PASSWORD=test -e SELFTEST_DUMP=/fx \
   java --add-exports java.base/java.lang=ALL-UNNAMED --add-exports java.desktop/sun.awt=ALL-UNNAMED \
        --add-exports java.desktop/sun.java2d=ALL-UNNAMED -cp /opt/openrocket/OpenRocket.jar:/opt/test \
        orcloud.bridge.SelfTest 2>&1 | grep -E "^(  FAIL|  note|ERROR|SELFTEST|[A-Z0-9].*\.ork$)"'
+
+# The launch planner's flight engine against OpenRocket: OpenRocket flies its example designs in
+# three winds (fixtures in worker/.cache/flight), then the engine flies the same and must agree.
+mkdir -p "$cache/flight"
+docker run --rm -v "$PWD/$cache/flight:/fx" -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.flight.FlightCheck /fx 2>&1 | grep -E "^(FLIGHTCHECK|  skip)"'
+node --test web/test/flight.test.mjs web/test/gfs.test.mjs
 
 (cd server && npm ci --no-audit --no-fund >/dev/null && npm test)
