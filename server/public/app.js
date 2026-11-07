@@ -46,14 +46,14 @@ async function showLanding() {
     <rect x="12" y="34" width="120" height="214" rx="4" fill="var(--surface)" stroke="var(--border)"/>
     <g fill="var(--muted)"><text x="22" y="52">Rocket</text><text x="32" y="68">Sustainer</text><text x="42" y="84">Nose cone</text><text x="42" y="100">Body tube</text><text x="52" y="116">Fin set</text><text x="52" y="132">Parachute</text></g>
     <rect x="38" y="90" width="88" height="14" rx="3" fill="#1c7ed6" fill-opacity=".18" stroke="#1c7ed6"/>
-    <rect x="48" y="106" width="78" height="14" rx="3" fill="#e8590c" fill-opacity=".18" stroke="#e8590c"/>
+    <rect x="48" y="106" width="78" height="14" rx="3" fill="#1e3a8a" fill-opacity=".18" stroke="#1e3a8a"/>
     <g transform="translate(150 70)" stroke="var(--text)" stroke-width="1.6">
       <path d="M0 40 C 30 20, 55 22, 70 24 L 230 24 L 230 56 L 70 56 C 55 58, 30 60, 0 40 Z" fill="var(--surface)"/>
       <path d="M70 24 V56 M160 24 V56"/>
       <path d="M190 24 L 222 2 L 238 2 L 230 24 M190 56 L 222 78 L 238 78 L 230 56" fill="var(--accent)" fill-opacity=".25"/>
     </g>
     <g font-weight="700" fill="#fff"><rect x="282" y="168" width="124" height="22" rx="11" fill="#1c7ed6"/><text x="294" y="183">Mina · Body tube</text>
-    <rect x="238" y="200" width="168" height="22" rx="11" fill="#e8590c"/><text x="250" y="215">Joon edited Fin set</text></g>
+    <rect x="238" y="200" width="168" height="22" rx="11" fill="#1e3a8a"/><text x="250" y="215">Joon edited Fin set</text></g>
   </svg>`;
   const err = new URLSearchParams(location.search).get('error');
   if (err) {

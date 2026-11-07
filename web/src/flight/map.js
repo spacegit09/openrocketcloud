@@ -6,6 +6,7 @@ import { ellipsePoints } from './montecarlo.js';
 import { offset } from './terrain.js';
 
 const CESIUM = 'https://cdn.jsdelivr.net/npm/cesium@1.146.0/Build/Cesium/';
+const NAVY = '#1e3a8a'; // the site's accent
 let loading = null;
 
 function loadCesium() {
@@ -106,8 +107,8 @@ export async function createMap(el, { arcgisKey } = {}) {
       const n = Math.cos(direction) * launchScale;
       tip = at(e * 1.12, n * 1.12, 1);
       launchMarks.push(viewer.entities.add({
-        polyline: { positions: [at(0, 0, 1), at(e, n, 1)], width: 16, clampToGround: false,
-          material: new Cesium.PolylineArrowMaterialProperty(Color.fromCssColorString('#ff7a2f')) },
+        polyline: { positions: [at(0, 0, 1), at(e, n, 1)], width: 18, clampToGround: false,
+          material: new Cesium.PolylineArrowMaterialProperty(Color.fromCssColorString(NAVY)) },
       }));
     }
     launchMarks.push(viewer.entities.add({
@@ -141,7 +142,7 @@ export async function createMap(el, { arcgisKey } = {}) {
       drawLaunch();
       pad = viewer.entities.add({
         position: Cartesian3.fromDegrees(lon, lat, 0),
-        point: { pixelSize: 12, color: Color.fromCssColorString('#ff7a2f'), outlineColor: Color.WHITE, outlineWidth: 2, heightReference: HeightReference.NONE },
+        point: { pixelSize: 12, color: Color.fromCssColorString(NAVY), outlineColor: Color.WHITE, outlineWidth: 2, heightReference: HeightReference.NONE },
         label: { text: 'Launch', font: '600 13px system-ui, sans-serif', pixelOffset: new Cesium.Cartesian2(0, -20), fillColor: Color.WHITE,
           outlineColor: Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE },
       });
@@ -157,10 +158,11 @@ export async function createMap(el, { arcgisKey } = {}) {
         if (!r || r.landed === false) continue;
         points.add({ position: at(r.landingEast, r.landingNorth, 0.5), pixelSize: 5, color: landing.withAlpha(0.85), outlineColor: Color.BLACK.withAlpha(0.6), outlineWidth: 1 });
       }
-      const colors = ['#51cf66', '#ffa94d', '#ff6b6b'];
+      const colors = ['#51cf66', NAVY, '#ff6b6b'];
       for (const [k, e] of stats.ellipses.entries()) {
         const pts = ellipsePoints(stats.mean, e).map(([x, y]) => at(x, y, 1));
         const color = Color.fromCssColorString(colors[k] ?? '#ffffff');
+        study.entities.add({ polyline: { positions: pts, width: 5, material: Color.WHITE.withAlpha(0.85) } }); // an edge, for dark ground
         study.entities.add({ polyline: { positions: pts, width: 2.5, material: color } });
         study.entities.add({ polygon: { hierarchy: pts, material: color.withAlpha(0.08), perPositionHeight: true } });
       }
@@ -200,7 +202,7 @@ export async function createMap(el, { arcgisKey } = {}) {
       replayEntity = viewer.entities.add({
         availability: new Cesium.TimeIntervalCollection([new Cesium.TimeInterval({ start, stop })]),
         position,
-        point: { pixelSize: 11, color: Color.WHITE, outlineColor: Color.fromCssColorString('#ff7a2f'), outlineWidth: 3 },
+        point: { pixelSize: 11, color: Color.WHITE, outlineColor: Color.fromCssColorString(NAVY), outlineWidth: 3 },
         path: { leadTime: 0, trailTime: 1e6, width: 2, material: Color.WHITE.withAlpha(0.7) },
       });
       viewer.clock.startTime = start.clone();

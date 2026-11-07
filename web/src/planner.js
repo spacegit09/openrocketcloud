@@ -279,7 +279,7 @@ async function show(study, { saved }) {
   lines.push(
     h('h3', {}, 'Where it lands'),
     h('p', { class: 'headline' },
-      `95% of ${stats.count} flights land inside the orange ellipse, ${dist(2 * e95.a)} by ${dist(2 * e95.b)}, centred ${dist(centre)} ${compass(bearingOf(...stats.mean))} of the pad.`),
+      `95% of ${stats.count} flights land inside the navy ellipse, ${dist(2 * e95.a)} by ${dist(2 * e95.b)}, centred ${dist(centre)} ${compass(bearingOf(...stats.mean))} of the pad.`),
     h('div', { class: 'stats' },
       stat('Apogee', `${Math.round(nominal.apogee)} m`, `${Math.round(stats.apogee.p5)}–${Math.round(stats.apogee.p95)} m in 90% of flights`),
       stat('Landing (forecast as is)', dist(Math.hypot(nominal.landingEast, nominal.landingNorth)), compass(bearingOf(nominal.landingEast, nominal.landingNorth))),

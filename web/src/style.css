@@ -5,9 +5,9 @@
   --border: #e3e6ea;
   --text: #1d2330;
   --muted: #667085;
-  --accent: #e8590c;
-  --accent-hover: #d9480f;
-  --accent-soft: #fff0e6;
+  --accent: #1e3a8a;
+  --accent-hover: #172e6e;
+  --accent-soft: #e7ecf7;
   --danger: #c92a2a;
   --ok: #2f9e44;
   --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 10%);
@@ -24,9 +24,9 @@
     --border: #2e343d;
     --text: #e8eaed;
     --muted: #98a2b3;
-    --accent: #ff7a2f;
-    --accent-hover: #ff8f50;
-    --accent-soft: #3a2416;
+    --accent: #5b7fd1;
+    --accent-hover: #7393de;
+    --accent-soft: #1b2440;
     --danger: #ff6b6b;
     --ok: #51cf66;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%);
@@ -219,7 +219,7 @@ body.design-page { height: 100vh; overflow: hidden; display: flex; flex-directio
 .pill { font-size: 12px; padding: 2px 9px; border-radius: 99px; display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); color: var(--muted); }
 .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .pill.live { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
-.pill.wait { color: #f08c00; background: color-mix(in srgb, #f08c00 12%, transparent); }
+.pill.wait { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .pill.off { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
 .activity { color: var(--muted); font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; flex: 1; transition: opacity .4s; }
 .activity b { color: var(--text); font-weight: 600; }
@@ -306,7 +306,7 @@ body.planner-page { height: 100vh; display: flex; flex-direction: column; overfl
 .plan-status:empty { display: none; }
 .plan-status.busy { color: var(--muted); }
 .plan-status.error { color: var(--danger); }
-.plan-status .warn, .plan-results .warn { color: #d9480f; }
+.plan-status .warn, .plan-results .warn { color: var(--accent); font-weight: 600; }
 details.spread summary { cursor: pointer; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
 button.wide { width: 100%; justify-content: center; padding: 9px 12px; }
 .progress { display: grid; gap: 5px; }
@@ -336,12 +336,12 @@ table.winds th { color: var(--muted); font-weight: 600; }
   .plan-map { height: 60vh; order: -1; }
   .plan-panel { border-right: 0; overflow: visible; }
 }
-.map-legend { position: absolute; z-index: 5; right: 12px; bottom: 44px; background: rgb(15 20 30 / 78%); color: #fff; font-size: 12px; padding: 8px 10px; border-radius: 8px; display: grid; gap: 4px; }
+.map-legend { position: absolute; z-index: 5; right: 12px; bottom: 44px; background: rgb(255 255 255 / 92%); color: #1d2330; box-shadow: 0 2px 8px rgb(0 0 0 / 25%); font-size: 12px; padding: 8px 10px; border-radius: 8px; display: grid; gap: 4px; }
 .map-legend[hidden] { display: none; }
 .map-legend div { display: flex; align-items: center; gap: 8px; }
 .map-legend .swatch { width: 14px; height: 14px; display: inline-block; flex: none; }
 .map-legend .swatch.ring { border: 2.5px solid var(--c); border-radius: 50%; }
-.map-legend .swatch.dot { width: 8px; height: 8px; margin: 3px; background: var(--c); border-radius: 50%; }
+.map-legend .swatch.dot { width: 8px; height: 8px; margin: 3px; background: var(--c); border-radius: 50%; box-shadow: 0 0 0 1px rgb(0 0 0 / 55%); }
 .map-legend .swatch.line { height: 3px; background: var(--c); border-radius: 2px; }
 
 /* ---------- footer (CheerpJ's free licence asks for the "Built with CheerpJ" credit) */
