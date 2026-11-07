@@ -1,6 +1,11 @@
 package orcloud.bridge;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Base64;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -15,6 +20,7 @@ import info.openrocket.core.document.Simulation;
 import info.openrocket.core.file.GeneralRocketLoader;
 import info.openrocket.swing.startup.GuiModule;
 import orcloud.flight.FlightTables;
+import orcloud.stl.PartMeshes;
 import orcloud.web.Preview;
 import orcloud.web.Warmup;
 
@@ -113,6 +119,7 @@ public final class FlightLab {
 		try {
 			start(motors);
 			OpenRocketDocument doc = new GeneralRocketLoader(new File(path)).load();
+			adoptModels(path);
 			String[] out = new String[1];
 			Exception[] failed = new Exception[1];
 			SwingUtilities.invokeAndWait(() -> {
@@ -129,6 +136,21 @@ public final class FlightLab {
 		} catch (Throwable e) {
 			Log.warn("Could not draw the design: " + e);
 			return "{\"error\":" + quote(String.valueOf(e.getMessage() != null ? e.getMessage() : e)) + "}";
+		}
+	}
+
+	/**
+	 * Registers the shapes of imported 3D models kept in the design's file (orcloud.stl.PartMeshes),
+	 * so parts made from them are drawn as the models, as on the design page.
+	 */
+	private static void adoptModels(String path) throws IOException {
+		try (ZipInputStream zip = new ZipInputStream(new FileInputStream(path))) {
+			for (ZipEntry e; (e = zip.getNextEntry()) != null;) {
+				String id = PartMeshes.componentId(e.getName());
+				if (id != null) {
+					PartMeshes.adopt(id, Base64.getEncoder().encodeToString(zip.readAllBytes()));
+				}
+			}
 		}
 	}
 
