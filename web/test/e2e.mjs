@@ -94,6 +94,19 @@ try {
   await a.screenshot({ path: join(out, '2-a-after-rename.png') });
   await b.screenshot({ path: join(out, '2-b-after-rename.png') });
 
+  // The design's preview for its card (OpenRocket's side view) reaches the design's record.
+  const waitPreview = async (than) => {
+    const t = Date.now();
+    while (Date.now() - t < 30_000) {
+      const p = designs.get('e2e').preview;
+      if (p && p !== than) return p;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    return null;
+  };
+  // (The design starts as an empty rocket: nothing to draw yet.)
+  const firstPreview = designs.get('e2e').preview;
+
   // 2) Adding a nose cone in A's OpenRocket reaches the room (and from there B).
   const before = seen.length;
   await a.mouse.click(83, 109); // select the stage ("Booster") in OpenRocket's component tree
@@ -115,6 +128,8 @@ try {
   const objs = Object.values(exp.data.model.objs);
   check(objs.some((o) => o.t === 'nosecone'), 'room copy has the nose cone');
   check(objs.some((o) => o.t === 'stage' && o.v.name === '<name>Booster</name>'), 'room copy has the renamed stage');
+  const nextPreview = await waitPreview(firstPreview);
+  check(Boolean(nextPreview) && JSON.parse(nextPreview).s.length > 0, 'the design\'s preview reached its record, with the new nose cone');
 } catch (e) {
   failed = true;
   log('ERROR', e.stack ?? e);

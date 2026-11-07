@@ -10,10 +10,12 @@
 //   access(user)       -> { role: 'owner' | 'editor' | 'viewer', name } for this design, or null
 //   motors()           -> [{ name, content }] custom motors of everyone the design is shared with
 //   touch(info)        records { version } on the design's listing (best effort)
+//   preview(text)      keeps OpenRocket's drawing of the design on its listing (best effort)
 // Connections are objects with an `id` and `send(message)`.
 import { applyOp, childIndex, componentName, fromJson, modelSize, toJson, validateOp, SIMS, DOC } from './lib/model.js';
 import { describeOp, groupEdits, inverseOf, isMinorOp, planRevert } from './lib/edits.js';
 import { revertNote, revertText } from './lib/history.js';
+import { cleanPreview } from './lib/preview.js';
 
 const BUCKETS = 64;
 const CHUNK = 96_000; // characters per stored value
@@ -285,9 +287,25 @@ export class Room {
       case 'presence':
         c.selection = Array.isArray(msg.selection) ? msg.selection.filter((x) => typeof x === 'string').slice(0, 50) : [];
         return this.broadcastPresence();
+      case 'preview':
+        return this.preview(c, msg.preview);
       default:
         return undefined;
     }
+  }
+
+  /**
+   * OpenRocket's drawing of the design (server/src/preview.js), from someone who can edit it: kept
+   * on the design's listing for its card, when it changed (cleared for an empty rocket).
+   */
+  async preview(c, text) {
+    if (c.role === 'viewer' || !this.model) return;
+    const clean = cleanPreview(text);
+    if (!clean) return;
+    const json = clean.s.length ? JSON.stringify(clean) : '';
+    if (json === this.lastPreview) return;
+    this.lastPreview = json;
+    await Promise.resolve(this.env.preview?.(json)).catch(() => {});
   }
 
   async welcome(conn, c) {

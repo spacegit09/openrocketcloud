@@ -142,6 +142,7 @@ svg.i { width: 16px; height: 16px; flex: none; }
 }
 .card .thumb { border-radius: var(--radius) var(--radius) 0 0; height: 92px; background: linear-gradient(135deg, var(--accent-soft), var(--surface-2)); display: grid; place-items: center; color: var(--accent); cursor: pointer; }
 .card .thumb svg { width: 150px; height: 40px; }
+.card .thumb svg.preview { width: 100%; height: 100%; padding: 14px 20px; box-sizing: border-box; stroke-width: 1.2px; stroke-linejoin: round; stroke-linecap: round; }
 .card .body { padding: 12px 14px 8px; flex: 1; cursor: pointer; }
 .card h3 { margin: 0 0 4px; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

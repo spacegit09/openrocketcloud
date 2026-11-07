@@ -142,6 +142,10 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
           window.cheerpOSAddStringFile(path, new Uint8Array(await file.arrayBuffer()));
           return `${path}\n${file.name}`;
         },
+        async Java_orcloud_web_Preview_jsPreview(lib, json) {
+          // OpenRocket's drawing of the design, for its card on the dashboard (kept by the room).
+          link.room?.send({ type: 'preview', preview: json });
+        },
         async Java_orcloud_web_FileWindows_jsFileWindow(lib, x, y, w, h) {
           markFileWindow(x, y, w, h);
         },

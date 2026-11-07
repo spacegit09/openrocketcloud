@@ -66,6 +66,7 @@ export default class DesignRoom extends Actor {
       },
       touch: ({ version }: { version: number }) =>
         db().Design.update(designId, { version, edited_at: new Date().toISOString() }),
+      preview: (preview: string) => db().Design.update(designId, { preview }),
     };
   }
 
