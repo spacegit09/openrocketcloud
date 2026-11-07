@@ -1,0 +1,23 @@
+// A Launch Planner study someone saved: its settings, the forecast it flew in and its results
+// (packed, see web/src/flight/saved.js), to open again later. Only its owner sees it.
+{
+  "name": "SavedFlight",
+  "type": "object",
+  "description": "A saved Launch Planner flight study",
+  "properties": {
+    "owner_email": { "type": "string" },
+    "name": { "type": "string", "maxLength": 200 },
+    "design_id": { "type": "string" },
+    "design_name": { "type": "string" },
+    "launch_time": { "type": "string", "format": "date-time" },
+    "summary": { "type": "string", "maxLength": 500 },
+    "data": { "type": "string" }
+  },
+  "required": ["owner_email", "name", "data"],
+  "rls": {
+    "create": { "data.owner_email": "{{user.email}}" },
+    "read": { "data.owner_email": "{{user.email}}" },
+    "update": { "data.owner_email": "{{user.email}}" },
+    "delete": { "data.owner_email": "{{user.email}}" }
+  }
+}

@@ -6,9 +6,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { readGrib2, profileAt } from '../base44/functions/gfsWinds/grib2.js';
-import { bracket, gfsProfile, hasHour, recentCycles } from '../base44/functions/gfsWinds/gfs.js';
+import { bracket, gefsHasHour, gefsHour, gefsProfiles, gfsProfile, hasHour, recentCycles } from '../base44/functions/gfsWinds/gfs.js';
 
 const grib = readFileSync(join(import.meta.dirname, 'fixtures', 'gfs-black-rock-f012.grb2'));
+// A member of NOAA's ensemble (GEFS run 2026-11-07 00 UTC, perturbed run 1, 12 h ahead), same place.
+const gefs = readFileSync(join(import.meta.dirname, 'fixtures', 'gefs-black-rock-p01-f012.grb2'));
 const direction = (l) => (Math.atan2(-l.u, -l.v) * 180 / Math.PI + 360) % 360; // where the wind comes from
 
 test('reads the fields of a GRIB2 subset', () => {
@@ -58,4 +60,38 @@ test('uses the newest run that is published, between two forecast hours', async 
   assert.deepEqual(asked.slice(-2), ['gfs.t18z.pgrb2.0p25.f012', 'gfs.t18z.pgrb2.0p25.f013']);
   assert.equal(r.levels.length, profileAt(readGrib2(grib), 40.9, -119.06).levels.length);
   await assert.rejects(gfsProfile({ lat: 40.9, lon: -119.06, time: new Date('2026-12-01T00:00:00Z'), now: new Date('2026-11-07T04:00:00Z'), fetch }), /16 days/);
+});
+
+test('ensemble files: the member, and heights above the ground GFS gives', () => {
+  const fields = readGrib2(gefs);
+  assert.equal(fields[0].member, 1);
+  assert.equal(fields[0].grid.di, 0.5);
+  assert.throws(() => profileAt(fields, 40.9, -119.06), /no ground height/);
+  const p = profileAt(fields, 40.9, -119.06, { ground: 1339 });
+  assert.equal(p.ground, 1339);
+  assert.equal(p.levels[0].agl, 10);
+  assert.ok(p.levels.length >= 8 && p.levels.every((l, k) => !k || l.agl > p.levels[k - 1].agl));
+});
+
+test('ensemble forecast hours: every 3 h to 240 h, then every 6 h to 384 h; the nearest is used', () => {
+  assert.ok(gefsHasHour(237) && gefsHasHour(246) && !gefsHasHour(243) && !gefsHasHour(13));
+  const run = new Date('2026-11-07T00:00:00Z');
+  assert.equal(gefsHour(run, new Date('2026-11-07T13:00:00Z')), 12);
+  assert.equal(gefsHour(run, new Date('2026-11-07T14:00:00Z')), 15);
+  assert.equal(gefsHour(run, new Date('2026-11-17T04:00:00Z')), 246);
+  assert.equal(gefsHour(run, new Date('2026-11-25T00:00:00Z')), null);
+});
+
+test('the ensemble: all 31 members from the newest published run', async () => {
+  const asked = new Set();
+  const fetch = async (url) => {
+    const q = new URL(url).searchParams;
+    asked.add(q.get('file').slice(0, 5));
+    return q.get('dir').includes('gefs.20261107/00') ? new Response(gefs) : new Response('<html>No files</html>');
+  };
+  const e = await gefsProfiles({ lat: 40.9, lon: -119.06, time: new Date('2026-11-07T12:00:00Z'), ground: 1339, now: new Date('2026-11-07T07:30:00Z'), fetch });
+  assert.equal(e.run, '2026-11-07T00:00:00.000Z');
+  assert.equal(e.valid, '2026-11-07T12:00:00.000Z');
+  assert.equal(e.members.length, 31);
+  assert.ok(asked.has('gec00') && asked.has('gep30'));
 });

@@ -124,16 +124,17 @@ export function valueAt(field, lat, lon) {
 
 /**
  * The wind and air at a launch site from GFS fields: { ground: the model's ground height (m above
- * sea level), levels: [{ agl (m above the model's ground), u, v (m/s, towards east and north), t
+ * sea level, or `ground` when the file has none), levels: [{ agl (m above the model's ground), u, v (m/s, towards east and north), t
  * (K, or null), p (Pa, or null) }] from the ground up }. Pressure levels below the highest level
  * given above ground (the model fills them in under the terrain) are left out.
  */
-export function profileAt(fields, lat, lon) {
+export function profileAt(fields, lat, lon, { ground: knownGround = null } = {}) {
   const at = (param, level, value) => {
     const f = fields.find((x) => x.param === param && x.level === level && (value === undefined || x.value === value));
     return f ? valueAt(f, lat, lon) : null;
   };
-  const ground = at('HGT', 'surface');
+  // Ensemble files leave out the model's ground height: the caller gives one (GFS's).
+  const ground = at('HGT', 'surface') ?? knownGround;
   if (ground === null) throw new Error('The forecast has no ground height.');
   const levels = [];
   for (const f of fields) {

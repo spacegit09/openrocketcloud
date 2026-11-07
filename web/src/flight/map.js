@@ -25,7 +25,7 @@ function loadCesium() {
 }
 
 /**
- * A map in `el`: { setSite(lat, lon), onPick(fn(lat, lon)), showStudy(study), replay(), clear() }.
+ * A map in `el`: { setSite(lat, lon), onPick(fn(lat, lon)), setLaunch(rail), showStudy(study), replay(), clear() }.
  * `arcgisKey` is the site's ArcGIS API key (Cesium's evaluation key is used without one).
  */
 export async function createMap(el, { arcgisKey } = {}) {
@@ -52,6 +52,11 @@ export async function createMap(el, { arcgisKey } = {}) {
 
   let site = null;
   let pad = null;
+  // The launch marker: the rail (drawn longer than it is, to be seen) and an arrow on the ground the
+  // way it leans, sized to the view (m).
+  let launch = null;
+  let launchMarks = [];
+  let launchScale = 80;
   const study = new Cesium.CustomDataSource('study');
   viewer.dataSources.add(study);
   const points = viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
@@ -84,6 +89,35 @@ export async function createMap(el, { arcgisKey } = {}) {
     pick(Cesium.Math.toDegrees(g.latitude), Cesium.Math.toDegrees(g.longitude));
   }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
+  function drawLaunch() {
+    for (const e of launchMarks) viewer.entities.remove(e);
+    launchMarks = [];
+    if (!site || !launch) return;
+    const { angle, direction, label, pending } = launch;
+    const tilted = angle > 0.2 * (Math.PI / 180) && !pending;
+    const rail = launchScale * 0.45;
+    const d = [Math.sin(angle) * Math.sin(direction), Math.sin(angle) * Math.cos(direction), Math.cos(angle)];
+    launchMarks.push(viewer.entities.add({
+      polyline: { positions: [at(0, 0, 0.5), at(d[0] * rail, d[1] * rail, Math.max(0.5, d[2] * rail))], width: 4, material: Color.WHITE.withAlpha(0.9) },
+    }));
+    let tip = at(0, 0, rail);
+    if (tilted) {
+      const e = Math.sin(direction) * launchScale;
+      const n = Math.cos(direction) * launchScale;
+      tip = at(e * 1.12, n * 1.12, 1);
+      launchMarks.push(viewer.entities.add({
+        polyline: { positions: [at(0, 0, 1), at(e, n, 1)], width: 16, clampToGround: false,
+          material: new Cesium.PolylineArrowMaterialProperty(Color.fromCssColorString('#ff7a2f')) },
+      }));
+    }
+    launchMarks.push(viewer.entities.add({
+      position: tip,
+      label: { text: label, font: '600 12px system-ui, sans-serif', fillColor: Color.WHITE, outlineColor: Color.BLACK, outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new Cesium.Cartesian2(0, 18), showBackground: true,
+        backgroundColor: Color.fromCssColorString('#0f141e').withAlpha(0.6) },
+    }));
+  }
+
   function clear() {
     legend.hidden = true;
     study.entities.removeAll();
@@ -104,6 +138,7 @@ export async function createMap(el, { arcgisKey } = {}) {
       site = [lat, lon];
       if (moved) clear();
       if (pad) viewer.entities.remove(pad);
+      drawLaunch();
       pad = viewer.entities.add({
         position: Cartesian3.fromDegrees(lon, lat, 0),
         point: { pixelSize: 12, color: Color.fromCssColorString('#ff7a2f'), outlineColor: Color.WHITE, outlineWidth: 2, heightReference: HeightReference.NONE },
@@ -150,6 +185,8 @@ export async function createMap(el, { arcgisKey } = {}) {
       const all = [at(0, 0, 0), ...results.filter(Boolean).map((r) => at(r.landingEast, r.landingNorth, 0))];
       if (nominal) all.push(at(nominal.apogeeEast, nominal.apogeeNorth, nominal.apogee));
       const sphere = Cesium.BoundingSphere.fromPoints(all);
+      launchScale = Math.max(80, Math.min(3000, sphere.radius * 0.5));
+      drawLaunch();
       viewer.camera.flyToBoundingSphere(sphere, { offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-40), sphere.radius * 3 + 300), duration: 1.5 });
     },
     /** Replays the nominal flight in real time (or `speed` times faster). */
@@ -175,5 +212,13 @@ export async function createMap(el, { arcgisKey } = {}) {
       viewer.trackedEntity = undefined;
     },
     clear,
+    /**
+     * The launch marker: the rail tilted `angle` toward `direction` (rad, clockwise from north),
+     * with `label`; `pending` when the direction is not known yet (into the wind, before a forecast).
+     */
+    setLaunch(next) {
+      launch = next;
+      drawLaunch();
+    },
   };
 }
