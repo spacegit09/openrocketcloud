@@ -2,6 +2,11 @@
 import { db } from './base44.js';
 import { markUndone } from './lib/history.js';
 
+// OpenRocket's jars kept in this browser across visits and releases (public/sw.js).
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
+}
+
 export const $ = (sel, root = document) => root.querySelector(sel);
 
 export function h(tag, attrs = {}, ...children) {
