@@ -1,6 +1,11 @@
 // Winds and air for a launch from NOAA's GFS forecast (0.25°, public domain): the newest published
-// run that covers the launch time, read from NOMADS's grib filter for a small area around the site
-// (one file of about 25 KB per forecast hour), interpolated to the site and between forecast hours.
+// run that covers the launch time, read from NOMADS's grib filter for the 1° square around the site
+// (one small file per forecast hour, the same for every site in the square, so they can be shared),
+// interpolated to the site and between forecast hours.
+//
+// Where the files come from is a `source` ({ fields(url, key) } resolving to the decoded GRIB
+// fields): by default straight from NOMADS, kept a while (simpleSource); the site's Forecasts actor
+// shares one source for everyone, under NOAA's limit on requests (nomads.js).
 import { readGrib2, profileAt } from './grib2.js';
 
 const FILTER = 'https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl';
@@ -35,6 +40,21 @@ export function recentCycles(now, count = 8) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
+/**
+ * The area to ask for around a site: the 1° square it is in, one grid step wider on every side
+ * (`step`, the grid's spacing), so the grid points around the site are always inside.
+ */
+export function square(lat, lon, step) {
+  const s = Math.floor(lat);
+  const w = Math.floor(lon);
+  return {
+    top: Math.min(90, s + 1 + step).toFixed(2),
+    bottom: Math.max(-90, s - step).toFixed(2),
+    left: (w - step).toFixed(2),
+    right: (w + 1 + step).toFixed(2),
+  };
+}
+
 export function filterUrl(cycle, hour, lat, lon) {
   const day = `${cycle.getUTCFullYear()}${pad(cycle.getUTCMonth() + 1)}${pad(cycle.getUTCDate())}`;
   const hh = pad(cycle.getUTCHours());
@@ -45,25 +65,30 @@ export function filterUrl(cycle, hour, lat, lon) {
   });
   for (const l of AGL_LEVELS) q.set(`lev_${l}_m_above_ground`, 'on');
   for (const p of PRESSURE_LEVELS) q.set(`lev_${p}_mb`, 'on');
+  const box = square(lat, lon, 0.25);
   q.set('subregion', '');
-  q.set('toplat', (lat + 0.5).toFixed(2));
-  q.set('bottomlat', (lat - 0.5).toFixed(2));
-  q.set('leftlon', (lon - 0.5).toFixed(2));
-  q.set('rightlon', (lon + 0.5).toFixed(2));
+  q.set('toplat', box.top);
+  q.set('bottomlat', box.bottom);
+  q.set('leftlon', box.left);
+  q.set('rightlon', box.right);
   return `${FILTER}?${q}`;
 }
 
-class NotPublished extends Error {}
+/** The file is not on NOMADS (yet): that run or forecast hour is not published. */
+export class NotPublished extends Error {}
 
-const cache = new Map(); // url -> { at, profile }
+/** NOAA's server is refusing requests (too many from this site), or the site's share is used up. */
+export class NoaaBusy extends Error {}
 
-async function profileFor(cycle, hour, lat, lon, fetchFn, url = filterUrl(cycle, hour, lat, lon), ground = null) {
-  const hit = cache.get(url);
-  if (hit && Date.now() - hit.at < 6 * HOUR) return hit.profile;
+/** Downloads one file from NOMADS's grib filter and decodes it. */
+export async function download(url, fetchFn = fetch) {
   const res = await fetchFn(url, { headers: { 'user-agent': 'RocketInCloud/1.0 (launch planner)' }, signal: AbortSignal.timeout(20_000) })
     .catch(() => {
       throw new Error("NOAA's forecast server did not answer. Try again in a moment.");
     });
+  if (res.status === 403 || res.status === 429 || res.status === 503) {
+    throw new NoaaBusy("NOAA's forecast server is busy. Try again in a few minutes.");
+  }
   const bytes = new Uint8Array(await res.arrayBuffer());
   const grib = bytes.length > 4 && bytes[0] === 0x47 && bytes[1] === 0x52 && bytes[2] === 0x49 && bytes[3] === 0x42;
   if (!res.ok || !grib) {
@@ -71,10 +96,29 @@ async function profileFor(cycle, hour, lat, lon, fetchFn, url = filterUrl(cycle,
     if (res.status === 404 || !grib) throw new NotPublished(`${url} is not available`);
     throw new Error(`NOAA's server answered ${res.status}.`);
   }
-  const profile = profileAt(readGrib2(bytes), lat, lon, { ground });
-  if (cache.size > 500) cache.clear();
-  cache.set(url, { at: Date.now(), profile });
-  return profile;
+  return readGrib2(bytes);
+}
+
+/** Files straight from NOMADS, kept for 6 hours (`fetchFn` for tests). */
+export function simpleSource(fetchFn = fetch) {
+  const cache = new Map(); // url -> { at, fields }
+  return {
+    async fields(url) {
+      const hit = cache.get(url);
+      if (hit && Date.now() - hit.at < 6 * HOUR) return hit.fields;
+      const fields = await download(url, fetchFn);
+      if (cache.size > 500) cache.clear();
+      cache.set(url, { at: Date.now(), fields });
+      return fields;
+    },
+  };
+}
+
+const defaultSource = simpleSource();
+const sourceFor = (source, fetchFn) => source ?? (fetchFn ? simpleSource(fetchFn) : defaultSource);
+
+async function profileFor(source, key, url, lat, lon, ground = null) {
+  return profileAt(await source.fields(url, key), lat, lon, { ground });
 }
 
 function mix(a, b, f) {
@@ -86,8 +130,9 @@ function mix(a, b, f) {
  * lat, lon, ground (the model's ground height, m above sea level), levels: [{ agl, u, v, t, p }] }
  * (see profileAt in grib2.js), from the newest published run that covers the time.
  */
-export async function gfsProfile({ lat, lon, time, now = new Date(), fetch: fetchFn = fetch }) {
+export async function gfsProfile({ lat, lon, time, now = new Date(), fetch: fetchFn = null, source = null }) {
   if (!(Math.abs(lat) <= 89.5) || !(Math.abs(lon) <= 180)) throw new Error('That is not a place on Earth.');
+  const files = sourceFor(source, fetchFn);
   let missing = 0;
   for (const cycle of recentCycles(now)) {
     const b = bracket(cycle, time);
@@ -96,7 +141,8 @@ export async function gfsProfile({ lat, lon, time, now = new Date(), fetch: fetc
       throw new Error('GFS forecasts reach 16 days ahead: choose an earlier launch time.');
     }
     try {
-      const [p0, p1] = await Promise.all([b.h0, b.h1].map((h, k) => (k && h === b.h0 ? null : profileFor(cycle, h, lat, lon, fetchFn))));
+      const [p0, p1] = await Promise.all([b.h0, b.h1].map((h, k) => (k && h === b.h0 ? null
+        : profileFor(files, `gfs ${cycle.toISOString()} ${h}`, filterUrl(cycle, h, lat, lon), lat, lon))));
       const second = p1 ?? p0;
       const key = (l) => (l.p === null ? `agl ${l.agl}` : `p ${l.p}`);
       const later = new Map(second.levels.map((l) => [key(l), l]));
@@ -144,11 +190,12 @@ export function gefsUrl(cycle, member, hour, lat, lon) {
     var_UGRD: 'on', var_VGRD: 'on', var_HGT: 'on', var_TMP: 'on', lev_10_m_above_ground: 'on',
   });
   for (const p of GEFS_PRESSURE_LEVELS) q.set(`lev_${p}_mb`, 'on');
+  const box = square(lat, lon, 0.5);
   q.set('subregion', '');
-  q.set('toplat', (lat + 0.75).toFixed(2));
-  q.set('bottomlat', (lat - 0.75).toFixed(2));
-  q.set('leftlon', (lon - 0.75).toFixed(2));
-  q.set('rightlon', (lon + 0.75).toFixed(2));
+  q.set('toplat', box.top);
+  q.set('bottomlat', box.bottom);
+  q.set('leftlon', box.left);
+  q.set('rightlon', box.right);
   return `${GEFS_FILTER}?${q}`;
 }
 
@@ -170,8 +217,11 @@ async function pool(jobs, limit) {
  * NOAA's ensemble forecast (GEFS, 0.5°, 31 runs from slightly different starting points) for a
  * launch: { model, run, valid (the forecast hour nearest the launch time), members: [{ member,
  * levels }] } with levels as in profileAt, heights above `ground` (the GFS ground height there).
+ * With a source that knows its waits (waitFor(urls), seconds) and `maxWait`: NoaaBusy rather than
+ * waiting longer for the members, and onWait(seconds) when there is a wait.
  */
-export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), fetch: fetchFn = fetch }) {
+export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), fetch: fetchFn = null, source = null, maxWait = null, onWait = null }) {
+  const files = sourceFor(source, fetchFn);
   let missing = 0;
   for (const cycle of recentCycles(now, 12)) {
     const hour = gefsHour(cycle, time);
@@ -179,13 +229,17 @@ export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), f
       if (time < cycle) continue;
       throw new Error('Ensemble forecasts reach 16 days ahead: choose an earlier launch time.');
     }
-    const get = (m) => profileFor(cycle, hour, lat, lon, fetchFn, gefsUrl(cycle, m, hour, lat, lon), ground);
+    const key = `gefs ${cycle.toISOString()} ${hour}`;
+    const get = (m) => profileFor(files, key, gefsUrl(cycle, m, hour, lat, lon), lat, lon, ground);
     try {
       await get(0); // the control run first: is this run published yet?
     } catch (e) {
       if (!(e instanceof NotPublished) || ++missing > 4) throw e instanceof NotPublished ? new Error('No ensemble forecast is available right now.') : e;
       continue;
     }
+    const wait = files.waitFor?.(Array.from({ length: GEFS_MEMBERS }, (_, m) => gefsUrl(cycle, m, hour, lat, lon))) ?? 0;
+    if (maxWait !== null && wait > maxWait) throw new NoaaBusy("NOAA's forecast server is busy with other launch plans right now");
+    if (wait > 3) onWait?.(Math.round(wait));
     const profiles = await pool(Array.from({ length: GEFS_MEMBERS }, (_, m) => () => get(m)), 8);
     const members = profiles.map((p, m) => (p ? { member: m, levels: p.levels } : null)).filter(Boolean);
     if (members.length < 20) throw new Error("NOAA's ensemble forecast did not come through. Try again in a moment.");

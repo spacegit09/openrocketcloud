@@ -9,6 +9,7 @@ dist
 .types/
 # Generated (scripts/prebuild.mjs, scripts/build-web-jars.sh)
 base44/actors/DesignRoom/lib/
+base44/actors/Forecasts/lib/
 src/lib/history.js
 src/lib/preview.js
 src/lib/jars.js

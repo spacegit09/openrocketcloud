@@ -3,7 +3,7 @@
 // and time; the flight engine flies it hundreds of times with the uncertain things varied; the map
 // shows the flight and where it is likely to land.
 import './style.css';
-import { base44, currentUser, db } from './base44.js';
+import { currentUser, db } from './base44.js';
 import { $, h, avatar, icon, toast, modal, confirmDialog, promptDialog, timeAgo } from './common.js';
 import { fetchDesign, openInOpenRocket } from './flight/openrocket.js';
 import { environment, fly } from './flight/engine.js';
@@ -11,6 +11,7 @@ import { DEFAULT_SPREAD, ensembleWinds, groundFunction, landingStats, runStudy, 
 import { deleteFlight, listFlights, openFlight, saveFlight, updateFlight } from './flight/saved.js';
 import { elevation, groundGrid } from './flight/terrain.js';
 import { createMap } from './flight/map.js';
+import { forecastWinds } from './flight/forecast.js';
 
 const params = new URLSearchParams(location.search);
 const deg = Math.PI / 180;
@@ -183,13 +184,7 @@ async function run() {
     const notes = [];
 
     progress(mode === 'ensemble' ? 'Getting the forecast winds (NOAA GFS and its 31-run ensemble)…' : 'Getting the forecast winds (NOAA GFS)…');
-    let wind;
-    try {
-      wind = (await base44.functions.invoke('gfsWinds', { lat, lon, time: when.toISOString(), ensemble: mode === 'ensemble' })).data;
-    } catch (e) {
-      throw new Error(e.response?.data?.error ?? 'Could not get the forecast. Try again in a moment.');
-    }
-    if (wind?.error) throw new Error(wind.error);
+    const wind = await forecastWinds({ lat, lon, time: when.toISOString(), ensemble: mode === 'ensemble' }, (text) => progress(text));
     let windSets = [];
     if (mode === 'ensemble') {
       if (wind.ensemble?.members?.length) {
