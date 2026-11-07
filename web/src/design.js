@@ -14,6 +14,8 @@ const screen = $('#screen');
 $('#back').append(icon('back'));
 $('#share-btn').append(icon('share'), 'Share');
 $('#download-btn').append(icon('download'));
+$('#planner-btn').append(icon('target'));
+$('#planner-btn').href = `/planner.html?id=${encodeURIComponent(designId)}`;
 $('#history-btn').append(icon('history'));
 $('#fullscreen-btn').append(icon('maximize'));
 $('#close-btn').append(icon('x'));

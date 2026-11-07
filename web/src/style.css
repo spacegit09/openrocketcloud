@@ -285,3 +285,65 @@ body.menu-row #screen { margin-top: -44px; }
 #screen .cjWindow.or-files .cjTitleBar svg:has(title) { display: block; }
 /* Dialog edges: a soft outline and shadow instead of CheerpJ's black line. */
 #screen .cjWindow.cjBordered:has(> .cjTitleBar) { box-shadow: 0 0 0 1px #a9a9a9, 0 8px 28px rgba(0, 0, 0, 0.22) !important; }
+
+/* ---------- launch planner */
+body.planner-page { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.topbar .crumb { color: var(--muted); font-weight: 600; padding-left: 12px; border-left: 1px solid var(--border); }
+.planner { flex: 1; min-height: 0; display: grid; grid-template-columns: 390px 1fr; }
+.plan-panel { overflow-y: auto; padding: 16px 18px 24px; border-right: 1px solid var(--border); background: var(--surface); display: grid; gap: 14px; align-content: start; }
+.plan-intro { margin: 0; color: var(--muted); font-size: 13px; }
+.plan-step { display: grid; gap: 9px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.plan-step h3 { margin: 0 0 2px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.plan-step h3 span { width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; display: grid; place-items: center; }
+.plan-step label { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.plan-step label.check { display: flex; align-items: center; gap: 8px; color: var(--text); }
+.plan-step label.check input { width: auto; }
+.plan-step .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.plan-step input, .plan-step select { width: 100%; min-width: 0; }
+.plan-step .row.hint { align-items: center; }
+.plan-step .row.hint .grow { flex: 1; }
+.plan-status { font-size: 12.5px; display: grid; gap: 4px; }
+.plan-status:empty { display: none; }
+.plan-status.busy { color: var(--muted); }
+.plan-status.error { color: var(--danger); }
+.plan-status .warn, .plan-results .warn { color: #d9480f; }
+details.spread summary { cursor: pointer; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+button.wide { width: 100%; justify-content: center; padding: 9px 12px; }
+.progress { display: grid; gap: 5px; }
+.progress .bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; position: relative; }
+.progress .bar::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: var(--done, 0%); background: var(--accent); transition: width .2s; }
+.progress.busy .bar::after { width: 30%; animation: plan-slide 1.2s ease-in-out infinite; }
+@keyframes plan-slide { from { left: -30%; } to { left: 100%; } }
+.plan-results { display: grid; gap: 10px; }
+.plan-results h3 { margin: 4px 0 0; font-size: 14px; }
+.plan-results p { margin: 0; }
+.plan-results .headline { font-size: 14px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+.stat .label { font-size: 11.5px; color: var(--muted); }
+.stat .value { font-size: 17px; font-weight: 650; }
+.stat .note { font-size: 11.5px; color: var(--muted); }
+table.winds { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+table.winds th, table.winds td { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border); }
+table.winds th { color: var(--muted); font-weight: 600; }
+.plan-credits { margin: 0; font-size: 11px; }
+.plan-map { position: relative; min-height: 0; background: #0b1220; }
+.plan-map .cesium-viewer { position: absolute; inset: 0; }
+.map-tools { position: absolute; z-index: 5; left: 12px; top: 12px; }
+@media (max-width: 860px) {
+  body.planner-page { height: auto; overflow: auto; }
+  .planner { grid-template-columns: 1fr; }
+  .plan-map { height: 60vh; order: -1; }
+  .plan-panel { border-right: 0; overflow: visible; }
+}
+.map-legend { position: absolute; z-index: 5; right: 12px; bottom: 44px; background: rgb(15 20 30 / 78%); color: #fff; font-size: 12px; padding: 8px 10px; border-radius: 8px; display: grid; gap: 4px; }
+.map-legend[hidden] { display: none; }
+.map-legend div { display: flex; align-items: center; gap: 8px; }
+.map-legend .swatch { width: 14px; height: 14px; display: inline-block; flex: none; }
+.map-legend .swatch.ring { border: 2.5px solid var(--c); border-radius: 50%; }
+.map-legend .swatch.dot { width: 8px; height: 8px; margin: 3px; background: var(--c); border-radius: 50%; }
+.map-legend .swatch.line { height: 3px; background: var(--c); border-radius: 2px; }
+
+/* ---------- footer (CheerpJ's free licence asks for the "Built with CheerpJ" credit) */
+.site-foot { max-width: 1120px; margin: 0 auto; padding: 18px 20px 28px; color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; text-align: center; }
+.site-foot a { color: inherit; text-decoration: underline; }

@@ -81,11 +81,25 @@ and live sharing. Nothing runs on your own computer or server.
   own OBJ exporters (`worker/bridge/src/orcloud/view3d`). The main window opens without CheerpJ's
   title bar, its menu bar moves into the page's top row (`MenuRow.java`, `web/src/menu-row.js`),
   and the page restyles the dialogs' title bars (`web/src/style.css`).
+- **Launch Planner** (`web/planner.html`, `web/src/flight`): OpenRocket runs in the page without
+  its windows (`FlightMain`, `FlightLab`) and computes the rocket's tables
+  (`worker/bridge/src/orcloud/flight/FlightTables.java`): normal force and centre of pressure over
+  Mach number and angle of attack, drag over Mach and Reynolds number, pitch damping, thrust from
+  the motors' curves, mass and inertia over time, recovery devices. A JavaScript copy of
+  OpenRocket's flight simulation (`engine.js`: six degrees of freedom on the way up, OpenRocket's
+  parachute descent) flies those tables about 1,000 times faster, in Web Workers; on OpenRocket's
+  single-stage example designs it matches OpenRocket's apogee within 0.5% and its landing point
+  within 10 m (`scripts/test.sh` checks this). Winds and air come from NOAA's GFS forecast
+  (public domain) through the `gfsWinds` backend function, which reads a small area from NOMADS
+  and decodes it (`grib2.js`); ground heights from the Terrain Tiles on AWS Open Data; the map is
+  CesiumJS with Esri World Imagery (set `VITE_ARCGIS_API_KEY` in `web/.env` to your ArcGIS
+  Location Platform key, restricted to your site's addresses).
 - **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
   run about 15× slower than desktop (1–4 s each), so "Update flight estimates in design window"
   and "Run out-dated simulations when you open the simulation tab" are kept off and left out of
-  the settings; *Save As* and exports download straight to your computer. CheerpJ's free licence is
-  for personal and non-commercial use.
+  the settings; *Save As* and exports download straight to your computer. CheerpJ's free Community
+  licence covers personal and non-commercial use, and software published by an individual or a
+  one-person company with a "Built with CheerpJ" credit; other business use needs a licence.
 
 Build and deploy (needs Docker, Node 20+ and the Base44 CLI: `npm install -g base44`):
 
@@ -97,7 +111,9 @@ base44 link --create --name "My OpenRocket"   # once per checkout
 base44 deploy --build --yes                   # site, actor, records, Google sign-in
 ```
 
-Tests: `npm test` (the room and `.ork` handling) and `node test/e2e.mjs` (two headless Chrome
+Tests: `npm test` (the room, `.ork` handling, the planner's weather decoding, Monte Carlo and
+flight engine; the engine's comparison with OpenRocket needs the fixtures `scripts/test.sh`
+writes) and `node test/e2e.mjs` (two headless Chrome
 windows running the real OpenRocket against a local stand-in for the actor). `node test/perf.mjs`
 times how long a design takes to open, what it downloads, and how long an edit takes to arrive.
 
@@ -253,6 +269,14 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   arrow. Dialogs have a plain title bar with only a close button, as
   on the desktop; the button that adds files from your computer appears only in file dialogs (for
   example when choosing a decal image).
+- **Launch Planner** (browser version; *Launch planner* on the dashboard, *Plan a launch* in a
+  design's ⋯ menu, or the target button in a design's header): a real-life launch simulation.
+  Choose a design and one of its simulations, the launch site (click the map) and time (up to 16
+  days ahead), and the rail; the planner flies it hundreds of times in NOAA's GFS forecast winds for
+  that place and time, varying the wind, motor, drag, mass, parachutes, rail aim and ejection delay,
+  and shows on a satellite map where 50%, 95% and 99% of flights land, with the flight path, a
+  replay, apogee and the forecast winds. Landings meet the real ground. Single-stage rockets only
+  for now; predictions, not a substitute for the range safety officer.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
 - **Who's here**: avatars show who has the design open and which part each person has selected.

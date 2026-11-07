@@ -11,6 +11,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         design: resolve(import.meta.dirname, 'design.html'),
+        planner: resolve(import.meta.dirname, 'planner.html'),
       },
     },
   },

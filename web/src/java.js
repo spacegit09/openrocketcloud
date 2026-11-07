@@ -4,6 +4,7 @@ import { h, modal } from './common.js';
 import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
 import { menuRowNatives } from './menu-row.js';
+import { labNatives } from './flight/lab-natives.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
@@ -87,12 +88,12 @@ let runtime = null;
  * Downloads and starts the Java runtime (CheerpJ) for `designId`. It needs neither the sign-in nor
  * the room, so the design page calls it first and looks those up meanwhile; later calls share it.
  */
-export function prepareJava(designId) {
+export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json' } = {}) {
   runtime ??= (async () => {
     // Runtime files to fetch up front (recorded with cjGetRuntimeResources): Java threads then never
     // wait on the network halfway through loading a class, which CheerpJ handles badly.
     const [preload] = await Promise.all([
-      fetch('/or/preload.json').then((r) => (r.ok ? r.json() : undefined), () => undefined),
+      fetch(preloadUrl).then((r) => (r.ok ? r.json() : undefined)).catch(() => undefined),
       loadScript(CHEERPJ),
     ]);
     // CheerpJ's Java 17 lacks the natives behind reflection's type annotations (used by Guice only
@@ -145,6 +146,7 @@ export function prepareJava(designId) {
         },
         ...view3dNatives,
         ...menuRowNatives,
+        ...labNatives,
       },
     });
   })();
