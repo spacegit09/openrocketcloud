@@ -22,6 +22,7 @@ import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.FileWindows;
+import orcloud.web.FinProfiles;
 import orcloud.web.MenuRow;
 import orcloud.web.ModelTab;
 import orcloud.web.Preview;
@@ -164,6 +165,8 @@ public final class WebMain {
 		} catch (Exception e) {
 			Log.warn("3D model import unavailable: " + e);
 		}
+		// Fin cross sections in 3D (OBJ) export, chosen in its options.
+		FinProfiles.install();
 		// The design's preview for its card on the dashboard.
 		try {
 			Preview.install(OrDoc.documentOf(frame));

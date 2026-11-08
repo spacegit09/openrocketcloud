@@ -2,7 +2,8 @@
 # Runs all tests:
 #  1. the live-share self-test against the real OpenRocket 24.12 (all bundled example designs),
 #     inside the worker image on a virtual display; it also writes Java model fixtures;
-#  2. the launch planner's flight engine against OpenRocket, and its weather decoding;
+#  2. the launch planner's flight engine against OpenRocket, its weather decoding and its shared
+#     forecasts, and fins built with their cross sections for 3D export;
 #  3. the server tests, including Java/Node parity on those fixtures.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -30,6 +31,11 @@ docker run --rm -e ORC_VNC_PASSWORD=test -e SELFTEST_DUMP=/fx \
 mkdir -p "$cache/flight"
 docker run --rm -v "$PWD/$cache/flight:/fx" -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.flight.FlightCheck /fx 2>&1 | grep -E "^(FLIGHTCHECK|  skip)"'
-node --test web/test/flight.test.mjs web/test/gfs.test.mjs
+node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.test.mjs
+
+# Fins with their cross sections (3D export): closed solids, as thick as the fin, with the volume
+# each profile gives.
+docker run --rm -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"'
 
 (cd server && npm ci --no-audit --no-fund >/dev/null && npm test)
