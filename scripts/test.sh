@@ -3,7 +3,8 @@
 #  1. the live-share self-test against the real OpenRocket 24.12 (all bundled example designs),
 #     inside the worker image on a virtual display; it also writes Java model fixtures;
 #  2. the launch planner's flight engine against OpenRocket, its weather decoding and its shared
-#     forecasts, and fins built with their cross sections for 3D export;
+#     forecasts, fins built with their cross sections for 3D export, and 3D export of every
+#     example with the "3D printing" settings;
 #  3. the server tests, including Java/Node parity on those fixtures.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -37,5 +38,13 @@ node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.tes
 # each profile gives.
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"'
+
+# 3D export with the "3D printing" settings of every example, with the browser build's copy of
+# OpenRocket's TriangulationHelper (faces with no area, as along a filled nose cone's axis).
+docker run --rm -v "$PWD/worker:/w" -w /w eclipse-temurin:17-jdk \
+  bash -c 'mkdir -p .cache/test-web && javac -nowarn -d .cache/test-web -cp .cache/OpenRocket.jar bridge/web/info/openrocket/core/file/wavefrontobj/TriangulationHelper.java'
+docker run --rm -v "$PWD/$cache/test-out:/opt/test" -v "$PWD/$cache/test-web:/opt/test-web" --entrypoint bash orcloud-worker -c '
+  set -o pipefail
+  java -Djava.awt.headless=true -cp /opt/test-web:/opt/openrocket/OpenRocket.jar:/opt/test orcloud.obj.ObjExportCheck 2>&1 | grep -E "^(OBJCHECK|  FAIL)"'
 
 (cd server && npm ci --no-audit --no-fund >/dev/null && npm test)

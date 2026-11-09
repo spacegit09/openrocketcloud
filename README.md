@@ -82,7 +82,9 @@ and live sharing. Nothing runs on your own computer or server.
   title bar, its menu bar moves into the page's top row (`MenuRow.java`, `web/src/menu-row.js`),
   and the page restyles the dialogs' title bars (`web/src/style.css`). On a Mac, ⌘-click adds parts
   to the selection in the component tree (and rows in lists and tables), as in OpenRocket for Mac
-  (`CommandClick.java`).
+  (`CommandClick.java`). Exporting as a 3D file with the "3D printing" settings no longer stops at
+  faces with no area, such as along a filled nose cone's axis, which made OpenRocket 24.12's pod
+  examples fail (a copy of its `TriangulationHelper`; `scripts/test.sh` exports every example so).
 - **Launch Planner** (`web/planner.html`, `web/src/flight`): OpenRocket runs in the page without
   its windows (`FlightMain`, `FlightLab`) and computes the rocket's tables
   (`worker/bridge/src/orcloud/flight/FlightTables.java`): normal force and centre of pressure over
