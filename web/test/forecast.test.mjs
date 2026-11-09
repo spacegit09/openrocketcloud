@@ -97,3 +97,42 @@ test('with others ahead, the ensemble is left out rather than waited for too lon
   assert.match(r.ensemble.error, /busy/);
   assert.ok(n.asked.length <= 10, `${n.asked.length} requests`);
 });
+
+test('main forecasts go ahead of ensemble files in line', async () => {
+  const n = nomads({ delay: 20 });
+  const src = new NomadsSource({ fetch: n.fetch, parallel: 1 });
+  const order = [];
+  const ens = [1, 2, 3, 4].map((k) => src.fields(`https://x/e${k}?gefs`, undefined, { later: true }).then(() => order.push(`e${k}`)));
+  const main = src.fields('https://x/main').then(() => order.push('main'));
+  await Promise.all([...ens, main]);
+  assert.deepEqual(order, ['e1', 'main', 'e2', 'e3', 'e4'], 'the main forecast went as soon as the one being fetched was done');
+});
+
+test('the wait for ensemble files counts those promised to studies ahead, and main forecasts do not wait for them', () => {
+  const n = nomads();
+  const src = new NomadsSource({ fetch: n.fetch, perMinute: 100 });
+  const urls = Array.from({ length: 31 }, (_, m) => `https://x/m${m}?gefs`);
+  assert.equal(src.waitFor(urls, { later: true }), 0);
+  const asked = [1, 2, 3].map(() => src.reserve(30)); // three studies ahead fetching their control runs
+  assert.ok(src.waitFor(urls, { later: true }) > 50, 'behind 90 promised files, the last of these waits for the next window');
+  assert.equal(src.waitFor(['https://x/main']), 0, 'a main forecast does not wait for ensembles');
+  asked.forEach((done) => done());
+  assert.equal(src.waitFor(urls, { later: true }), 0);
+});
+
+test('with a long line, the ensemble is left out before any of it is asked for, and the rest of a study\'s members go in line together', async () => {
+  const n = nomads({ delay: 5 });
+  const f = new Forecaster({ fetch: n.fetch, perMinute: 20, windowMs: 2000, maxEnsembleWait: 0.5 });
+  const time = new Date(Date.now() + 12 * 3600e3).toISOString();
+  const r = await f.forecast({ lat: 40.9, lon: -119.06, time, ensemble: true });
+  assert.match(r.ensemble.error, /busy/);
+  assert.equal(n.asked.filter((a) => a.url.includes('gefs')).length, 0, 'no ensemble file asked for');
+
+  const roomy = new NomadsSource({ fetch: n.fetch, perMinute: 1000 });
+  const lined = [];
+  const spy = { fields: (u, k, o) => { if (o?.later) lined.push(roomy.later.length); return roomy.fields(u, k, o); }, waitFor: (u, o) => roomy.waitFor(u, o), reserve: (k) => roomy.reserve(k) };
+  const g = new Forecaster({ source: spy });
+  const r2 = await g.forecast({ lat: 40.9, lon: -119.06, time, ensemble: true });
+  assert.equal(r2.ensemble.members.length, 31);
+  assert.ok(Math.max(...lined) >= 20, 'the members after the control run were in line at the same time');
+});
