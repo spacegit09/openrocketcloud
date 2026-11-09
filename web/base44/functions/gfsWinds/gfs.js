@@ -117,8 +117,8 @@ export function simpleSource(fetchFn = fetch) {
 const defaultSource = simpleSource();
 const sourceFor = (source, fetchFn) => source ?? (fetchFn ? simpleSource(fetchFn) : defaultSource);
 
-async function profileFor(source, key, url, lat, lon, ground = null) {
-  return profileAt(await source.fields(url, key), lat, lon, { ground });
+async function profileFor(source, key, url, lat, lon, ground = null, options = undefined) {
+  return profileAt(await source.fields(url, key, options), lat, lon, { ground });
 }
 
 function mix(a, b, f) {
@@ -217,8 +217,10 @@ async function pool(jobs, limit) {
  * NOAA's ensemble forecast (GEFS, 0.5°, 31 runs from slightly different starting points) for a
  * launch: { model, run, valid (the forecast hour nearest the launch time), members: [{ member,
  * levels }] } with levels as in profileAt, heights above `ground` (the GFS ground height there).
- * With a source that knows its waits (waitFor(urls), seconds) and `maxWait`: NoaaBusy rather than
- * waiting longer for the members, and onWait(seconds) when there is a wait.
+ * With a source that keeps everyone in one line (waitFor(urls), seconds; the Forecasts actor) and
+ * `maxWait`: decided before asking for any of it, NoaaBusy rather than waiting longer than that
+ * for the members, and onWait(seconds) when there is a wait. Their files then wait behind the
+ * main forecasts in line, all in line at once (their place kept while the first is fetched).
  */
 export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), fetch: fetchFn = null, source = null, maxWait = null, onWait = null }) {
   const files = sourceFor(source, fetchFn);
@@ -230,17 +232,25 @@ export async function gefsProfiles({ lat, lon, time, ground, now = new Date(), f
       throw new Error('Ensemble forecasts reach 16 days ahead: choose an earlier launch time.');
     }
     const key = `gefs ${cycle.toISOString()} ${hour}`;
-    const get = (m) => profileFor(files, key, gefsUrl(cycle, m, hour, lat, lon), lat, lon, ground);
+    const urls = Array.from({ length: GEFS_MEMBERS }, (_, m) => gefsUrl(cycle, m, hour, lat, lon));
+    const lined = Boolean(files.waitFor);
+    const get = (m) => profileFor(files, key, urls[m], lat, lon, ground, lined ? { later: true } : undefined);
+    const wait = files.waitFor?.(urls, { later: true }) ?? 0;
+    if (maxWait !== null && wait > maxWait) throw new NoaaBusy("NOAA's forecast server is busy with other launch plans right now");
+    if (wait > 3) onWait?.(Math.round(wait));
+    const asked = files.reserve?.(GEFS_MEMBERS - 1) ?? (() => {});
+    let first;
     try {
-      await get(0); // the control run first: is this run published yet?
+      first = await get(0); // the control run first: is this run published yet?
     } catch (e) {
+      asked();
       if (!(e instanceof NotPublished) || ++missing > 4) throw e instanceof NotPublished ? new Error('No ensemble forecast is available right now.') : e;
       continue;
     }
-    const wait = files.waitFor?.(Array.from({ length: GEFS_MEMBERS }, (_, m) => gefsUrl(cycle, m, hour, lat, lon))) ?? 0;
-    if (maxWait !== null && wait > maxWait) throw new NoaaBusy("NOAA's forecast server is busy with other launch plans right now");
-    if (wait > 3) onWait?.(Math.round(wait));
-    const profiles = await pool(Array.from({ length: GEFS_MEMBERS }, (_, m) => () => get(m)), 8);
+    const jobs = Array.from({ length: GEFS_MEMBERS - 1 }, (_, m) => () => get(m + 1));
+    const rest = lined ? Promise.all(jobs.map((job) => job().catch(() => null))) : pool(jobs, 8);
+    asked();
+    const profiles = [first, ...(await rest)];
     const members = profiles.map((p, m) => (p ? { member: m, levels: p.levels } : null)).filter(Boolean);
     if (members.length < 20) throw new Error("NOAA's ensemble forecast did not come through. Try again in a moment.");
     return { model: 'NOAA GEFS 0.5°', run: cycle.toISOString(), valid: new Date(cycle.getTime() + hour * HOUR).toISOString(), members };

@@ -7,12 +7,16 @@
 //   storage            { get(key), put(key, value), delete(key), deleteAll() }
 //   connections()      -> the open connections
 //   user(conn)         -> { id, email, name } of the signed-in person, or null
-//   access(user)       -> { role: 'owner' | 'editor' | 'viewer', name } for this design, or null
+//   access(user, { fresh })
+//                      -> { role: 'owner' | 'editor' | 'viewer', name } for this design, or null
+//                      (the host may answer from a lookup a moment old; with fresh, it looks
+//                      again before refusing); throws if it could not look
 //   motors()           -> [{ name, content }] custom motors of everyone the design is shared with
 //   touch(info)        records { version } on the design's listing (best effort)
 //   preview(text, { onlyIfMissing })
 //                      keeps OpenRocket's drawing of the design on its listing (only if it has none,
 //                      with onlyIfMissing); resolves to whether it did
+//   roleTtlMs          (optional) how often everyone's access is looked up again (default 10 s)
 // Connections are objects with an `id` and `send(message)`.
 import { applyOp, childIndex, componentName, fromJson, modelSize, toJson, validateOp, SIMS, DOC } from './lib/model.js';
 import { describeOp, groupEdits, inverseOf, isMinorOp, planRevert } from './lib/edits.js';
@@ -72,10 +76,14 @@ export class Room {
     this.model = null;
     this.clients = new Map(); // conn.id -> { user, role, roleAt, selection, frags }
     this.queue = Promise.resolve();
+    this.roleTtl = env.roleTtlMs ?? ROLE_TTL_MS;
+    this.rechecking = null;
   }
 
-  // Events are handled one at a time, in arrival order: handlers wait on storage and entity
-  // lookups, and two edits must never interleave.
+  // Events are handled one at a time, in arrival order: handlers wait on storage, and two edits
+  // must never interleave. Lookups of people, their access and their motors (a fraction of a
+  // second each on Base44) are kept out of this line where they can be: started before an event
+  // takes its place in it, or done in the background.
   serial(fn) {
     const run = this.queue.then(fn, fn);
     this.queue = run.catch(() => {});
@@ -83,11 +91,17 @@ export class Room {
   }
 
   handleConnect(conn) {
-    return this.serial(() => this.connect(conn));
+    // Looked up now, so that many people joining at once are looked up together.
+    const looked = this.lookUp(conn, { fresh: true });
+    looked.catch(() => {});
+    return this.serial(async () => this.connect(conn, await looked));
   }
 
   handleMessage(conn, msg) {
-    return this.serial(() => this.message(conn, msg));
+    // The motors for a welcome too.
+    const motors = msg?.type === 'hello' ? Promise.resolve().then(() => this.env.motors()) : null;
+    motors?.catch(() => {});
+    return this.serial(() => this.message(conn, msg, motors));
   }
 
   handleClose(conn) {
@@ -181,27 +195,77 @@ export class Room {
 
   // ---------------------------------------------------------------- connections
 
-  /** The person behind a connection and their role, checked again every few seconds. */
-  async client(conn, { fresh = false } = {}) {
+  /** Who is behind a connection and their access to the design: { user, access } or null. */
+  async lookUp(conn, { fresh = false } = {}) {
+    const user = await this.env.user(conn);
+    return user ? { user, access: await this.env.access(user, { fresh }) } : null;
+  }
+
+  /** Keeps a connection's person and access; returns its client, or null without access. */
+  admit(conn, looked) {
+    if (!looked?.access?.role) return null;
     let c = this.clients.get(conn.id);
     if (!c) {
-      const user = await this.env.user(conn);
-      if (!user) return null;
-      c = { user, role: null, roleAt: 0, name: null, selection: [], frags: new Map() };
+      c = { user: looked.user, role: null, roleAt: 0, name: null, selection: [], frags: new Map() };
       this.clients.set(conn.id, c);
     }
-    if (fresh || Date.now() - c.roleAt > ROLE_TTL_MS) {
-      const access = await this.env.access(c.user);
-      c.role = access?.role ?? null;
-      c.name = access?.name ?? null;
-      c.roleAt = Date.now();
+    c.user = looked.user;
+    c.role = looked.access.role;
+    c.name = looked.access.name ?? null;
+    c.roleAt = Date.now();
+    return c;
+  }
+
+  /**
+   * The person behind a connection, if they still have access. Their access is looked up again
+   * every few seconds in the background, so edits never wait for it; one taken away shows on
+   * their next message after that.
+   */
+  async client(conn) {
+    let c = this.clients.get(conn.id);
+    if (!c) {
+      // A connection from before the room started again (after an idle period).
+      c = this.admit(conn, await this.lookUp(conn).catch(() => null));
+      if (!c) return null;
     }
+    if (Date.now() - c.roleAt > this.roleTtl) this.recheck();
     return c.role ? c : null;
   }
 
+  /** Looks up everyone's access again, in the background, once at a time (once per person). */
+  recheck() {
+    if (this.rechecking) return;
+    this.rechecking = (async () => {
+      const byUser = new Map();
+      for (const c of this.clients.values()) {
+        if (!byUser.has(c.user.id)) byUser.set(c.user.id, []);
+        byUser.get(c.user.id).push(c);
+      }
+      for (const list of byUser.values()) {
+        let access;
+        try {
+          access = await this.env.access(list[0].user, {});
+        } catch (e) {
+          // Not known: everyone keeps their access until the next check.
+          for (const c of this.clients.values()) c.roleAt = Date.now();
+          throw e;
+        }
+        for (const c of list) {
+          c.role = access?.role ?? null;
+          c.name = access?.name ?? null;
+          c.roleAt = Date.now();
+        }
+      }
+    })()
+      .catch((e) => console.error('access check failed', e))
+      .finally(() => {
+        this.rechecking = null;
+      });
+  }
+
   /** Returns a reason to refuse the connection, or null. */
-  async connect(conn) {
-    const c = await this.client(conn, { fresh: true });
+  async connect(conn, looked) {
+    const c = this.admit(conn, looked);
     if (!c) {
       this.clients.delete(conn.id);
       return 'You do not have access to this design.';
@@ -257,7 +321,7 @@ export class Room {
 
   // ---------------------------------------------------------------- messages
 
-  async message(conn, msg) {
+  async message(conn, msg, motors = null) {
     if (!msg || typeof msg !== 'object') return;
     const c = await this.client(conn);
     if (!c) {
@@ -283,7 +347,7 @@ export class Room {
     if (msg.rid !== undefined) return this.request(conn, c, msg);
     switch (msg.type) {
       case 'hello':
-        return this.welcome(conn, c);
+        return this.welcome(conn, c, motors);
       case 'ops':
         return this.ops(conn, c, msg);
       case 'presence':
@@ -313,7 +377,7 @@ export class Room {
     return Boolean(kept);
   }
 
-  async welcome(conn, c) {
+  async welcome(conn, c, motors = null) {
     if (!this.model) return this.send(conn, { type: 'error', message: 'This design has no content yet.' });
     const seqs = (await this.st.get('seqs')) ?? {};
     this.send(conn, {
@@ -325,7 +389,7 @@ export class Room {
       role: c.role,
       model: toJson(this.model),
       // Custom motors of everyone the design is shared with; OpenRocket loads them at start.
-      motors: await this.env.motors(),
+      motors: await (motors ?? this.env.motors()),
     });
   }
 
