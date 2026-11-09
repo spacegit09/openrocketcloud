@@ -1,5 +1,7 @@
 package orcloud.bridge;
 
+import java.awt.AWTEvent;
+import java.awt.Toolkit;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -56,6 +58,11 @@ import orcloud.stl.PartMeshes;
  */
 final class Bridge implements Link.Handler {
 	private static final int DEBOUNCE_MS = 200;
+	/**
+	 * The periodic snapshot waits for this long without typing or clicking. A snapshot holds up
+	 * OpenRocket's window for a moment (about 0.1 s when OpenRocket runs in a browser).
+	 */
+	private static final long QUIET_INPUT_MS = 2000;
 
 	private final Link conn;
 	private final String token;
@@ -77,6 +84,7 @@ final class Bridge implements Link.Handler {
 	private boolean applying;
 	private boolean deferred;
 	private int quietTicks;
+	private long lastInput; // System.currentTimeMillis() of the user's last key or mouse input
 	private String lastPresence = "";
 
 	// Local edits since the last snapshot.
@@ -372,6 +380,10 @@ final class Bridge implements Link.Handler {
 		debounce = new Timer(DEBOUNCE_MS, e -> snapshotAndSend());
 		debounce.setRepeats(false);
 		new Timer(1000, e -> tick()).start();
+		// While the user goes on typing or clicking, the snapshot of an edit waits for a pause (at
+		// most until the next tick, a second at most).
+		Toolkit.getDefaultToolkit().addAWTEventListener(e -> userInput(), AWTEvent.KEY_EVENT_MASK
+				| AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.MOUSE_WHEEL_EVENT_MASK);
 
 		scanUndoHistory();
 		rebuild();         // catch up with edits made while OpenRocket was starting
@@ -444,6 +456,13 @@ final class Bridge implements Link.Handler {
 		debounce.restart();
 	}
 
+	private void userInput() {
+		lastInput = System.currentTimeMillis();
+		if (debounce != null && debounce.isRunning()) {
+			debounce.restart();
+		}
+	}
+
 	private void tick() {
 		if (doc == null) {
 			return;
@@ -452,8 +471,9 @@ final class Bridge implements Link.Handler {
 		if (deferred && !OrDoc.modalDialogOpen()) {
 			rebuild();
 		}
-		if (dirty || quietTicks >= 5) {
-			// Some edits (photo studio, custom expressions...) fire no events.
+		if (dirty || (quietTicks >= 5 && System.currentTimeMillis() - lastInput >= QUIET_INPUT_MS)) {
+			// Some edits (photo studio, custom expressions...) fire no events: every 5 s, when the
+			// user is not typing or clicking.
 			quietTicks = 0;
 			snapshotAndSend();
 		}
