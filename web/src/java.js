@@ -117,6 +117,8 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
         // CheerpJ's. The 3D view draws with WebGL instead (view3d.js).
         'os.arch=amd64',
         `orcloud.design=${designId}`,
+        // On a Mac, the Command key adds to a selection, as in OpenRocket there (CommandClick.java).
+        `orcloud.mac=${/mac/i.test(navigator.userAgentData?.platform ?? navigator.platform ?? '')}`,
       ],
       natives: {
         Java_java_lang_reflect_Field_getTypeAnnotationBytes0: noTypeAnnotations,

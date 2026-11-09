@@ -21,6 +21,7 @@ import info.openrocket.core.document.OpenRocketDocument;
 import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
+import orcloud.web.CommandClick;
 import orcloud.web.FileWindows;
 import orcloud.web.FinProfiles;
 import orcloud.web.MenuRow;
@@ -55,6 +56,8 @@ public final class WebMain {
 		OrDoc.installClasspathUrlHandler();
 		OrDoc.configurePreferences(workDir);
 		browserPreferences();
+		// On a Mac, ⌘-click adds to a selection (the component tree, lists, tables).
+		CommandClick.install();
 
 		Bridge bridge = new Bridge(BrowserLink::new, "", workDir);
 		bridge.start();
