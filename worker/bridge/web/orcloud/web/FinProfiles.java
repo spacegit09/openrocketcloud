@@ -131,10 +131,13 @@ public final class FinProfiles {
 		scaled.setToolTipText("Off: the fin's thickness all the way to the tip, as fins cut from sheet. On: the thickness shrinks with the chord.");
 		scaled.addActionListener(e -> PREFS.putBoolean(SCALED, scaled.isSelected()));
 		panel.add(scaled, "spanx, gapleft 10lp, wrap");
-		JLabel note = new JLabel("Square, rounded or airfoil: each fin's Cross section, in its Edit dialog.");
-		note.setFont(note.getFont().deriveFont(note.getFont().getSize2D() - 1f));
-		note.setForeground(UIManager.getColor("Label.disabledForeground"));
-		panel.add(note, "spanx, gapleft 10lp");
+		for (String text : new String[] { "Square, rounded or airfoil: each fin's Cross section, in its Edit dialog.",
+				"Root fillets (on both sides of each fin): its Fillet radius, in the same dialog." }) {
+			JLabel note = new JLabel(text);
+			note.setFont(note.getFont().deriveFont(note.getFont().getSize2D() - 1f));
+			note.setForeground(UIManager.getColor("Label.disabledForeground"));
+			panel.add(note, "spanx, gapleft 10lp, wrap 0");
+		}
 		options.add(new JSeparator(JSeparator.HORIZONTAL), "spanx, growx, wrap para");
 		options.add(panel, "spanx, growx, wrap");
 		options.revalidate();

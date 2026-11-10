@@ -85,6 +85,10 @@ and live sharing. Nothing runs on your own computer or server.
   (`CommandClick.java`). Exporting as a 3D file with the "3D printing" settings no longer stops at
   faces with no area, such as along a filled nose cone's axis, which made OpenRocket 24.12's pod
   examples fail (a copy of its `TriangulationHelper`; `scripts/test.sh` exports every example so).
+  3D exports also give fins what OpenRocket knows about them but leaves out of its 3D shapes: their
+  cross section (rounded, or an airfoil profile chosen in the export dialog) and their root fillets,
+  of the radius set in each fin set's dialog, on both sides of every fin, running out at the fins'
+  edges (`AirfoilFin`, `FinFillet`); the 3D view shows them too.
 - **Launch Planner** (`web/planner.html`, `web/src/flight`): OpenRocket runs in the page without
   its windows (`FlightMain`, `FlightLab`) and computes the rocket's tables
   (`worker/bridge/src/orcloud/flight/FlightTables.java`): normal force and centre of pressure over

@@ -3,8 +3,8 @@
 #  1. the live-share self-test against the real OpenRocket 24.12 (all bundled example designs),
 #     inside the worker image on a virtual display; it also writes Java model fixtures;
 #  2. the launch planner's flight engine against OpenRocket, its weather decoding and its shared
-#     forecasts, fins built with their cross sections for 3D export, and 3D export of every
-#     example with the "3D printing" settings;
+#     forecasts, fins built with their cross sections and root fillets for 3D export, and 3D export
+#     of every example with the "3D printing" settings;
 #  3. the server tests, including Java/Node parity on those fixtures.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -34,15 +34,19 @@ docker run --rm -v "$PWD/$cache/flight:/fx" -v "$PWD/$cache/test-out:/opt/test" 
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.flight.FlightCheck /fx 2>&1 | grep -E "^(FLIGHTCHECK|  skip)"'
 node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.test.mjs web/test/room.test.mjs web/test/room-lookups.test.mjs
 
-# Fins with their cross sections (3D export): closed solids, as thick as the fin, with the volume
-# each profile gives.
+# Fins with their cross sections and root fillets (3D export): closed solids, as thick as the fin,
+# with the volume each profile gives; fillets tangent to fin and body, with OpenRocket's cross section.
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
-  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"'
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.FilletCheck 2>&1 | grep -E "^(FILLETCHECK|  FAIL)"'
 
-# 3D export with the "3D printing" settings of every example, with the browser build's copy of
-# OpenRocket's TriangulationHelper (faces with no area, as along a filled nose cone's axis).
+# 3D export with the "3D printing" settings of every example, as is and with root fillets on every
+# fin set, with the browser build's copies of OpenRocket's TriangulationHelper (faces with no area,
+# as along a filled nose cone's axis) and FinSetExporter (fin cross sections and root fillets).
 docker run --rm -v "$PWD/worker:/w" -w /w eclipse-temurin:17-jdk \
-  bash -c 'mkdir -p .cache/test-web && javac -nowarn -d .cache/test-web -cp .cache/OpenRocket.jar bridge/web/info/openrocket/core/file/wavefrontobj/TriangulationHelper.java'
+  bash -c 'mkdir -p .cache/test-web && javac -nowarn -d .cache/test-web -cp .cache/OpenRocket.jar:.cache/test-out \
+    bridge/web/info/openrocket/core/file/wavefrontobj/TriangulationHelper.java \
+    bridge/web/info/openrocket/core/file/wavefrontobj/export/components/FinSetExporter.java bridge/web/orcloud/web/FinProfiles.java'
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" -v "$PWD/$cache/test-web:/opt/test-web" --entrypoint bash orcloud-worker -c '
   set -o pipefail
   java -Djava.awt.headless=true -cp /opt/test-web:/opt/openrocket/OpenRocket.jar:/opt/test orcloud.obj.ObjExportCheck 2>&1 | grep -E "^(OBJCHECK|  FAIL)"'
