@@ -52,7 +52,7 @@ public final class FlutterTab {
 	public static final String TITLE = "Flutter";
 	public static final String TIP = "The fins' flutter speed, and how close your simulations come to it";
 
-	private static final Preferences PREFS = Preferences.userRoot().node("orcloud-web").node("flutter");
+	private static final Preferences PREFS = FinFlutter.PREFS;
 	private static final String UNIT = "unit";
 	/** Shear modulus units: name, Pa. */
 	private static final String[] UNITS = { "GPa", "MPa", "ksi", "psi" };
@@ -72,19 +72,12 @@ public final class FlutterTab {
 
 	/** The shear modulus (Pa) the fin set is checked with: entered for it, or its material's typical one (NaN if none). */
 	static double shearModulus(FinSet fins) {
-		double entered = PREFS.getDouble(String.valueOf(fins.getID()), Double.NaN);
-		return entered > 0 ? entered : FinFlutter.typicalShearModulus(fins.getMaterial().getName());
+		return FinFlutter.shearModulus(fins);
 	}
 
 	/** The fin set as FinFlutter sees it: one fin's root chord, span, area, thickness and centre of area. */
 	static FinFlutter flutter(FinSet fins) {
-		info.openrocket.core.util.Coordinate[] outline = fins.getFinPoints();
-		double[] x = new double[outline.length], y = new double[outline.length];
-		for (int i = 0; i < outline.length; i++) {
-			x[i] = outline[i].x;
-			y[i] = outline[i].y;
-		}
-		return new FinFlutter(fins.getLength(), fins.getSpan(), fins.getPlanformArea(), fins.getThickness(), FinFlutter.centroid(x, y));
+		return FinFlutter.of(fins);
 	}
 
 	/** One row of the simulations table. */
