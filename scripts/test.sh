@@ -38,10 +38,16 @@ node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.tes
 # with the volume each profile gives; fillets tangent to fin and body, with OpenRocket's cross section.
 # The fins' flutter speed (the Flutter tab of a fin set's dialog): Bennett's and Martin's published
 # numbers, and how it scales.
+# The rocket optimiser's search on problems with known answers and its edge cases, and what it
+# measures (each design as its simulation run again shows it, OpenRocket's stability, the flutter
+# margin). Comparing it with OpenRocket's own optimiser on the examples takes a few minutes more:
+#   java -cp OpenRocket.jar:classes orcloud.optimization.OptimizerComparison
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.FilletCheck 2>&1 | grep -E "^(FILLETCHECK|  FAIL)"
-  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.FlutterCheck 2>&1 | grep -E "^(FLUTTERCHECK|  FAIL)"'
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.FlutterCheck 2>&1 | grep -E "^(FLUTTERCHECK|  FAIL)"
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.optimization.ConstrainedSearchCheck 2>&1 | grep -E "^(CONSTRAINEDSEARCHCHECK|  FAIL)"
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.optimization.RocketObjectiveCheck 2>&1 | grep -E "^(ROCKETOBJECTIVECHECK|  FAIL)"'
 
 # 3D export with the "3D printing" settings of every example, as is and with root fillets on every
 # fin set, with the browser build's copies of OpenRocket's TriangulationHelper (faces with no area,

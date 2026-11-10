@@ -92,7 +92,17 @@ and live sharing. Nothing runs on your own computer or server.
   tab: the fins' flutter speed (Martin's NACA TN 4197 boundary as Bennett corrected it for rockets
   in Apogee's Peak of Flight 615, with the fin's sweep) from their shape, thickness and material
   stiffness (typical values for OpenRocket's materials, or your own), and how close each simulation
-  comes to it along its flight, in its own air (`FinFlutter`, `FlutterTab`).
+  comes to it along its flight, in its own air (`FinFlutter`, `FlutterTab`). Rocket optimization
+  (Tools menu) runs a more accurate search than OpenRocket's (`worker/bridge/src/orcloud/optimization`,
+  with copies of its `GeneralOptimizationDialog` and `OptimizationWorker`). Every design flies in the
+  simulation's own gusts, as running it again would; OpenRocket's copies gave each a new random
+  seed, so the same design could differ by a few tenths of a per cent. It also flies with no coarser
+  a time step than OpenRocket recommends. Limits are followed rather than stopped at, with steps
+  along them worked out from their slopes. Ranges' ends are reached exactly. A quadratic model of
+  the tries made gives steps to the best near it, and a spread of first tries looks for other
+  valleys. On the bundled examples it lands within 0.03 % of the best design known, where
+  OpenRocket's lands up to 19 % short (`OptimizerComparison`). It can also keep the fins' flutter
+  margin above a limit, and offers the fins' thickness as a parameter.
 - **Launch Planner** (`web/planner.html`, `web/src/flight`): OpenRocket runs in the page without
   its windows (`FlightMain`, `FlightLab`) and computes the rocket's tables
   (`worker/bridge/src/orcloud/flight/FlightTables.java`): normal force and centre of pressure over

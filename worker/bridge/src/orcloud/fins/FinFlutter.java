@@ -50,6 +50,29 @@ public final class FinFlutter {
 		this.epsilon = bennett > MARTIN_EPSILON ? bennett : MARTIN_EPSILON;
 	}
 
+	/** A fin set's fin as this sees it: its root chord, span, area, thickness and centre of area. */
+	public static FinFlutter of(info.openrocket.core.rocketcomponent.FinSet fins) {
+		info.openrocket.core.util.Coordinate[] outline = fins.getFinPoints();
+		double[] x = new double[outline.length], y = new double[outline.length];
+		for (int i = 0; i < outline.length; i++) {
+			x[i] = outline[i].x;
+			y[i] = outline[i].y;
+		}
+		return new FinFlutter(fins.getLength(), fins.getSpan(), fins.getPlanformArea(), fins.getThickness(), centroid(x, y));
+	}
+
+	/**
+	 * The shear modulus (Pa) a fin set is checked with: entered for it on its Flutter tab (kept in
+	 * this browser's preferences, by the fin set's ID), else its material's typical one (NaN if none).
+	 */
+	public static double shearModulus(info.openrocket.core.rocketcomponent.FinSet fins) {
+		double entered = PREFS.getDouble(String.valueOf(fins.getID()), Double.NaN);
+		return entered > 0 ? entered : typicalShearModulus(fins.getMaterial().getName());
+	}
+
+	/** Where shear moduli entered on the Flutter tab are kept: by fin set ID, in Pa. */
+	public static final java.util.prefs.Preferences PREFS = java.util.prefs.Preferences.userRoot().node("orcloud-web").node("flutter");
+
 	/** The x of the centre of area of a closed outline (x, y pairs), as Bennett's Cx. */
 	public static double centroid(double[] x, double[] y) {
 		double a = 0, cx = 0;
