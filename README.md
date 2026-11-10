@@ -89,10 +89,10 @@ and live sharing. Nothing runs on your own computer or server.
   cross section (rounded, or an airfoil profile chosen in the export dialog) and their root fillets,
   of the radius set in each fin set's dialog, on both sides of every fin, running out at the fins'
   edges (`AirfoilFin`, `FinFillet`); the 3D view shows them too. A fin set's dialog has a Flutter
-  tab: the fins' flutter speed (the NACA TN 4197 estimate, as Apogee's Peak of Flight and RocketPy
-  use it) from their shape, thickness and material stiffness (typical values for OpenRocket's
-  materials, or your own), and how close each simulation comes to it along its flight, in its own
-  air (`FinFlutter`, `FlutterTab`).
+  tab: the fins' flutter speed (Martin's NACA TN 4197 boundary as Bennett corrected it for rockets
+  in Apogee's Peak of Flight 615, with the fin's sweep) from their shape, thickness and material
+  stiffness (typical values for OpenRocket's materials, or your own), and how close each simulation
+  comes to it along its flight, in its own air (`FinFlutter`, `FlutterTab`).
 - **Launch Planner** (`web/planner.html`, `web/src/flight`): OpenRocket runs in the page without
   its windows (`FlightMain`, `FlightLab`) and computes the rocket's tables
   (`worker/bridge/src/orcloud/flight/FlightTables.java`): normal force and centre of pressure over
