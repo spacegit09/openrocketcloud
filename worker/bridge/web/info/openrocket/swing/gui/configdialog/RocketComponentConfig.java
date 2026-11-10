@@ -1,6 +1,6 @@
 /*
  * Copy of OpenRocket 24.12's RocketComponentConfig (GPL-3.0, (c) the OpenRocket team) for the
- * browser build, with two changes marked "orcloud":
+ * browser build, with these changes marked "orcloud":
  * - The label with the component's mass, at the bottom of every component's dialog, had the whole
  *   dialog laid out again each time its text changed, which is after every change of the
  *   component's size (about 0.1 s per edit under CheerpJ). It grows to fill its row, so now it is
@@ -10,6 +10,7 @@
  *   about half of every component's dialog (opening one took about 1.2 s, now about 0.65 s). The
  *   dialog keeps its size: the first time a kind of component's dialog opens, the tabs are made at
  *   once to learn their size, which they then keep while not yet made.
+ * - Fin sets get a Flutter tab (orcloud.web.FlutterTab), made when first shown like those two.
  * It is placed ahead of OpenRocket.jar on the class path.
  */
 package info.openrocket.swing.gui.configdialog;
@@ -214,6 +215,12 @@ public class RocketComponentConfig extends JPanel implements Invalidatable, Inva
 				register(appearancePanel);
 				return appearancePanel;
 			}), trans.get("RocketCompCfg.tab.Appearance.ttip"));
+		}
+
+		//// orcloud: the fins' flutter speed
+		if (component instanceof FinSet) {
+			tabbedPane.addTab(orcloud.web.FlutterTab.TITLE, null, new LazyTab("flutter",
+					() -> orcloud.web.FlutterTab.panel(document, (FinSet) component, this::register)), orcloud.web.FlutterTab.TIP);
 		}
 
 		//// Comment and Specify a comment for the component
