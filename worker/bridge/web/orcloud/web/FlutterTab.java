@@ -76,9 +76,15 @@ public final class FlutterTab {
 		return entered > 0 ? entered : FinFlutter.typicalShearModulus(fins.getMaterial().getName());
 	}
 
-	/** The fin set as FinFlutter sees it: one fin's root chord, span, area and thickness. */
+	/** The fin set as FinFlutter sees it: one fin's root chord, span, area, thickness and centre of area. */
 	static FinFlutter flutter(FinSet fins) {
-		return new FinFlutter(fins.getLength(), fins.getSpan(), fins.getPlanformArea(), fins.getThickness());
+		info.openrocket.core.util.Coordinate[] outline = fins.getFinPoints();
+		double[] x = new double[outline.length], y = new double[outline.length];
+		for (int i = 0; i < outline.length; i++) {
+			x[i] = outline[i].x;
+			y[i] = outline[i].y;
+		}
+		return new FinFlutter(fins.getLength(), fins.getSpan(), fins.getPlanformArea(), fins.getThickness(), FinFlutter.centroid(x, y));
 	}
 
 	/** One row of the simulations table. */
@@ -195,12 +201,12 @@ public final class FlutterTab {
 			add(scroll, "span, grow, wrap");
 
 			// A set width, so the wrapped text is measured at it.
-			JLabel note = new JLabel("<html><body style='width: 470px'>The NACA TN 4197 estimate, as rocketry uses it"
-					+ " (Apogee's Peak of Flight 291, RocketPy), with each simulation's own air pressure and speed of sound."
-					+ " Margin is the flutter speed over the airspeed at the closest point of the flight. It is a rough guide:"
-					+ " keep at least " + Math.round((LOW - 1) * 100) + "% margin. It leaves out fin tabs, fillets and how the fins"
-					+ " are mounted, which all stiffen them; materials vary. Other fin outlines count as the trapezoid with the"
-					+ " same root chord, span and area.</body></html>");
+			JLabel note = new JLabel("<html><body style='width: 470px'>Martin's flutter boundary (NACA TN 4197) as Bennett"
+					+ " corrected it for rockets (Apogee's Peak of Flight 615), with ε from the fin's sweep (at least Martin's 0.25),"
+					+ " in each simulation's own air. Margin is the flutter speed over the airspeed at the closest point of the"
+					+ " flight. It is a rough guide: keep at least " + Math.round((LOW - 1) * 100) + "% margin. It leaves out fin"
+					+ " tabs, fillets and how the fins are mounted, which stiffen them; materials vary. Other outlines count as the"
+					+ " trapezoid of the same root chord, span and area.</body></html>");
 			note.setFont(note.getFont().deriveFont(note.getFont().getSize2D() - 1f));
 			note.setForeground(Color.GRAY);
 			add(note, "span");
@@ -280,8 +286,8 @@ public final class FlutterTab {
 				table.fireTableDataChanged();
 				return;
 			}
-			shape.setText(String.format(Locale.ROOT, "aspect ratio %.2f, taper ratio %.2f, %.1f %% as thick as the root chord%s",
-					fin.aspectRatio, fin.taper, fin.thicknessRatio * 100,
+			shape.setText(String.format(Locale.ROOT, "aspect ratio %.2f, taper ratio %.2f, %.1f %% as thick as the root chord, ε %.2f%s",
+					fin.aspectRatio, fin.taper, fin.thicknessRatio * 100, fin.epsilon,
 					fins instanceof TrapezoidFinSet ? "" : " (its trapezoid)"));
 			if (!(g > 0)) {
 				seaLevel.setText("enter the material's shear modulus");

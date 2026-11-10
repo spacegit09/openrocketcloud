@@ -36,7 +36,8 @@ node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.tes
 
 # Fins with their cross sections and root fillets (3D export): closed solids, as thick as the fin,
 # with the volume each profile gives; fillets tangent to fin and body, with OpenRocket's cross section.
-# The fins' flutter speed (the Flutter tab of a fin set's dialog): a worked example and its scaling.
+# The fins' flutter speed (the Flutter tab of a fin set's dialog): Bennett's and Martin's published
+# numbers, and how it scales.
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.AirfoilCheck 2>&1 | grep -E "^(AIRFOILCHECK|  FAIL)"
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.fins.FilletCheck 2>&1 | grep -E "^(FILLETCHECK|  FAIL)"

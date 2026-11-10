@@ -2,27 +2,42 @@ package orcloud.fins;
 
 /**
  * A fin's flutter speed: the airspeed above which it may start to flutter (twist and bend in a
- * growing oscillation, often until it breaks off). The estimate rocketry uses, from NACA TN 4197
- * (Martin, 1958), in the form of Apogee's Peak of Flight newsletter 291 and RocketPy:
+ * growing oscillation, often until it breaks off). Martin's flutter boundary (NACA TN 4197, 1958),
+ * as John K. Bennett corrected and refined it for rockets (Apogee's Peak of Flight 615, 2023, and
+ * his Fin Flutter Boundary Calculator v1.3):
  *
- * <pre>  Vf = a sqrt( G 2 (AR + 2) (t/c)^3 / (1.337 AR^3 (lambda + 1) p) )</pre>
+ * <pre>  Vf = a sqrt( G / ( DN AR^3 / ((t/c)^3 (AR + 2)) * (lambda + 1) / 2 * p / p0 ) ),  DN = 24 epsilon gamma p0 / pi</pre>
  *
  * with a the speed of sound and p the air pressure where the rocket is, G the shear modulus of the
  * fin's material (in the same unit as p), AR the fin's aspect ratio (span squared over its area),
- * lambda its taper ratio (tip chord over root chord) and t/c its thickness over its root chord. A
- * fin of another outline (elliptical, freeform) counts as the trapezoid with its root chord, span and
- * area. It is a rough guide: it leaves out tabs, fillets and how the fins are mounted, which all
- * stiffen them, and materials vary.
+ * lambda its taper ratio (tip chord over root chord), t/c its thickness over its root chord, gamma
+ * 1.4, and epsilon how far the fin's centre of area lies behind its root's quarter chord, as a share
+ * of the root chord (Cx / c - 1/4). Martin took epsilon as 1/4 (a fin without sweep), so DN = 39.3
+ * psi; Bennett takes it from the fin's shape, which gives swept fins a lower flutter speed. Here it
+ * is never below 1/4, so that fins swept forward are not given a higher one.
+ *
+ * The form rocketry long used (Peak of Flight 291 and 411, RocketPy's fin_flutter_analysis) has an
+ * extra factor of 2 under the root, counting Martin's 1/2 twice: its flutter speeds are sqrt(2)
+ * too high, as Bennett showed. A fin of another outline (elliptical, freeform) counts as the
+ * trapezoid with its root chord, span and area, and its own centre of area. It is a rough guide: it
+ * leaves out tabs, fillets and how the fins are mounted, which all stiffen them, and materials vary.
  */
 public final class FinFlutter {
 	/** The standard atmosphere at sea level: pressure (Pa) and speed of sound (m/s). */
 	public static final double SEA_LEVEL_PRESSURE = 101325, SEA_LEVEL_SOUND = 340.294;
 
-	public final double rootChord, tipChord, span, area, thickness;
-	public final double aspectRatio, taper, thicknessRatio;
+	/** Martin's epsilon: a fin without sweep, its centre of area at mid chord. */
+	public static final double MARTIN_EPSILON = 0.25;
+	private static final double GAMMA = 1.4;
 
-	/** A fin with this root chord, span (height), area of one side and thickness (all in m). */
-	public FinFlutter(double rootChord, double span, double area, double thickness) {
+	public final double rootChord, tipChord, span, area, thickness;
+	public final double aspectRatio, taper, thicknessRatio, epsilon;
+
+	/**
+	 * A fin with this root chord, span (height), area of one side and thickness (all in m), its
+	 * centre of area `centroid` (m) behind the root's leading edge (NaN: at mid chord).
+	 */
+	public FinFlutter(double rootChord, double span, double area, double thickness, double centroid) {
 		this.rootChord = rootChord;
 		this.span = span;
 		this.area = area;
@@ -31,6 +46,20 @@ public final class FinFlutter {
 		this.aspectRatio = area > 0 ? span * span / area : Double.NaN;
 		this.taper = rootChord > 0 ? tipChord / rootChord : Double.NaN;
 		this.thicknessRatio = rootChord > 0 ? thickness / rootChord : Double.NaN;
+		double bennett = rootChord > 0 ? centroid / rootChord - 0.25 : Double.NaN;
+		this.epsilon = bennett > MARTIN_EPSILON ? bennett : MARTIN_EPSILON;
+	}
+
+	/** The x of the centre of area of a closed outline (x, y pairs), as Bennett's Cx. */
+	public static double centroid(double[] x, double[] y) {
+		double a = 0, cx = 0;
+		for (int i = 0; i < x.length; i++) {
+			int j = (i + 1) % x.length;
+			double cross = x[i] * y[j] - x[j] * y[i];
+			a += cross;
+			cx += (x[i] + x[j]) * cross;
+		}
+		return a != 0 ? cx / (3 * a) : Double.NaN;
 	}
 
 	/** Whether the fin has the size the estimate needs. */
@@ -41,7 +70,9 @@ public final class FinFlutter {
 	/** The flutter speed (m/s) for shear modulus g (Pa), in air at pressure p (Pa) with speed of sound a (m/s). */
 	public double speed(double g, double p, double a) {
 		double ar = aspectRatio, tc = thicknessRatio;
-		return a * Math.sqrt(g * 2 * (ar + 2) * tc * tc * tc / (1.337 * ar * ar * ar * (taper + 1) * p));
+		// DN / p0 = 24 epsilon gamma / pi (1.337 x 2 when epsilon is 1/4), times (lambda + 1) / 2
+		double k = 24 * epsilon * GAMMA / Math.PI * (taper + 1) / 2;
+		return a * Math.sqrt(g * tc * tc * tc * (ar + 2) / (k * ar * ar * ar * p));
 	}
 
 	/** The flutter speed (m/s) at sea level, in the standard atmosphere. */
