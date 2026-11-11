@@ -760,6 +760,13 @@ public class GeneralOptimizationDialog extends JDialog {
 							}, trans.get("error.optimizationFailure.title"), JOptionPane.ERROR_MESSAGE);
 				}
 				
+				// Rocket in Cloud: say so when no design tried meets every requirement.
+				RocketObjective.Outcome outcome = getOutcome();
+				if (exception == null && outcome != null && !outcome.stopped && outcome.best != null && !outcome.best.score.feasible()) {
+					JOptionPane.showMessageDialog(GeneralOptimizationDialog.this, unmet(outcome.best, limits),
+							"No design meets the requirements", JOptionPane.WARNING_MESSAGE);
+				}
+				
 				worker = null;
 				stopOptimization();
 				
@@ -1015,6 +1022,39 @@ public class GeneralOptimizationDialog extends JDialog {
 		}
 	}
 	
+	/** Rocket in Cloud: what the design closest to meeting the requirements falls short in. */
+	private static String unmet(RocketObjective.Evaluation e, RocketObjective.Limits limits) {
+		java.util.Locale l = java.util.Locale.ROOT;
+		Unit cal = UnitGroup.UNITS_STABILITY_CALIBERS.getDefaultUnit(), length = UnitGroup.UNITS_LENGTH.getDefaultUnit();
+		List<String> lines = new ArrayList<>();
+		if (e.failure != null && Double.isNaN(e.stability)) {
+			lines.add("Its simulation failed: " + e.failure);
+		}
+		if (!Double.isNaN(limits.minStability)) {
+			boolean ok = limits.minAbsolute ? e.stabilityLength >= limits.minStability : e.stability >= limits.minStability;
+			lines.add(String.format(l, "%s stability %s (%s); at least %s wanted", ok ? "✓" : "✗", cal.toStringUnit(e.stability),
+					length.toStringUnit(e.stabilityLength), limits.minAbsolute ? length.toStringUnit(limits.minStability) : cal.toStringUnit(limits.minStability)));
+		}
+		if (!Double.isNaN(limits.maxStability)) {
+			boolean ok = limits.maxAbsolute ? e.stabilityLength <= limits.maxStability : e.stability <= limits.maxStability;
+			lines.add(String.format(l, "%s stability %s (%s); at most %s wanted", ok ? "✓" : "✗", cal.toStringUnit(e.stability),
+					length.toStringUnit(e.stabilityLength), limits.maxAbsolute ? length.toStringUnit(limits.maxStability) : cal.toStringUnit(limits.maxStability)));
+		}
+		if (limits.minFlutter > 0) {
+			lines.add(Double.isNaN(e.flutter) ? "? fin flutter margin not known (not simulated)"
+					: String.format(l, "%s fin flutter margin %.2f× (lowest for %s); at least %.2f× wanted", e.flutter >= limits.minFlutter ? "✓" : "✗",
+							e.flutter, e.flutterFins, limits.minFlutter));
+		}
+		StringBuilder text = new StringBuilder("<html>No design tried within the parameters' ranges meets every requirement.<br>"
+				+ "The one closest to meeting them is shown:<ul>");
+		for (String line : lines) {
+			text.append("<li>").append(line.replace("&", "&amp;").replace("<", "&lt;")).append("</li>");
+		}
+		text.append("</ul>Widen the ranges, add parameters that change what falls short (the thickness of the fin set named<br>"
+				+ "raises its flutter speed most; fin height, root chord and nose length change stability), or ask for less.</html>");
+		return text.toString();
+	}
+
 	/** Rocket in Cloud: the best design's stability and flutter margin (and whether they meet the requirements). */
 	private void showBest(FunctionEvaluationData data) {
 		RocketObjective.Evaluation e = data instanceof OptimizationWorker.Evaluated ? ((OptimizationWorker.Evaluated) data).evaluation : null;
@@ -1027,6 +1067,7 @@ public class GeneralOptimizationDialog extends JDialog {
 				+ " (" + UnitGroup.UNITS_LENGTH.getDefaultUnit().toStringUnit(e.stabilityLength) + ")");
 		bestFlutterLabel.setText(Double.isNaN(e.flutter) ? (minimumFlutterSelected.isSelected() ? "-" : "not required")
 				: String.format(java.util.Locale.ROOT, "%.2f×", e.flutter));
+		bestFlutterLabel.setToolTipText(e.flutterFins == null ? null : "Lowest for " + e.flutterFins);
 		boolean ok = e.score.feasible();
 		java.awt.Color c = ok ? javax.swing.UIManager.getColor("Label.foreground") : GUIUtil.getUITheme().getErrorColor();
 		bestStabilityLabel.setForeground(c);

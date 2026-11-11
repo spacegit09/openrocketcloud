@@ -20,7 +20,8 @@ import orcloud.fins.FinFlutter;
  * Checks what the rocket optimiser measures (RocketObjective): a design gives the same result each
  * time, and the same as running its simulation again (the simulation's own gusts); its stability
  * is OpenRocket's (StabilityParameter); its flutter margin is the fins' along a full flight; a
- * design outside the stability limits is not simulated; a fin set whose material has no known
+ * design outside the stability limits is not simulated (with the flutter limit, once a design has
+ * met every limit: until then how far it is from the flutter limit counts); a fin set whose material has no known
  * shear modulus is left out of the flutter limit (and named); a booster's fins are checked along
  * the booster's flight from launch; the flutter limit with the stability parameter (no simulation
  * of its own) still simulates; a modifier with no range is left out of the search; a coarse time
@@ -80,6 +81,33 @@ public final class RocketObjectiveCheck {
 		RocketObjective.Evaluation unstable = obj.evaluate(small);
 		check(!unstable.simulated() && !unstable.score.feasible() && Math.abs(unstable.score.violation - (1.5 - unstable.stability)) < 1e-9,
 				"too unstable a design: simulated " + unstable.simulated() + ", past by " + unstable.score.violation + ", stability " + unstable.stability);
+
+		// With the flutter limit, while no design has met every limit, one outside the stability limits
+		// is simulated too (how far it is from the flutter limit counts in telling which comes closest);
+		// once one has, it is not.
+		RocketObjective fresh = new RocketObjective(sim, p.parameter, p.goal, p.limits, mods, null);
+		RocketObjective.Evaluation before = fresh.evaluate(small);
+		check(before.simulated() && !Double.isNaN(before.flutter) && before.score.slack.length == 2 && before.score.slack[1] == before.flutter - 1.25,
+				"too unstable a design before any met the limits: simulated " + before.simulated() + ", flutter " + before.flutter);
+		fresh.evaluate(now);
+		check(!fresh.evaluate(small).simulated(), "too unstable a design after one met the limits: simulated");
+
+		// A flutter limit no design can meet (the example's main fins flutter at a quarter of its speed,
+		// and only its control fins change), with a start too unstable: the closest design is one that
+		// is flown, its flutter margin known and the fins it is lowest for named, not one just too
+		// unstable to be flown (as before, which showed no value).
+		OpenRocketDocument scripting = OptimizerComparison.load("Simulation scripting");
+		OptimizerComparison.Problem q = new OptimizerComparison.Problem("check", "Simulation scripting", 0,
+				new info.openrocket.core.optimization.rocketoptimization.parameters.MaximumVelocityParameter(), new MaximizationGoal(),
+				OptimizerComparison.ROOT, OptimizerComparison.TIP, OptimizerComparison.HEIGHT, OptimizerComparison.THICKNESS)
+				.stability(1.4, Double.NaN, false).flutter(0.5);
+		RocketObjective.Outcome unreachable = new RocketObjective(scripting.getSimulations().get(0), q.parameter, q.goal, q.limits,
+				OptimizerComparison.modifiers(scripting, q), null).optimize(null, null);
+		RocketObjective.Evaluation closest = unreachable.best;
+		check(!closest.score.feasible() && closest.simulated() && closest.stability >= 1.4 && closest.flutter < 0.5
+				&& closest.flutterFins != null && closest.flutterFins.startsWith("Main fin set"),
+				"unreachable flutter limit: closest simulated " + closest.simulated() + ", stability " + closest.stability + ", flutter "
+						+ closest.flutter + " (" + closest.flutterFins + ")");
 
 		// A material with no known shear modulus: left out, and named.
 		OpenRocketDocument doc2 = OptimizerComparison.load("A simple model rocket");

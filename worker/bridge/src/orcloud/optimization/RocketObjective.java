@@ -59,7 +59,8 @@ import orcloud.fins.FinFlutter;
  *
  * <p>Stability is worked out as OpenRocket's stability limit does (StabilityDomain: the worst
  * centre of pressure at the default Mach number, the centre of gravity at launch, calibers of the
- * widest body), and as there, a design outside the stability limits is not simulated. The flutter
+ * widest body), and as there, a design outside the stability limits is not simulated (with the
+ * flutter limit, only once a design has met every limit). The flutter
  * margin is the lowest of each fin set's flutter speed (FinFlutter, with its material's shear
  * modulus: entered on the Flutter tab, or its typical one) over the airspeed along the flight of
  * its stage. Fin sets without a shear modulus are left out (`unchecked` names them).
@@ -90,6 +91,8 @@ public final class RocketObjective {
 		public double stability = Double.NaN, stabilityLength = Double.NaN;
 		/** The lowest flutter speed over airspeed (NaN: not simulated, or no fins checked). */
 		public double flutter = Double.NaN;
+		/** The fin set with that lowest flutter margin. */
+		public String flutterFins;
 		/** Why the simulation failed, if it did. */
 		public String failure;
 		public ConstrainedSearch.Score score;
@@ -114,6 +117,8 @@ public final class RocketObjective {
 	private final Runnable pause;
 	/** Indices of the modifiers the search varies (those with a range). */
 	private final int[] varied;
+	/** Whether a design evaluated so far meets every limit. */
+	private boolean metAll;
 
 	/**
 	 * Copies what it needs from `base` (its rocket and options), so make it where the design may
@@ -197,7 +202,12 @@ public final class RocketObjective {
 			within &= s >= 0 || Double.isNaN(s);
 		}
 		boolean nan = stabilityLimits && Double.isNaN(e.stability);
-		if (within && !nan) {
+		// A design outside the stability limits is not simulated, as in OpenRocket, except with the
+		// flutter limit while no design has met every limit: then how far it is from the flutter
+		// limit counts too in telling which design comes closest (else a design just too unstable
+		// to be simulated, its flutter unknown, would seem closer than any that is flown and
+		// flutters, and the search would end there with nothing to show).
+		if ((within || (limits.flutter() && !metAll)) && !nan) {
 			simulate(sim, e);
 		}
 		if (limits.flutter()) {
@@ -212,6 +222,7 @@ public final class RocketObjective {
 			e.failure = "No stability (no centre of pressure or gravity)";
 		}
 		e.score = new ConstrainedSearch.Score(e.goal, s, e);
+		metAll |= e.score.feasible();
 		return e;
 	}
 
@@ -261,7 +272,9 @@ public final class RocketObjective {
 				}
 			}
 			if (limits.flutter() && sim.getSimulatedData() != null) {
-				e.flutter = flutter(sim);
+				String[] which = new String[1];
+				e.flutter = flutter(sim, which);
+				e.flutterFins = which[0];
 			}
 		} catch (SimulationCalculationException ex) {
 			e.parameter = Double.NaN;
@@ -300,6 +313,11 @@ public final class RocketObjective {
 	 * of its stage (NaN if none).
 	 */
 	static double flutter(Simulation sim) {
+		return flutter(sim, new String[1]);
+	}
+
+	/** As flutter(sim), naming in which[0] the fin set with the lowest margin. */
+	static double flutter(Simulation sim, String[] which) {
 		FlightData data = sim.getSimulatedData();
 		double lowest = Double.NaN;
 		double launch = sim.getOptions().getLaunchAltitude();
@@ -316,6 +334,7 @@ public final class RocketObjective {
 			double m = margin(branch(data, fins), launch, fin, g);
 			if (!Double.isNaN(m) && !(m >= lowest)) {
 				lowest = m;
+				which[0] = fins.getName();
 			}
 		}
 		return lowest;
