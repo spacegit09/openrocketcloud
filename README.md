@@ -136,6 +136,19 @@ base44 link --create --name "My OpenRocket"   # once per checkout
 base44 deploy --build --yes                   # site, actor, records, Google sign-in
 ```
 
+To try changes before deploying, run the design page on your computer:
+
+```bash
+node web/scripts/dev-design.mjs                                   # OpenRocket's simple model rocket
+node web/scripts/dev-design.mjs "Two stage high power rocket"     # another bundled example
+node web/scripts/dev-design.mjs ~/rockets/mine.ork ~/rockets/motor.eng   # your design and motors
+```
+
+It serves the site with Vite and a local stand-in for the live-sharing room holding that design,
+and prints the address to open (as the design's owner, without signing in; edits last until it
+stops). Changes to the page's JavaScript and CSS show at once. After changing Java
+(`worker/bridge`), run `scripts/build-web-jars.sh` and reload the page.
+
 Tests: `npm test` (the room, `.ork` handling, the planner's weather decoding, Monte Carlo and
 flight engine; the engine's comparison with OpenRocket needs the fixtures `scripts/test.sh`
 writes) and `node test/e2e.mjs` (two headless Chrome

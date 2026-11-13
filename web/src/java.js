@@ -10,6 +10,22 @@ import { CLASSPATH } from './lib/jars.js';
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
 
+/** How far the Java runtime's download has got (CheerpJ's preload): { done, total }, or null. */
+let download = null;
+const downloadListeners = new Set();
+
+/**
+ * Calls `listener({ done, total })` as the Java runtime downloads (now, if it has started). Most of
+ * the wait before OpenRocket starts is this download, from CheerpJ's servers, which at times comes
+ * slowly from some places (from Korea, at times answered in Seattle at tens of kilobytes a second),
+ * and the browser does not keep it between visits: a page can show it is getting somewhere.
+ */
+export function onJavaDownload(listener) {
+  downloadListeners.add(listener);
+  if (download) listener(download);
+  return () => downloadListeners.delete(listener);
+}
+
 function loadScript(src) {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) return resolve();
@@ -111,6 +127,10 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
     await window.cheerpjInit({
       version: 17,
       preloadResources: preload,
+      preloadProgress: (done, total) => {
+        download = { done, total };
+        for (const listener of downloadListeners) listener(download);
+      },
       clipboardMode: 'system',
       javaProperties: [
         // JOGL (OpenRocket's OpenGL library, for its photo studio) only knows real CPU types, not
