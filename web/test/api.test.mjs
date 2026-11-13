@@ -5,51 +5,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ApiError, designsApi, flightsApi, motorsApi } from '../base44/shared/api.js';
 import { readDesign, sealer } from '../base44/shared/sealed.js';
-
-/** Base44-like entity tables: equality filters (an array field matches any element, an array value means any of). */
-function fakeDb() {
-  let clock = Date.parse('2026-01-01T00:00:00Z');
-  const now = () => new Date((clock += 1000)).toISOString(); // every write a second later
-  const table = () => {
-    const rows = new Map();
-    const matches = (r, query) => Object.entries(query).every(([k, v]) => {
-      const have = Array.isArray(r[k]) ? r[k] : [r[k]];
-      const want = Array.isArray(v) ? v : [v];
-      return have.some((x) => want.includes(x));
-    });
-    return {
-      rows,
-      async filter(query, sort = '-created_date', limit = 5000) {
-        const field = sort.replace(/^-/, '');
-        const dir = sort.startsWith('-') ? -1 : 1;
-        return [...rows.values()].filter((r) => matches(r, query))
-          .sort((a, b) => (a[field] < b[field] ? -dir : a[field] > b[field] ? dir : 0)).slice(0, limit).map((r) => ({ ...r }));
-      },
-      async list(sort, limit) {
-        return this.filter({}, sort, limit);
-      },
-      async get(id) {
-        if (!rows.has(id)) throw new Error('not found');
-        return { ...rows.get(id) };
-      },
-      async create(data) {
-        const at = now();
-        const r = { ...data, id: crypto.randomUUID(), created_date: at, updated_date: at };
-        rows.set(r.id, r);
-        return { ...r };
-      },
-      async update(id, data) {
-        rows.set(id, { ...rows.get(id), ...data, updated_date: now() });
-        return { ...rows.get(id) };
-      },
-      async delete(id) {
-        rows.delete(id);
-      },
-    };
-  };
-  const User = table();
-  return { Design: table(), Motor: table(), SavedFlight: table(), User };
-}
+import { fakeDb, MAX_RECORD } from './fake-base44.mjs';
 
 /** People with Base44 accounts (User records, as Base44 keeps them), and what each may call. */
 function setup() {
@@ -160,7 +116,7 @@ test('stored records hold no names, emails, design names or motor files in the c
   const d = await mina.designs({ action: 'create', name: 'Secret glider' });
   await mina.designs({ action: 'share', id: d.id, members: [{ email: 'joon@example.com', role: 'editor' }] });
   await mina.motors({ action: 'add', filename: 'hush.eng', content: 'H128 29 194 0 0.1 0.2 Hushed\n0.1 50\n', summary: '[]' });
-  const stored = JSON.stringify([...db.Design.rows.values(), ...db.Motor.rows.values()]);
+  const stored = JSON.stringify([...db.Design.rows.values(), ...db.Motor.rows.values(), ...db.SealedPart.rows.values()]);
   for (const plain of ['example.com', 'mina', 'Mina Park', 'joon', 'Secret glider', 'hush', 'H128', 'Hushed']) {
     assert.ok(!stored.includes(plain), `found "${plain}" in stored records`);
   }
@@ -195,7 +151,7 @@ test('launch plans: each person lists, opens, saves over, renames and deletes on
 test('stored launch plans hold no names, emails, places or results in the clear', async () => {
   const { db, mina } = setup();
   await mina.flights({ action: 'create', ...PLAN });
-  const stored = JSON.stringify([...db.SavedFlight.rows.values()]);
+  const stored = JSON.stringify([...db.SavedFlight.rows.values(), ...db.SealedPart.rows.values()]);
   for (const plain of ['example.com', 'mina', 'Saturday', 'Secret glider', 'room-1', '2026-03-07', 'Lands', PLAN.data]) {
     assert.ok(!stored.includes(plain), `found "${plain}" in stored records`);
   }
@@ -259,4 +215,44 @@ test('a design\'s drawing: kept sealed; a viewer may only fill in a missing one;
   assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, '', 'an empty rocket');
   assert.deepEqual(await mina.designs({ action: 'preview', id: d.id, preview: '<svg onload=alert(1)>' }), { kept: false });
   assert.ok(!JSON.stringify([...db.Design.rows.values()]).includes('380'), 'the drawing is not stored in the clear');
+});
+
+const noise = (n) => Buffer.from(crypto.getRandomValues(new Uint8Array(n))).toString('base64').slice(0, n);
+
+test('the stand-in refuses records over Base44\'s size, as Base44 does', async () => {
+  const db = fakeDb();
+  await assert.rejects(db.SavedFlight.create({ sealed: noise(MAX_RECORD + 10) }), /too large/);
+});
+
+test('big values are kept in parts: a big launch plan, motor file and drawing save, open, and clean up', async () => {
+  const { db, mina, joon } = setup();
+  const data = noise(60_000); // a plan of many flights (incompressible, the worst case)
+  const f = await mina.flights({ action: 'create', ...PLAN, data });
+  assert.equal((await mina.flights({ action: 'get', id: f.id })).data, data);
+  assert.ok(db.SealedPart.rows.size >= 5, `${db.SealedPart.rows.size} parts`);
+  for (const r of [...db.SavedFlight.rows.values(), ...db.SealedPart.rows.values()]) assert.ok(JSON.stringify(r).length < MAX_RECORD);
+  // Saving over it replaces its parts; deleting it removes them.
+  const data2 = noise(40_000);
+  await mina.flights({ action: 'update', id: f.id, data: data2 });
+  assert.equal((await mina.flights({ action: 'list' }))[0].data, data2);
+  const partsNow = db.SealedPart.rows.size;
+  assert.ok(partsNow >= 4 && partsNow < 9, `old parts removed (${partsNow} left)`);
+  await mina.flights({ action: 'delete', id: f.id });
+  assert.equal(db.SealedPart.rows.size, 0, 'no parts left behind');
+
+  const rse = `<engine-database><engine code="X">${'<eng-data t="0.1" f="10.0" m="0.1"/>'.repeat(4000)}</engine></engine-database>`;
+  const m = await mina.motors({ action: 'add', filename: 'big.rse', content: rse, summary: '[]' });
+  assert.equal((await mina.motors({ action: 'list' }))[0].content, rse);
+  const d = await mina.designs({ action: 'create', name: 'Detailed' });
+  await mina.designs({ action: 'share', id: d.id, members: [{ email: 'joon@example.com', role: 'viewer' }] });
+  const shared = await joon.designs({ action: 'motors', id: d.id });
+  assert.deepEqual(shared.map((f) => [f.name.slice(9), f.content === rse]), [['big.rse', true]], 'a member gets the owner\'s big motor file whole');
+  const shapes = Array.from({ length: 1500 }, (_, i) => ({ d: `M ${i} 0 L ${i + 1} ${(i * 7) % 40} L ${i + 2} 3 Z` }));
+  const drawing = JSON.stringify({ v: 1, box: [0, -20, 1600, 60], s: shapes });
+  assert.ok(drawing.length > MAX_RECORD);
+  assert.deepEqual(await mina.designs({ action: 'preview', id: d.id, preview: drawing }), { kept: true });
+  assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, drawing);
+  await mina.motors({ action: 'delete', id: m.id });
+  await mina.designs({ action: 'delete', id: d.id });
+  assert.equal(db.SealedPart.rows.size, 0);
 });

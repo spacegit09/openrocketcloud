@@ -17,6 +17,8 @@ function toBase64(bytes) {
 
 const fromBase64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
+const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+
 /** Sealing with one key (DATA_KEY: 32 random bytes, base64): lookupKey, seal and open. */
 export function sealer(secret) {
   let raw = null;
@@ -43,22 +45,31 @@ export function sealer(secret) {
       const sig = new Uint8Array(await crypto.subtle.sign('HMAC', mac, enc.encode(String(email).trim().toLowerCase())));
       return toBase64(sig).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     },
-    /** Encrypts any JSON value. */
+    /**
+     * Encrypts any JSON value: "v1." and the encrypted JSON, or for more than a kilobyte, "v2." and
+     * it compressed (gzip) first, which makes flight data and files several times smaller.
+     */
     async seal(value) {
       const { aes } = await keys;
+      let plain = enc.encode(JSON.stringify(value));
+      const packed = plain.length > 1024;
+      if (packed) plain = await pipe(plain, new CompressionStream('gzip'));
       const iv = crypto.getRandomValues(new Uint8Array(12));
-      const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, enc.encode(JSON.stringify(value))));
+      const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aes, plain));
       const out = new Uint8Array(iv.length + data.length);
       out.set(iv);
       out.set(data, iv.length);
-      return `v1.${toBase64(out)}`;
+      return `${packed ? 'v2' : 'v1'}.${toBase64(out)}`;
     },
     /** Decrypts what seal() produced; throws if it was altered or sealed with another key. */
     async open(sealed) {
       const { aes } = await keys;
-      if (!String(sealed).startsWith('v1.')) throw new Error('Not sealed data.');
-      const bytes = fromBase64(String(sealed).slice(3));
-      const data = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.subarray(0, 12) }, aes, bytes.subarray(12));
+      const text = String(sealed);
+      const packed = text.startsWith('v2.');
+      if (!packed && !text.startsWith('v1.')) throw new Error('Not sealed data.');
+      const bytes = fromBase64(text.slice(3));
+      let data = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.subarray(0, 12) }, aes, bytes.subarray(12)));
+      if (packed) data = await pipe(data, new DecompressionStream('gzip'));
       return JSON.parse(dec.decode(data));
     },
   };

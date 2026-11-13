@@ -5,40 +5,7 @@ import test from 'node:test';
 import { ApiError } from '../base44/shared/api.js';
 import { logbooksApi } from '../base44/shared/logbooks.js';
 import { sealer } from '../base44/shared/sealed.js';
-
-function fakeDb() {
-  let clock = Date.parse('2026-01-01T00:00:00Z');
-  const now = () => new Date((clock += 1000)).toISOString();
-  const rows = new Map();
-  const matches = (r, q) => Object.entries(q).every(([k, v]) => (Array.isArray(r[k]) ? r[k] : [r[k]]).some((x) => (Array.isArray(v) ? v : [v]).includes(x)));
-  return {
-    Logbook: {
-      rows,
-      async filter(q, sort = '-created_date', limit = 500) {
-        const f = sort.replace(/^-/, '');
-        const d = sort.startsWith('-') ? -1 : 1;
-        return [...rows.values()].filter((r) => matches(r, q)).sort((a, b) => (a[f] < b[f] ? -d : a[f] > b[f] ? d : 0)).slice(0, limit).map((r) => ({ ...r }));
-      },
-      async get(id) {
-        if (!rows.has(id)) throw new Error('not found');
-        return { ...rows.get(id) };
-      },
-      async create(data) {
-        const at = now();
-        const r = { ...data, id: crypto.randomUUID().replace(/-/g, '').slice(0, 24), created_date: at, updated_date: at };
-        rows.set(r.id, r);
-        return { ...r };
-      },
-      async update(id, data) {
-        rows.set(id, { ...rows.get(id), ...data, updated_date: now() });
-        return { ...rows.get(id) };
-      },
-      async delete(id) {
-        rows.delete(id);
-      },
-    },
-  };
-}
+import { fakeDb, MAX_RECORD } from './fake-base44.mjs';
 
 function setup() {
   const db = fakeDb();
@@ -46,12 +13,12 @@ function setup() {
   const signed = [];
   const files = { sign: async (uri) => (signed.push(uri), `https://files.example/${encodeURIComponent(uri)}?sig=1`) };
   const as = (email, name) => (body) => logbooksApi({ db, s, me: { id: `id-${email}`, email, name }, files }, body);
-  return { db, signed, mina: as('mina@example.com', 'Mina Park'), joon: as('joon@example.com', 'Joon Lee'), sora: as('sora@example.com', 'Sora Kim') };
+  return { db, s, signed, mina: as('mina@example.com', 'Mina Park'), joon: as('joon@example.com', 'Joon Lee'), sora: as('sora@example.com', 'Sora Kim') };
 }
 
 const refused = (status) => (e) => e instanceof ApiError && e.status === status;
 const DATA = { name: 'Altimeter', source: 'entered', time: 's', columns: [{ q: 'altitude', unit: 'm' }, { q: 'velocity', unit: 'm/s' }], rows: [[0, 0, 0], [1, 60, 80], [2, 110, 30], [3, 105, -10]] };
-const PHOTO = { kind: 'photo', file_uri: 'private/u1/7f3a.jpg', name: 'liftoff.jpg', type: 'image/jpeg', size: 812345, w: 4000, h: 3000, preview: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==' };
+const PHOTO = { kind: 'photo', file_uri: 'private/u1/7f3a.jpg', name: 'liftoff.jpg', type: 'image/jpeg', size: 812345, w: 4000, h: 3000, preview: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==', thumb: 'data:image/jpeg;base64,/9j/thumbAAA=' };
 
 test('the owner makes a logbook, fills it in, and lists it; others see nothing', async () => {
   const { mina, joon } = setup();
@@ -104,7 +71,7 @@ test('photos and videos: recorded with previews, captions, links for everyone sh
   assert.deepEqual([m.kind, m.name, m.preview], ['photo', 'liftoff.jpg', PHOTO.preview]);
   await mina({ action: 'addMedia', id: b.id, item: { kind: 'video', file_uri: 'private/u1/v.mp4', name: 'flight.mp4', preview: '<script>' } });
   const [card] = await mina({ action: 'list' });
-  assert.deepEqual([card.photos, card.videos, card.cover], [1, 1, PHOTO.preview]);
+  assert.deepEqual([card.photos, card.videos, card.cover], [1, 1, PHOTO.thumb], 'the card shows the photo\'s thumbnail');
   assert.equal((await mina({ action: 'get', id: b.id })).media[1].preview, null, 'only image previews are kept');
   await mina({ action: 'updateMedia', id: b.id, mediaId: m.id, caption: 'Liftoff!' });
   await mina({ action: 'share', id: b.id, members: [{ email: 'joon@example.com', role: 'viewer' }] });
@@ -146,8 +113,49 @@ test('stored logbooks hold no names, emails, notes, data or files in the clear',
   await mina({ action: 'addDataset', id: b.id, dataset: { ...DATA, name: 'Telemetry' } });
   await mina({ action: 'addMedia', id: b.id, item: PHOTO });
   await mina({ action: 'share', id: b.id, members: [{ email: 'joon@example.com', role: 'editor' }] });
-  const stored = JSON.stringify([...db.Logbook.rows.values()]);
+  const stored = JSON.stringify([...db.Logbook.rows.values(), ...db.SealedPart.rows.values()]);
   for (const plain of ['example.com', 'mina', 'Mina Park', 'joon', 'Secret test', 'Hidden Valley', 'CATO', 'Telemetry', 'altitude', 'liftoff', '7f3a', '/9j/']) {
     assert.ok(!stored.includes(plain), `found "${plain}" in stored records`);
   }
+});
+
+test('a big altimeter file (5,560 rows, as an Altimeter Two logs) saves, reads back, and cleans up', async () => {
+  const { db, mina } = setup();
+  const b = await mina({ action: 'create', title: 'Big data' });
+  const rows = Array.from({ length: 5560 }, (_, i) => [Math.round((0.005055 + i * 0.006454) * 1e6) / 1e6, Math.round(300 * Math.sin(i / 3500) * 100) / 100]);
+  const added = await mina({ action: 'addDataset', id: b.id, dataset: { name: 'Altimeter', time: 's', columns: [{ q: 'altitude', unit: 'ft' }], rows } });
+  assert.equal(added.datasets[0].count, 5560);
+  assert.deepEqual((await mina({ action: 'get', id: b.id })).datasets[0].rows, rows);
+  for (const r of [...db.Logbook.rows.values(), ...db.SealedPart.rows.values()]) assert.ok(JSON.stringify(r).length < MAX_RECORD);
+  // A second one, photos with big previews, and a long note: the record itself stays small.
+  await mina({ action: 'addDataset', id: b.id, dataset: { name: 'Again', time: 's', columns: [{ q: 'altitude', unit: 'ft' }], rows } });
+  const bytes = new Uint8Array(150_000);
+  for (let i = 0; i < bytes.length; i += 65_536) crypto.getRandomValues(bytes.subarray(i, i + 65_536));
+  const big = `data:image/jpeg;base64,${Buffer.from(bytes).toString('base64')}`;
+  for (let i = 0; i < 3; i++) await mina({ action: 'addMedia', id: b.id, item: { ...PHOTO, preview: big } });
+  await mina({ action: 'update', id: b.id, notes: 'x'.repeat(19_000), description: 'y'.repeat(19_000) });
+  const got = await mina({ action: 'get', id: b.id });
+  assert.equal(got.datasets.length, 2);
+  assert.ok(got.media.every((m) => m.preview === big));
+  assert.equal(got.notes.length, 19_000);
+  assert.equal((await mina({ action: 'list' }))[0].cover, PHOTO.thumb, 'the card shows the small thumbnail');
+  await mina({ action: 'removeDataset', id: b.id, datasetId: got.datasets[0].id });
+  await mina({ action: 'removeMedia', id: b.id, mediaId: got.media[0].id });
+  await mina({ action: 'delete', id: b.id });
+  assert.equal(db.SealedPart.rows.size, 0, 'nothing left behind');
+});
+
+test('a logbook saved before data sets were kept on their own still opens', async () => {
+  const { db, s, mina } = setup();
+  const b = await mina({ action: 'create', title: 'Old layout' });
+  const r = db.Logbook.rows.get(b.id);
+  const meta = await s.open(r.sealed);
+  meta.datasets = [{ id: 'old1', name: 'Old', source: 'entered', time: 's', offset: 0, columns: [{ q: 'altitude', unit: 'm', name: '' }], count: 2 }];
+  meta.media = [{ id: 'm1', kind: 'photo', file_uri: 'private/x.jpg', name: 'old.jpg', caption: '' }];
+  db.Logbook.rows.set(b.id, { ...r, sealed: await s.seal(meta), sealed_data: await s.seal({ rows: { old1: [[0, 0], [1, 9]] }, previews: { m1: PHOTO.preview } }) });
+  const got = await mina({ action: 'get', id: b.id });
+  assert.deepEqual(got.datasets[0].rows, [[0, 0], [1, 9]]);
+  assert.equal(got.media[0].preview, PHOTO.preview);
+  const added = await mina({ action: 'addDataset', id: b.id, dataset: DATA });
+  assert.deepEqual(added.datasets.map((d) => d.rows.length), [2, 4], 'old and new together');
 });
