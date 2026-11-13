@@ -1,6 +1,6 @@
-// Transition schema while records move to sealed form (web/base44/functions/migrateSealed):
-// the sealed fields beside the old plain ones, access rules as before. The final schema, with
-// only the sealed fields and closed to direct access, is web/migration/entities/Motor.jsonc.
+// A custom motor file (.eng RASP or .rse RockSim), sealed (web/base44/shared/sealed.js). OpenRocket
+// gets the motors of everyone a design is shared with; the site reaches them only through the
+// motors function, the room as the service role.
 {
   "name": "Motor",
   "type": "object",
@@ -17,34 +17,15 @@
     "sealed": {
       "type": "string",
       "description": "Encrypted file name, contents and summary (AES-256-GCM with the app's DATA_KEY secret)"
-    },
-    "owner_email": {
-      "type": "string"
-    },
-    "filename": {
-      "type": "string",
-      "maxLength": 200
-    },
-    "content": {
-      "type": "string"
-    },
-    "summary": {
-      "type": "string"
     }
   },
-  "required": [],
+  "required": [
+    "sealed"
+  ],
   "rls": {
-    "create": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "read": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "update": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "delete": {
-      "data.owner_email": "{{user.email}}"
-    }
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
   }
 }

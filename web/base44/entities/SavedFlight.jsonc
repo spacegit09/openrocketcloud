@@ -1,6 +1,6 @@
-// Transition schema while records move to sealed form (web/base44/functions/migrateSealed):
-// the sealed fields beside the old plain ones, access rules as before. The final schema, with
-// only the sealed fields and closed to direct access, is web/migration/entities/SavedFlight.jsonc.
+// A Launch Planner study someone saved (its settings, the forecast it flew in and its results,
+// packed: see web/src/flight/saved.js), sealed (web/base44/shared/sealed.js). Only its owner sees
+// it, through the flights function.
 {
   "name": "SavedFlight",
   "type": "object",
@@ -17,45 +17,15 @@
     "sealed": {
       "type": "string",
       "description": "Encrypted name, design, launch time, summary and study (AES-256-GCM with the app's DATA_KEY secret)"
-    },
-    "owner_email": {
-      "type": "string"
-    },
-    "name": {
-      "type": "string",
-      "maxLength": 200
-    },
-    "design_id": {
-      "type": "string"
-    },
-    "design_name": {
-      "type": "string"
-    },
-    "launch_time": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "summary": {
-      "type": "string",
-      "maxLength": 500
-    },
-    "data": {
-      "type": "string"
     }
   },
-  "required": [],
+  "required": [
+    "sealed"
+  ],
   "rls": {
-    "create": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "read": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "update": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "delete": {
-      "data.owner_email": "{{user.email}}"
-    }
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
   }
 }
