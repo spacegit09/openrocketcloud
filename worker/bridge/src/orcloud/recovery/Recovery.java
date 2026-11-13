@@ -29,7 +29,7 @@ import info.openrocket.core.startup.Application;
 import info.openrocket.core.unit.CaliberUnit;
 
 /**
- * The recovery and ballast helpers' sums (Tools > Recovery & ballast in the browser version): the
+ * The recovery and ballast helpers' sums (Tools > Recovery and Tools > Ballast in the browser version): the
  * size of parachute for a descent rate, the black powder for an ejection charge and how many shear
  * pins it breaks, and the nose weight for a stability margin; each from the design as OpenRocket
  * sees it.
