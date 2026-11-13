@@ -287,6 +287,27 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   rocket figure. Drag to turn the rocket, right-drag to move the light, scroll to zoom; click a part
   to select it (shift-click adds to the selection, reaching past parts already selected), and
   double-click to edit it.
+- **Recovery & ballast** (browser version): *Tools → Recovery & ballast…* works from the design.
+  *Parachute*: the diameter that brings it down at a chosen rate (5 m/s under a main, about 25 m/s
+  under a drogue), counting what it brings down (its stage after burnout, with the parachute at that
+  size), the other recovery devices open with it and the air at the landing site, with the landing
+  energy (competitions limit each section to 75 ft·lbf); *Set* changes the parachute. *Ejection
+  charge*: the black powder for the bay around a parachute (between the bulkheads, rings and
+  shoulders in its tube or reaching into it; a coupler with no bulkhead counts as open) at a
+  pressure, from the ideal gas law every online charge calculator uses, allowing for how full the
+  parachute packs the bay: T. Fetter's ground tests ("Using Black Powder for Parachute Deployment",
+  NARCON 2025) found a parachute filling it soaks up so much of the charge's heat that it needs about
+  twice the usual sum, so that is the default. It shows the push on the bulkhead and the shear pins
+  it breaks with a 2× margin (or the pressure that does), taking 2-56 and 4-40 nylon pins at 31 and
+  50 lbf as the other calculators do. *Nose
+  weight*: the weight at a point in the nose that gives every motor configuration at least the
+  stability wanted, as the design view measures it and with OpenRocket's own mass calculation (so a
+  stage whose mass is overridden keeps its mass while the weight moves its centre of gravity); *Add*
+  puts it in the nose as a mass component named "Nose weight", changed or taken out the same way.
+  Each change can be undone. `RecoveryCheck` sizes the examples' parachutes and checks OpenRocket's
+  simulation lands them at the rate asked for, that the nose weight gives the stability asked
+  for exactly, with and without overridden masses, and that the charge for each of Fetter's tested
+  bays is at least what separated it and at most twice what ejected it hard.
 - **3D models** (browser version): *Tools → Import 3D model (STL)…* turns a 3D-printed part into
   mass and balance. An STL file is only a surface, so you tell it the file's units, which axis runs
   along the rocket and which end faces the nose, the material, and how it was made (printed walls

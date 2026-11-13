@@ -27,6 +27,7 @@ import orcloud.web.FinProfiles;
 import orcloud.web.MenuRow;
 import orcloud.web.ModelTab;
 import orcloud.web.Preview;
+import orcloud.web.RecoveryHelpers;
 import orcloud.web.SettingsMenu;
 import orcloud.web.StlImport;
 import orcloud.web.Warmup;
@@ -167,6 +168,12 @@ public final class WebMain {
 			ModelTab.install(doc);
 		} catch (Exception e) {
 			Log.warn("3D model import unavailable: " + e);
+		}
+		// Tools > Recovery & ballast: parachute size, ejection charge and shear pins, nose weight.
+		try {
+			RecoveryHelpers.install(frame, OrDoc.documentOf(frame));
+		} catch (Exception e) {
+			Log.warn("Recovery helpers unavailable: " + e);
 		}
 		// Fin cross sections in 3D (OBJ) export, chosen in its options.
 		FinProfiles.install();
