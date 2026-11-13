@@ -115,7 +115,7 @@ and live sharing. Nothing runs on your own computer or server.
   its GEFS ensemble (both public domain) through the `gfsWinds` backend function, which reads a
   small area from NOMADS and decodes it (`grib2.js`); the ensemble's files have few heights, so
   each member's wind is the GFS wind shifted at every height by that member's difference from the
-  members' average (`ensembleWinds`). Saved flights are SavedFlight records (gzip-compressed,
+  members' average (`ensembleWinds`). Saved launch plans are SavedFlight records (gzip-compressed,
   about 10 KB for 500 flights); ground heights from the Terrain Tiles on AWS Open Data; the map is
   CesiumJS with Esri World Imagery (set `VITE_ARCGIS_API_KEY` in `web/.env` to your ArcGIS
   Location Platform key, restricted to your site's addresses).
@@ -309,7 +309,9 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   example when choosing a decal image).
 - **Launch Planner** (browser version; *Launch planner* on the dashboard, *Plan a launch* in a
   design's ⋯ menu, or the target button in a design's header): a real-life launch simulation.
-  Choose a design and one of its simulations, the launch site (click the map) and time (up to 16
+  *Launch planner* opens on your launch plans, as cards like the dashboard's designs, each with a
+  picture of the plan from above (the pad, the flight's track and where its flights landed); open
+  one, rename or delete it, or start a **New launch plan**. Choose a design and one of its simulations, the launch site (click the map) and time (up to 16
   days ahead), and the rail; the planner flies it hundreds of times in NOAA's forecast winds for
   that place and time, varying the motor, drag, mass, parachutes, rail aim and ejection delay, and
   shows on a satellite map where 50%, 95% and 99% of flights land, with the launch direction (the
@@ -317,9 +319,9 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   GEFS, the default): each flight flies in one of NOAA's 31 forecasts run from slightly different
   starting points, so the landing area is as wide as the weather is uncertain that day; or the
   **forecast with a fixed spread** (NOAA GFS with its speed and direction varied by set amounts),
-  the same margin every day. Landings meet the real ground. **Save this flight** keeps a study
-  (settings, forecast and results) to open again later from *Saved flights*, or by its link; only
-  you see your saved flights. Single-stage rockets only for now; predictions, not a substitute for
+  the same margin every day. Landings meet the real ground. **Save this launch plan** keeps a
+  study (settings, forecast and results) among your launch plans, to open again later, or by its
+  link; only you see your launch plans. Single-stage rockets only for now; predictions, not a substitute for
   the range safety officer.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.

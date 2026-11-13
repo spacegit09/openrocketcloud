@@ -68,8 +68,8 @@ button:hover, .btn:hover { background: var(--surface-2); text-decoration: none; 
 button:disabled { opacity: 0.55; cursor: default; }
 button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 button.primary:hover, .btn.primary:hover { background: var(--accent-hover); }
-button.ghost { border-color: transparent; background: transparent; }
-button.ghost:hover { background: var(--surface-2); }
+button.ghost, .btn.ghost { border-color: transparent; background: transparent; }
+button.ghost:hover, .btn.ghost:hover { background: var(--surface-2); }
 button.danger { color: var(--danger); }
 button.icon { padding: 6px; }
 input, select {
@@ -143,7 +143,11 @@ svg.i { width: 16px; height: 16px; flex: none; }
 .card .thumb { border-radius: var(--radius) var(--radius) 0 0; height: 92px; background: linear-gradient(135deg, var(--accent-soft), var(--surface-2)); display: grid; place-items: center; color: var(--accent); cursor: pointer; }
 .card .thumb svg { width: 150px; height: 40px; }
 .card .thumb svg.preview { width: 100%; height: 100%; padding: 14px 20px; box-sizing: border-box; stroke-width: 1.2px; stroke-linejoin: round; stroke-linecap: round; }
+.card .thumb svg.plan-preview { width: 100%; height: 100%; }
+.card .thumb.plan-thumb svg.i { width: 28px; height: 28px; }
 .card .body { padding: 12px 14px 8px; flex: 1; cursor: pointer; }
+.card .plan-summary { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .foot > .hint { padding-left: 6px; }
 .card h3 { margin: 0 0 4px; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .meta { color: var(--muted); font-size: 12.5px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .card .foot { display: flex; align-items: center; gap: 4px; padding: 6px 8px 8px; border-top: 1px solid var(--border); }
@@ -292,7 +296,8 @@ body.menu-row #screen { margin-top: -44px; }
 
 /* ---------- launch planner */
 body.planner-page { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.topbar .crumb { color: var(--muted); font-weight: 600; padding-left: 12px; border-left: 1px solid var(--border); }
+.topbar .crumb { color: var(--muted); font-weight: 600; padding-left: 12px; border-left: 1px solid var(--border); text-decoration: none; }
+a.crumb:hover { color: var(--text); text-decoration: none; }
 .planner { flex: 1; min-height: 0; display: grid; grid-template-columns: 390px 1fr; }
 .plan-panel { overflow-y: auto; padding: 16px 18px 24px; border-right: 1px solid var(--border); background: var(--surface); display: grid; gap: 14px; align-content: start; }
 .plan-intro { margin: 0; color: var(--muted); font-size: 13px; }
