@@ -32,9 +32,10 @@ docker run --rm -e ORC_VNC_PASSWORD=test -e SELFTEST_DUMP=/fx \
 mkdir -p "$cache/flight"
 docker run --rm -v "$PWD/$cache/flight:/fx" -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
   java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.flight.FlightCheck /fx 2>&1 | grep -E "^(FLIGHTCHECK|  skip)"'
-# The access rules for designs, motors and launch plans (and the room's access lists), and their sealing.
+# The access rules for designs, motors, launch plans and logbooks (and the room's access lists), their
+# sealing, and the logbook's data format, imports and graphs.
 node --test web/test/flight.test.mjs web/test/gfs.test.mjs web/test/forecast.test.mjs web/test/room.test.mjs web/test/room-lookups.test.mjs \
-  web/test/api.test.mjs web/test/sealed.test.mjs
+  web/test/api.test.mjs web/test/sealed.test.mjs web/test/logbook.test.mjs web/test/logbook-api.test.mjs
 
 # Fins with their cross sections and root fillets (3D export): closed solids, as thick as the fin,
 # with the volume each profile gives; fillets tangent to fin and body, with OpenRocket's cross section.

@@ -1,0 +1,145 @@
+/* The flight logbook (logbook.html, src/logbook.js). */
+
+/* ---------- cards */
+.lb-thumb { overflow: hidden; }
+.card .thumb.lb-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card .thumb.lb-thumb svg.i { width: 28px; height: 28px; }
+svg.lb-spark { width: 100%; height: 100%; padding: 8px 10px; }
+svg.lb-spark .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+svg.lb-spark .fill { fill: var(--accent); opacity: 0.12; }
+
+/* ---------- a logbook */
+.page.lb { max-width: 1180px; display: grid; gap: 16px; }
+.lb-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lb-head .lb-title { font-size: 21px; font-weight: 700; margin: 0; flex: 1 1 280px; min-width: 0; }
+.lb-head h2.lb-title { flex: 0 1 auto; }
+.lb-head input.lb-title { border-color: transparent; background: transparent; padding: 4px 8px; margin-left: -8px; }
+.lb-head input.lb-title:hover, .lb-head input.lb-title:focus { border-color: var(--border); background: var(--surface); }
+.lb-save { min-width: 70px; text-align: right; }
+.lb-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.lb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px 16px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.lb-card h3 { margin: 0; font-size: 15px; }
+.lb-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.lb-field { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.lb-field > input, .lb-field > select, .lb-field > textarea { width: 100%; }
+.lb-fields .lb-location, .lb-fields .lb-weather { grid-column: span 2; }
+textarea {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 10px; resize: vertical; min-height: 64px;
+}
+textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+textarea.mono, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+input[readonly], textarea[readonly], .lb-card select:disabled { background: var(--surface-2); opacity: 1; color: var(--text); }
+.lb-sec-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- data sets, graphs */
+.lb-datasets { display: grid; gap: 2px; }
+.lb-dataset { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius-sm); }
+.lb-dataset:hover { background: var(--surface-2); }
+.lb-dataset.off .grow { opacity: 0.5; }
+.lb-dataset .grow { flex: 1; min-width: 0; }
+.lb-dataset .name { font-weight: 600; }
+.lb-dataset .sub { color: var(--muted); font-size: 12.5px; }
+.lb-offset { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.lb-offset input { width: 76px; padding: 4px 6px; }
+.lb-charts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.lb-charts.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lb-chart { margin: 0; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px 10px; background: var(--surface); }
+.lb-chart-frame { position: relative; }
+.lb-chart svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; }
+.lb-chart .grid line { stroke: var(--border); stroke-width: 1; }
+.lb-chart .grid line.v { stroke-dasharray: 2 3; }
+.lb-chart .zero { stroke: var(--muted); stroke-width: 1; }
+.lb-chart text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+.lb-chart .axis-title { fill: var(--text); font-size: 12px; font-weight: 600; }
+.lb-chart .cursor { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.lb-chart figcaption { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); padding: 4px 4px 0 56px; }
+.lb-chart figcaption i, .lb-readout i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+.lb-readout { position: absolute; top: 8px; display: grid; gap: 2px; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg); padding: 6px 9px; font-size: 12px; white-space: nowrap; z-index: 2; }
+.lb-stats summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.lb-stats table, .lb-preview, .lb-report table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 6px; }
+.lb-stats th, .lb-stats td, .lb-preview th, .lb-preview td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.lb-stats th, .lb-preview th { color: var(--muted); font-weight: 600; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; }
+
+/* ---------- dialogs */
+.lb-dialog .content { display: grid; gap: 14px; max-height: min(72vh, 760px); overflow-y: auto; }
+.lb-step { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+.lb-step h4 { margin: 0; font-size: 13.5px; }
+.lb-col { display: flex; align-items: center; gap: 8px; }
+.lb-col label.check { min-width: 230px; }
+.lb-col input:not([type="checkbox"]) { flex: 1; }
+.lb-col input.unit { flex: 0 0 120px; }
+label.check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text); }
+label.check input { width: auto; }
+.lb-cols, .lb-custom { display: grid; gap: 6px; }
+.lb-format { display: grid; gap: 6px; }
+.lb-order { margin: 0; padding: 8px 12px 8px 32px; background: var(--accent-soft); border-radius: var(--radius-sm); display: grid; gap: 2px; font-weight: 600; }
+.lb-order li::marker { color: var(--accent); }
+.lb-example { display: grid; gap: 2px; }
+.lb-example pre { margin: 0; padding: 8px 10px; background: var(--surface-2); border-radius: var(--radius-sm); overflow-x: auto; }
+.lb-result .ok { color: var(--ok); margin: 0; }
+.lb-result .error ul { margin: 4px 0 0; padding-left: 18px; }
+.lb-preview { max-width: 100%; display: block; overflow-x: auto; }
+.lb-types { display: grid; gap: 8px; }
+.lb-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 4px 12px; margin-top: 6px; }
+.lb-types details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+button.link { color: var(--accent); padding: 2px 0; justify-self: start; }
+
+/* ---------- photos and videos */
+.lb-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.lb-tile { margin: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); display: grid; }
+.lb-tile .lb-open { padding: 0; border: 0; border-radius: 0; position: relative; display: block; aspect-ratio: 4 / 3; background: var(--surface-2); width: 100%; }
+.lb-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lb-noprev { width: 100%; aspect-ratio: 4 / 3; display: grid; place-items: center; color: var(--muted); background: var(--surface-2); }
+.lb-noprev svg.i { width: 28px; height: 28px; }
+.lb-play { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 30px; text-shadow: 0 1px 6px rgb(0 0 0 / 60%); }
+.lb-tile figcaption { padding: 6px 8px 8px; display: grid; gap: 4px; min-width: 0; }
+.lb-tile figcaption input { width: 100%; padding: 4px 6px; }
+.lb-tile figcaption .row { gap: 4px; }
+.lb-tile figcaption .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-tile.uploading { opacity: 0.75; }
+.lb-caption { font-size: 13px; }
+.lb-viewer { display: grid; place-items: center; }
+.lb-viewer img, .lb-viewer video { max-width: 100%; max-height: 66vh; border-radius: var(--radius-sm); background: #000; }
+
+@media (max-width: 860px) {
+  .lb-top { grid-template-columns: 1fr; }
+  .lb-col label.check { min-width: 150px; }
+}
+@media (max-width: 520px) {
+  .lb-fields { grid-template-columns: 1fr; }
+  .lb-fields .lb-location, .lb-fields .lb-weather { grid-column: auto; }
+  .lb-offset span { display: none; }
+}
+
+/* ---------- the printed logbook (Export PDF) */
+.lb-report { display: none; }
+@media print {
+  @page { margin: 14mm 12mm; }
+  html, body { background: #fff !important; color: #111 !important; }
+  body > *:not(.lb-report) { display: none !important; }
+  .lb-report { display: block !important; color: #111; font-size: 11pt; }
+  .lb-report header { border-bottom: 2px solid #1e3a8a; margin-bottom: 10pt; }
+  .lb-report h1 { font-size: 20pt; margin: 0 0 2pt; }
+  .lb-report header p { margin: 0 0 6pt; color: #555; font-size: 9.5pt; }
+  .lb-report h2 { font-size: 13pt; color: #1e3a8a; margin: 14pt 0 6pt; break-after: avoid; }
+  .lb-report .r-details th { text-align: left; width: 25%; color: #555; font-weight: 600; padding: 3pt 6pt 3pt 0; vertical-align: top; }
+  .lb-report .r-details td { padding: 3pt 0; }
+  .lb-report .r-text { white-space: pre-wrap; margin: 0; line-height: 1.45; }
+  .lb-report .r-data th, .lb-report .r-data td, .lb-report .lb-stats th, .lb-report .lb-stats td { border-bottom: 1px solid #ddd; padding: 3pt 5pt; text-align: left; font-size: 9pt; }
+  .lb-report .r-chart { break-inside: avoid; margin: 10pt 0; }
+  .lb-report .lb-chart { border: 1px solid #ccc; }
+  .lb-report .lb-chart text { fill: #444; }
+  .lb-report .lb-chart .axis-title { fill: #111; }
+  .lb-report .lb-chart .grid line { stroke: #ddd; }
+  .lb-report .lb-chart figcaption { color: #333; }
+  .lb-report .lb-stats summary { display: none; }
+  .lb-report .r-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; }
+  .lb-report figure { margin: 0; break-inside: avoid; }
+  .lb-report .r-photo img { width: 100%; max-height: 95mm; object-fit: contain; background: #f4f4f4; }
+  .lb-report figcaption { font-size: 9pt; color: #444; margin-top: 2pt; }
+  .lb-report .r-videos figure { display: flex; gap: 8pt; align-items: center; margin-bottom: 6pt; }
+  .lb-report .r-videos img { width: 45mm; }
+  .lb-report section { break-inside: auto; }
+}
