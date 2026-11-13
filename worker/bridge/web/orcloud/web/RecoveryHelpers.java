@@ -51,40 +51,47 @@ import net.miginfocom.swing.MigLayout;
 import orcloud.recovery.Recovery;
 
 /**
- * Tools > Recovery & ballast (browser version): three helpers working from the design.
+ * Two windows of helpers working from the design (browser version), each with its own item in the
+ * Tools menu:
  * <ul>
- * <li>Parachute: the size of a parachute for a descent rate, from what it brings down (its stage
- * after burnout, the parachute at that size) and the other recovery devices open with it.</li>
- * <li>Ejection charge: the black powder for a bay (found in the design around its recovery device)
- * at a pressure, allowing for how full the parachute packs it, its push on the bulkhead, and the
- * shear pins it breaks.</li>
- * <li>Nose weight: the weight in the nose for a stability margin, for every motor configuration,
- * as the design view measures stability.</li>
+ * <li>Recovery, in two tabs. Parachute: the size of a parachute for a descent rate, from what it
+ * brings down (its stage after burnout, the parachute at that size) and the other recovery devices
+ * open with it. Ejection charge: the black powder for a bay (found in the design around its
+ * recovery device) at a pressure, allowing for how full the parachute packs it, its push on the
+ * bulkhead, and the shear pins it breaks.</li>
+ * <li>Ballast: the weight in the nose for a stability margin, for every motor configuration, as
+ * the design view measures stability.</li>
  * </ul>
  * See orcloud.recovery.Recovery for the sums.
  */
 public final class RecoveryHelpers {
-	public static final String TITLE = "Recovery & ballast";
+	/** The windows, by their titles (and their menu items'). */
+	public static final String RECOVERY = "Recovery", BALLAST = "Ballast";
 
 	private RecoveryHelpers() {
 	}
 
-	/** Adds the menu item to OpenRocket's Tools menu. */
+	/** Adds the menu items to OpenRocket's Tools menu. */
 	public static void install(BasicFrame frame, OpenRocketDocument doc) {
-		JMenuItem item = new JMenuItem(TITLE + "...");
-		item.addActionListener(e -> new HelperDialog(frame, doc).setVisible(true));
+		JMenuItem recovery = new JMenuItem(RECOVERY + "...");
+		recovery.addActionListener(e -> new HelperDialog(frame, doc, false).setVisible(true));
+		JMenuItem ballast = new JMenuItem(BALLAST + "...");
+		ballast.addActionListener(e -> new HelperDialog(frame, doc, true).setVisible(true));
 		JMenuBar bar = frame.getJMenuBar();
 		String tools = Application.getTranslator().get("main.menu.tools");
-		for (int i = 0; i < bar.getMenuCount(); i++) {
+		JMenu menu = null;
+		for (int i = 0; i < bar.getMenuCount() && menu == null; i++) {
 			JMenu m = bar.getMenu(i);
 			if (m != null && tools.equals(m.getText())) {
-				m.add(item);
-				return;
+				menu = m;
 			}
 		}
-		JMenu menu = new JMenu("Tools");
-		menu.add(item);
-		bar.add(menu);
+		if (menu == null) {
+			menu = new JMenu("Tools");
+			bar.add(menu);
+		}
+		menu.add(recovery);
+		menu.add(ballast);
 	}
 
 	private static String length(double m) {
@@ -131,8 +138,9 @@ public final class RecoveryHelpers {
 	private static final class HelperDialog extends JDialog {
 		private final OpenRocketDocument doc;
 		private final Rocket rocket;
-		/** What redraws each tab; only the one showing is worked out. */
+		/** What redraws each tab (or the one panel); only the one showing is worked out. */
 		private final List<Runnable> refreshers = new ArrayList<>();
+		/** The Recovery window's tabs; the Ballast window has one panel and none. */
 		private final JTabbedPane tabs = new JTabbedPane();
 		private boolean refreshing, pending;
 		/** Changes to the design come in bursts (a part's dialog, an undo): one redraw for each burst. */
@@ -146,16 +154,20 @@ public final class RecoveryHelpers {
 			}
 		};
 
-		HelperDialog(BasicFrame frame, OpenRocketDocument doc) {
-			super(frame, TITLE, false);
+		HelperDialog(BasicFrame frame, OpenRocketDocument doc, boolean ballast) {
+			super(frame, ballast ? BALLAST : RECOVERY, false);
 			this.doc = doc;
 			this.rocket = doc.getRocket();
-			tabs.addTab("Parachute", parachuteTab());
-			tabs.addTab("Ejection charge", ejectionTab());
-			tabs.addTab("Nose weight", noseWeightTab());
-			tabs.addChangeListener(e -> refresh());
+			JComponent body;
+			if (ballast) {
+				body = ballastPanel();
+			} else {
+				tabs.addTab("Parachute", parachuteTab());
+				tabs.addTab("Ejection charge", ejectionTab());
+				body = tabs;
+			}
 			JPanel pane = new JPanel(new MigLayout("fill, insets dialog", "[grow]", "[grow][]"));
-			pane.add(tabs, "grow, wrap");
+			pane.add(body, "grow, wrap");
 			JButton close = new JButton("Close");
 			close.addActionListener(e -> dispose());
 			pane.add(close, "right");
@@ -168,10 +180,16 @@ public final class RecoveryHelpers {
 				}
 			});
 			// Every tab filled in before sizing the window to them; then only the one showing.
-			for (int i = 0; i < refreshers.size(); i++) {
+			for (int i = 0; i < tabs.getTabCount(); i++) {
 				tabs.setSelectedIndex(i);
+				refresh();
 			}
-			tabs.setSelectedIndex(0);
+			if (tabs.getTabCount() > 0) {
+				tabs.setSelectedIndex(0);
+				tabs.addChangeListener(e -> refresh());
+			} else {
+				refresh();
+			}
 			// Enter takes a value typed in (no default button to close the window); Escape closes it.
 			GUIUtil.installEscapeCloseOperation(this);
 			setDefaultCloseOperation(DISPOSE_ON_CLOSE);
@@ -183,7 +201,7 @@ public final class RecoveryHelpers {
 			if (refreshing) {
 				return;
 			}
-			int tab = tabs.getSelectedIndex();
+			int tab = tabs.getTabCount() > 0 ? tabs.getSelectedIndex() : 0;
 			if (tab < 0 || tab >= refreshers.size()) {
 				return;
 			}
@@ -314,7 +332,7 @@ public final class RecoveryHelpers {
 			apply.addActionListener(e -> {
 				Parachute c = (Parachute) chute.getSelectedItem();
 				double d = (Double) apply.getClientProperty("diameter");
-				doc.addUndoPosition(TITLE + ": parachute size");
+				doc.addUndoPosition(RECOVERY + ": parachute size");
 				c.setDiameter(d);
 				if (Math.abs(c.getCD() - cd.getValue()) > 1e-9) {
 					c.setCD(cd.getValue());
@@ -564,9 +582,9 @@ public final class RecoveryHelpers {
 			return p;
 		}
 
-		// ---------------------------------------------------------------- nose weight
+		// ---------------------------------------------------------------- ballast (nose weight)
 
-		private JComponent noseWeightTab() {
+		private JComponent ballastPanel() {
 			JPanel p = new JPanel(new MigLayout("fill, gap rel unrel", "[][grow][]", "[][][][]para[grow][][]"));
 			// Looked up again each time: undo and redo put new copies of the parts in the design.
 			RocketComponent first = Recovery.noseOf(rocket);
@@ -632,7 +650,7 @@ public final class RecoveryHelpers {
 			apply.addActionListener(e -> {
 				double kg = (Double) apply.getClientProperty("weight");
 				RocketComponent nose = Recovery.noseOf(rocket);
-				doc.addUndoPosition(TITLE + ": nose weight");
+				doc.addUndoPosition(BALLAST + ": nose weight");
 				Recovery.setNoseWeight(nose, kg, Math.min(at.getValue(), nose.getLength()));
 			});
 			refreshers.add(() -> {

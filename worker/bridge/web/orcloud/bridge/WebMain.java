@@ -169,7 +169,7 @@ public final class WebMain {
 		} catch (Exception e) {
 			Log.warn("3D model import unavailable: " + e);
 		}
-		// Tools > Recovery & ballast: parachute size, ejection charge and shear pins, nose weight.
+		// Tools > Recovery (parachute size, ejection charge and shear pins) and Tools > Ballast (nose weight).
 		try {
 			RecoveryHelpers.install(frame, OrDoc.documentOf(frame));
 		} catch (Exception e) {
