@@ -34,7 +34,7 @@ try {
     if (!url.pathname.startsWith('/api/')) return req.continue();
     const json = (body) => req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname.endsWith('/entities/User/me')) return json(me);
-    if (url.pathname.endsWith('/entities/Design')) return json(designs);
+    if (url.pathname.endsWith('/functions/designs')) return json(designs);
     return json({});
   });
   await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle0' });

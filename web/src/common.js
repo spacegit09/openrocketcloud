@@ -1,5 +1,5 @@
 // Shared helpers for the dashboard and the design page.
-import { db } from './base44.js';
+import { api } from './base44.js';
 import { markUndone } from './lib/history.js';
 
 // OpenRocket's jars kept in this browser across visits and releases (public/sw.js).
@@ -162,11 +162,11 @@ export async function shareDialog(designId, me, onChange) {
 
   let design;
   const save = async (members) => {
-    design = await db.Design.update(designId, { members, member_emails: [design.owner_email, ...members.map((m) => m.email)] });
+    design = await api('designs', { action: 'share', id: designId, members });
     onChange?.(design);
   };
   const render = async () => {
-    design = await db.Design.get(designId);
+    design = await api('designs', { action: 'get', id: designId });
     const owner = design.owner_email === me.email;
     form.hidden = !owner;
     const people = [{ email: design.owner_email, name: design.owner_name, role: 'owner' }, ...(design.members ?? [])];

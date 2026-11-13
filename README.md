@@ -133,8 +133,24 @@ scripts/build-web-jars.sh       # OpenRocket-web.jar and orcloud-web.jar into we
 cd web && npm install
 base44 login
 base44 link --create --name "My OpenRocket"   # once per checkout
+base44 secrets set DATA_KEY=$(openssl rand -base64 32)   # once: seals personal data (keep a copy)
 base44 deploy --build --yes                   # site, actor, records, Google sign-in
 ```
+
+**Privacy in the Base44 dashboard.** Design names, owners and members, design drawings, custom
+motor files and saved launch plans are stored sealed: encrypted (AES-256-GCM) with the app's
+`DATA_KEY` secret by the app's backend functions (`designs`, `motors`, `flights`) and the
+live-share room, so the dashboard's Data pages show only ciphertext. Records are found by keyed
+fingerprints of email addresses, which cannot be turned back into addresses without the key, and
+are created by the service role, so their *Created by* is no one. The tables are closed to
+direct access from browsers; the functions check who may do what (`web/base44/shared/api.js`).
+Errors are logged without their messages, which could quote a record. Designs' contents and edit
+histories live in the room's actor storage, which the dashboard does not show. What the dashboard
+still shows is Base44's own: the *Users* page (each person's name and Google email, and so the user
+count), and logs of function calls by person. This keeps personal data out of sight of anyone
+browsing the dashboard; whoever controls the app's code and secrets could still deploy code that
+reads it. Keep a copy of `DATA_KEY` somewhere safe: Base44 cannot show it again, and without it the
+sealed records cannot be read.
 
 To try changes before deploying, run the design page on your computer:
 
@@ -396,9 +412,11 @@ worker/            OpenRocket session image
   bridge/test/     SelfTest: checks the sync model and STL import against real OpenRocket
   rootfs/          session entrypoint (Xvnc + openbox + OpenRocket), window manager config
 web/               browser version (Base44 project)
-  base44/          DesignRoom actor (room.js), Design and Motor records, sign-in settings
+  base44/          DesignRoom actor (room.js), sealed Design, Motor and SavedFlight records and
+                   the functions that reach them (shared/: sealing, access rules), sign-in settings
   src/             dashboard and design page (vanilla JS), .ork zip handling, CheerpJ start-up
-  test/            room tests, local stand-in for the actor, two-browser end-to-end test
+  test/            room tests, access rules and sealing, local stand-in for the actor,
+                   two-browser end-to-end test
 frontdoor/         optional Base44 sign-in site for the self-hosted server
 docs/              GitHub Pages: a guide to the code
 server/            Node 24 server (Express, ws, dockerode, SQLite)

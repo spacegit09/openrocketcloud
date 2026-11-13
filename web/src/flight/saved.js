@@ -1,7 +1,8 @@
-// Saved Launch Planner flights (SavedFlight records, which only their owner sees): a study packed
+// Saved Launch Planner flights (sealed SavedFlight records, reached through the flights function;
+// only their owner sees them): a study packed
 // small — its settings, the forecast it flew in, the nominal flight's path and every flight's
 // landing — so it can be shown again later without flying it again.
-import { db } from '../base44.js';
+import { api } from '../base44.js';
 import { packStudy, unpackStudy } from './study.js';
 
 async function gzipBase64(text) {
@@ -29,26 +30,26 @@ async function fields(study, summary) {
 }
 
 /** Saves a study under `name`; the record's summary line is `summary`. */
-export async function saveFlight(name, study, summary, me) {
-  return db.SavedFlight.create({ owner_email: me.email, name, ...(await fields(study, summary)) });
+export async function saveFlight(name, study, summary) {
+  return api('flights', { action: 'create', name, ...(await fields(study, summary)) });
 }
 
 /** Saves a study over a saved flight (`record`), keeping its name. */
 export async function updateFlight(record, study, summary) {
-  return db.SavedFlight.update(record.id, await fields(study, summary));
+  return api('flights', { action: 'update', id: record.id, ...(await fields(study, summary)) });
 }
 
 /** Your saved flights, the latest saved first. */
 export async function listFlights() {
-  return db.SavedFlight.list('-updated_date', 200);
+  return api('flights', { action: 'list' });
 }
 
 export async function openFlight(record) {
-  const r = typeof record === 'string' ? await db.SavedFlight.get(record) : record;
+  const r = typeof record === 'string' ? await api('flights', { action: 'get', id: record }).catch(() => null) : record;
   if (!r) throw new Error('That saved flight no longer exists.');
   return { record: r, study: unpackStudy(JSON.parse(await gunzipBase64(r.data))) };
 }
 
 export async function deleteFlight(id) {
-  return db.SavedFlight.delete(id);
+  return api('flights', { action: 'delete', id });
 }
