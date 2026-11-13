@@ -4,7 +4,7 @@ import './style.css';
 import { currentUser, db, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
-import { closeOpenRocket, editsSaved, previewSaved, prepareJava, startOpenRocket } from './java.js';
+import { closeOpenRocket, editsSaved, onJavaDownload, previewSaved, prepareJava, startOpenRocket } from './java.js';
 import { exportOrk, fileName, saveFile } from './lib/ork.js';
 import { fromJson } from '../../server/src/model.js';
 
@@ -37,6 +37,23 @@ const STEPS = [
   ['ready', 'Opening the design'],
 ];
 
+// The Java runtime's download, under the steps: how far it has got, and, when it is slow, why.
+const downloadLine = h('p', { class: 'hint download' }, 'Downloading Java…');
+const slowNote = h('p', { class: 'hint download-slow', hidden: true },
+  'Java is downloading slowly. It comes from the servers of CheerpJ (what runs Java in your browser), '
+  + 'which are far away from some places, so this can take a few minutes. Keep this page open.');
+const opened = performance.now();
+let downloaded = false;
+onJavaDownload(({ done, total }) => {
+  downloaded = total > 0 && done >= total;
+  const percent = total > 0 ? Math.floor((100 * done) / total) : 0;
+  downloadLine.textContent = downloaded ? 'Java downloaded; starting it…' : `Downloading Java: ${percent}%`;
+});
+// Still downloading after half a minute: say why.
+setTimeout(() => {
+  if (!downloaded && state !== 'ready' && state !== 'ended') slowNote.hidden = false;
+}, Math.max(0, 30_000 - (performance.now() - opened)));
+
 function showOverlay(content) {
   $('#overlay-box').replaceChildren(...content);
   $('#overlay').hidden = false;
@@ -63,9 +80,11 @@ function renderState() {
   showOverlay([
     h('div', { class: 'spinner' }),
     h('h2', {}, 'Opening OpenRocket'),
-    h('p', {}, 'OpenRocket runs right here in your browser. The first time takes about 20–30 seconds; later visits are quicker.'),
+    h('p', {}, 'OpenRocket runs right here in your browser. It usually starts in under a minute, longer when its Java download is slow.'),
     h('div', { class: 'steps' }, STEPS.map(([s, label], i) =>
       h('div', { class: i < at ? 'done' : i === at ? 'now' : '' }, i < at ? '✓ ' : i === at ? '› ' : '  ', label))),
+    downloadLine,
+    slowNote,
   ]);
   setStatus('Starting', 'wait');
 }
