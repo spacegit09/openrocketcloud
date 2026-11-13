@@ -4,7 +4,7 @@
 // shows the flight and where it is likely to land.
 import './style.css';
 import { currentUser, db } from './base44.js';
-import { $, h, avatar, icon, toast, modal, confirmDialog, promptDialog, timeAgo } from './common.js';
+import { $, h, avatar, icon, toast, confirmDialog, promptDialog, timeAgo } from './common.js';
 import { fetchDesign, openInOpenRocket } from './flight/openrocket.js';
 import { environment, fly } from './flight/engine.js';
 import { DEFAULT_SPREAD, ensembleWinds, groundFunction, landingStats, runStudy, variations } from './flight/montecarlo.js';
@@ -12,6 +12,9 @@ import { deleteFlight, listFlights, openFlight, saveFlight, updateFlight } from 
 import { elevation, groundGrid } from './flight/terrain.js';
 import { createMap } from './flight/map.js';
 import { forecastWinds } from './flight/forecast.js';
+import { planPreview } from './flight/plan-preview.js';
+
+for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
 const params = new URLSearchParams(location.search);
 const deg = Math.PI / 180;
@@ -349,19 +352,19 @@ function renderSave() {
     const at = new Date(savedAs.updated_date ?? savedAs.created_date).toLocaleString();
     note.append(h('div', { class: `saved-note${edited ? ' changed' : ''}` }, h('b', {}, savedAs.name),
       h('span', { class: 'hint' }, edited
-        ? ` · saved ${at}. You changed the settings: these are still the saved results. Run the simulation again to see the new ones, then save them to this flight.`
+        ? ` · saved ${at}. You changed the settings: these are still the saved results. Run the simulation again to see the new ones, then save them to this plan.`
         : ` · saved ${at}. These are the results as saved; run it again for the latest forecast.`)));
     return;
   }
   if (basedOn) {
     const update = h('button', { class: 'primary' }, 'Save changes');
-    const asNew = h('button', {}, 'Save as a new flight');
+    const asNew = h('button', {}, 'Save as a new plan');
     update.onclick = () => saveCurrent({ over: basedOn });
     asNew.onclick = () => saveCurrent({});
-    area.append(h('p', { class: 'hint save-from' }, 'Flown again from your saved flight ', h('b', {}, `“${basedOn.name}”`), '.'),
+    area.append(h('p', { class: 'hint save-from' }, 'Flown again from your launch plan ', h('b', {}, `“${basedOn.name}”`), '.'),
       h('div', { class: 'save-row' }, update, asNew));
   } else {
-    const save = h('button', { class: 'wide' }, 'Save this flight');
+    const save = h('button', { class: 'wide' }, 'Save this launch plan');
     save.onclick = () => saveCurrent({});
     area.append(save);
   }
@@ -381,7 +384,7 @@ async function saveCurrent({ over = null }) {
   let name = over?.name;
   if (!over) {
     const when = new Date(current.when);
-    name = await promptDialog('Save this flight', 'Name', `${current.design.name} · ${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'Save');
+    name = await promptDialog('Save this launch plan', 'Name', `${current.design.name} · ${when.toLocaleDateString()} ${when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`, 'Save');
     if (!name) return;
   }
   for (const b of document.querySelectorAll('#save-area button')) b.disabled = true;
@@ -390,12 +393,12 @@ async function saveCurrent({ over = null }) {
     const record = over ? await updateFlight(over, current, summary) : await saveFlight(name, current, summary, me);
     savedAs = { ...over, ...record, name: record?.name ?? name };
     basedOn = null;
-    toast(over ? `Saved the changes to “${savedAs.name}”.` : 'Saved. Open it any time from Saved flights.');
+    toast(over ? `Saved the changes to “${savedAs.name}”.` : 'Saved. Open it any time from your launch plans.');
     const url = new URL(location.href);
     url.searchParams.set('flight', savedAs.id);
     history.replaceState(null, '', url.href);
   } catch (e) {
-    toast(`Could not save the flight: ${e.message}`);
+    toast(`Could not save the launch plan: ${e.message}`);
   }
   renderSave();
 }
@@ -442,34 +445,108 @@ async function openSaved(recordOrId) {
   }
 }
 
-async function savedDialog() {
-  const list = h('div', { class: 'list saved-list' }, h('div', { class: 'item sub' }, 'Loading…'));
-  const close = h('button', {}, 'Close');
-  const dlg = modal('Saved flights', [h('p', { class: 'hint', style: 'margin:0' }, 'Flights you saved, with their results as they were. Only you see them.'), list], [close]);
-  close.onclick = dlg.close;
+// ------------------------------------------------------------------ home: your launch plans
+
+let plans = [];
+/** Each plan's picture (planPreview), by record id and save time: worked out once per page. */
+const previews = new Map();
+
+/** The planner's home: your saved launch plans as cards, and New launch plan. */
+async function showPlans() {
+  document.body.classList.remove('planner-page');
+  $('#plans').hidden = false;
+  $('#plan-search').oninput = renderPlans;
+  document.addEventListener('click', () => document.querySelectorAll('.menu').forEach((m) => (m.hidden = true)));
+  await loadPlans();
+}
+
+async function loadPlans() {
   try {
-    const flights = await listFlights();
-    list.replaceChildren(...(flights.length ? flights.map((f) => {
-      const open = h('button', {}, 'Open');
-      const del = h('button', { class: 'ghost icon', title: 'Delete', 'aria-label': `Delete ${f.name}` }, icon('trash'));
-      open.onclick = () => {
-        dlg.close();
-        openSaved(f);
-      };
-      del.onclick = async () => {
-        if (!(await confirmDialog('Delete saved flight?', `“${f.name}” will be deleted. This cannot be undone.`, 'Delete', true))) return;
-        await deleteFlight(f.id).catch((e) => toast(e.message));
-        dlg.close();
-        savedDialog();
-      };
-      return h('div', { class: 'item' },
-        h('div', { class: 'grow' }, h('div', {}, h('b', {}, f.name)),
-          h('div', { class: 'sub' }, `${f.design_name ?? ''} · launch ${f.launch_time ? new Date(f.launch_time).toLocaleString() : ''} · saved ${timeAgo(f.updated_date ?? f.created_date)}`),
-          f.summary ? h('div', { class: 'sub' }, f.summary) : null),
-        open, del);
-    }) : [h('div', { class: 'item sub' }, 'No saved flights yet. Run a simulation, then press Save this flight.')]));
+    plans = await listFlights();
   } catch (e) {
-    list.replaceChildren(h('div', { class: 'item sub' }, e.message));
+    toast(e.message);
+    plans = [];
+  }
+  renderPlans();
+}
+
+function renderPlans() {
+  const q = $('#plan-search').value.trim().toLowerCase();
+  const shown = plans.filter((f) => !q || f.name.toLowerCase().includes(q) || (f.design_name ?? '').toLowerCase().includes(q));
+  $('#plans-empty').hidden = plans.length > 0;
+  $('#plan-grid').replaceChildren(...shown.map(planCard));
+}
+
+/** A plan's picture, or null (a plan saved by another version of the planner). */
+function previewOf(f) {
+  const key = `${f.id} ${f.updated_date ?? f.created_date}`;
+  if (!previews.has(key)) previews.set(key, openFlight(f).then(({ study }) => planPreview(study)).catch(() => null));
+  return previews.get(key).then((svg) => svg?.cloneNode(true) ?? null);
+}
+
+function planCard(f) {
+  const open = () => { location.href = `/planner.html?flight=${encodeURIComponent(f.id)}`; };
+  const thumb = h('div', { class: 'thumb plan-thumb' }, icon('target'));
+  thumb.onclick = open;
+  previewOf(f).then((svg) => svg && thumb.replaceChildren(svg));
+  const more = h('button', { class: 'ghost icon', title: 'More', 'aria-label': `More actions for ${f.name}` }, icon('more'));
+  const menu = h('div', { class: 'menu', hidden: true });
+  const item = (ic, label, fn, cls) => {
+    const b = h('button', { class: cls }, icon(ic), label);
+    b.onclick = (e) => {
+      e.stopPropagation();
+      menu.hidden = true;
+      fn();
+    };
+    return b;
+  };
+  menu.append(
+    item('target', 'Open', open),
+    item('edit', 'Rename', () => renamePlan(f)),
+    h('hr'),
+    item('trash', 'Delete', () => deletePlan(f), 'danger'),
+  );
+  more.onclick = (e) => {
+    e.stopPropagation();
+    document.querySelectorAll('.menu').forEach((m) => m !== menu && (m.hidden = true));
+    menu.hidden = !menu.hidden;
+    if (!menu.hidden) {
+      menu.classList.remove('up');
+      if (menu.getBoundingClientRect().bottom > window.innerHeight - 8) menu.classList.add('up');
+    }
+  };
+  const launch = f.launch_time ? new Date(f.launch_time) : null;
+  return h('article', { class: 'card', 'data-id': f.id },
+    thumb,
+    h('div', { class: 'body', onclick: open },
+      h('h3', { title: f.name }, f.name),
+      h('div', { class: 'meta' }, h('span', {}, f.design_name ?? 'A design')),
+      launch ? h('div', { class: 'meta' }, h('span', {}, `Launch ${launch.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}`)) : null,
+      f.summary ? h('div', { class: 'meta plan-summary', title: f.summary }, f.summary) : null),
+    h('div', { class: 'foot' },
+      h('span', { class: 'hint' }, `Saved ${timeAgo(Date.parse(f.updated_date ?? f.created_date) || Date.now())}`),
+      h('span', { class: 'spacer' }),
+      h('span', { class: 'menu-wrap' }, more, menu)));
+}
+
+async function renamePlan(f) {
+  const name = await promptDialog('Rename launch plan', 'Name', f.name, 'Rename');
+  if (!name || name === f.name) return;
+  try {
+    await db.SavedFlight.update(f.id, { name });
+    await loadPlans();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+async function deletePlan(f) {
+  if (!(await confirmDialog('Delete launch plan?', `“${f.name}” will be deleted. This cannot be undone.`, 'Delete', true))) return;
+  try {
+    await deleteFlight(f.id);
+    await loadPlans();
+  } catch (e) {
+    toast(e.message);
   }
 }
 
@@ -483,6 +560,8 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
+  // The planner's home lists your launch plans; a plan, a new plan or a design's plan opens the planner.
+  if (!params.has('id') && !params.has('flight') && !params.has('new')) return showPlans();
   $('#planner').hidden = false;
 
   mapReady = createMap($('#map'), { arcgisKey: import.meta.env.VITE_ARCGIS_API_KEY });
@@ -503,7 +582,6 @@ async function main() {
     input.onchange = () => (spread[k] = Math.max(0, Number(input.value) || 0) / scale);
   }
   for (const radio of document.querySelectorAll('input[name="wind-mode"]')) radio.onchange = fillSpread;
-  $('#saved-btn').onclick = savedDialog;
   $('#into-wind').onchange = () => {
     $('#rail-dir-row').hidden = $('#into-wind').checked;
     updateLaunch();
@@ -529,6 +607,16 @@ async function main() {
   $('#design').onchange = () => chooseDesign($('#design').value);
   $('#sim').onchange = () => chooseSimulation($('#sim').value);
   $('#run').onclick = run;
+  // Back to your launch plans; results not saved would be lost: ask first.
+  for (const link of [$('#plans-link'), $('.topbar .crumb')]) {
+    link.onclick = async (e) => {
+      if (!current || savedAs) return;
+      e.preventDefault();
+      if (await confirmDialog('Leave without saving?', 'These results are not saved. Save them to find them again among your launch plans.', 'Leave', true)) {
+        location.href = link.href;
+      }
+    };
+  }
   // Any change to the settings (not to the results) means the results on show are not theirs.
   $('.plan-panel').addEventListener('change', (e) => {
     if (!e.target.closest('#results')) markEdited();

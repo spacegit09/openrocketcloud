@@ -11,7 +11,7 @@
 <body class="planner-page">
   <header class="topbar">
     <a class="brand" href="/"><img class="logo" src="/logo.png" alt="">Rocket in Cloud</a>
-    <span class="crumb">Launch Planner</span>
+    <a class="crumb" href="/planner.html">Launch Planner</a>
     <span class="spacer"></span>
     <span class="me" id="me" hidden></span>
   </header>
@@ -20,7 +20,7 @@
     <aside class="plan-panel">
       <div class="plan-top">
         <p class="plan-intro">Real-life launch simulation: your OpenRocket design flown hundreds of times in the forecast winds for your launch site, showing where it is likely to land.</p>
-        <button class="ghost" id="saved-btn" type="button">Saved flights</button>
+        <a class="btn ghost" id="plans-link" href="/planner.html">All launch plans</a>
       </div>
 
       <section class="plan-step">
@@ -84,6 +84,22 @@
       <div class="map-tools"><button id="replay" hidden>Replay flight</button></div>
     </section>
   </div>
+
+  <main class="page" id="plans" hidden>
+    <div class="page-head">
+      <h2>Your launch plans</h2>
+      <span class="spacer"></span>
+      <input class="search" id="plan-search" type="search" placeholder="Search launch plans" aria-label="Search launch plans">
+      <a class="btn" href="/" title="Your OpenRocket designs"><span data-icon="rocket"></span>Your designs</a>
+      <a class="btn primary" id="new-plan" href="/planner.html?new"><span data-icon="plus"></span>New launch plan</a>
+    </div>
+    <div class="grid" id="plan-grid"></div>
+    <div class="empty" id="plans-empty" hidden>
+      <h3>No launch plans yet</h3>
+      <p>Choose a design, where and when you will fly it, and see where it is likely to land. Save it, and it shows up here.</p>
+      <a class="btn primary" href="/planner.html?new"><span data-icon="plus"></span>New launch plan</a>
+    </div>
+  </main>
 
   <main class="page" id="signed-out" hidden>
     <h2>Launch Planner</h2>
