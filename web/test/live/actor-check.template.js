@@ -100,7 +100,11 @@ try {
   conn.send({ type: 'hello' });
   const w = await next((m) => m.type === 'welcome');
   check(Object.keys(w.model.objs).length === Object.keys(MODEL.objs).length, `welcome carries the design (${Object.keys(w.model.objs).length} objects)`);
-  check(w.motors.some((m) => m.name.endsWith('live-check.eng') && m.content.includes('LiveCheck')), 'welcome carries the owner\'s motor');
+  const files = await call('designs', { action: 'motors', id: d.id });
+  check(files.some((m) => m.name.endsWith('live-check.eng') && m.content.includes('LiveCheck')), 'the designs function hands out the owner\'s motor for the design');
+  const drawing = JSON.stringify({ v: 1, box: [0, -10, 100, 20], s: [{ d: 'M 0 0 L 100 0' }] });
+  check((await call('designs', { action: 'preview', id: d.id, preview: drawing })).kept === true, 'the design keeps a drawing through the designs function');
+  check((await call('designs', { action: 'get', id: d.id })).preview === drawing, 'and gives it back');
   const stage = Object.entries(w.model.objs).find(([, o]) => o.t === 'stage')[0];
   const t1 = Date.now();
   conn.send({ type: 'ops', seq: 1, ops: [{ op: 'set', id: stage, v: { name: '<name>Live booster</name>' } }] });

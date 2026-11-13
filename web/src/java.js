@@ -1,6 +1,8 @@
 // Runs the official OpenRocket in this page with CheerpJ (Java in the browser) and connects its
 // live-share bridge (orcloud.bridge.BrowserLink in worker/bridge/web) to the design's room.
+import { api } from './base44.js';
 import { h, modal } from './common.js';
+import { testHub } from './room-client.js';
 import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
 import { latestPlacement, menuRowNatives } from './menu-row.js';
@@ -69,7 +71,7 @@ let modelFiles = 0;
 
 // The bridge's side of the page: events for BrowserLink.jsReceive ("o" connected, "c" + reason
 // disconnected, "m" + JSON a message from the room) and the room and callbacks of startOpenRocket.
-const link = { events: [], waiting: null, room: null, onReady: null };
+const link = { events: [], waiting: null, room: null, onReady: null, designId: null, motors: null };
 
 // Edits OpenRocket sent (their "seq") that the room has not confirmed yet: it confirms each batch
 // with an "ack", or by passing it on to everyone, the sender included.
@@ -80,10 +82,11 @@ export function closeOpenRocket() {
   toJava('x');
 }
 
-// The room keeping OpenRocket's latest drawing of the design (its card's preview).
+// The design keeping OpenRocket's latest drawing of it (its card's preview), through the designs
+// function (the room cannot seal it; with the local test hub, the hub keeps it).
 let previewSaving = Promise.resolve();
 
-/** Resolves once the room has kept OpenRocket's latest drawing of the design, or after `timeoutMs`. */
+/** Resolves once the design has kept OpenRocket's latest drawing of it, or after `timeoutMs`. */
 export function previewSaved(timeoutMs = 5000) {
   return Promise.race([previewSaving, new Promise((r) => setTimeout(r, timeoutMs))]);
 }
@@ -174,8 +177,12 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
           return `${path}\n${file.name}`;
         },
         async Java_orcloud_web_Preview_jsPreview(lib, json) {
-          // OpenRocket's drawing of the design, for its card on the dashboard (kept by the room).
-          if (link.room) previewSaving = link.room.request('preview', { preview: json }, 20_000).catch(() => {});
+          // OpenRocket's drawing of the design, for its card on the dashboard.
+          if (testHub()) {
+            if (link.room) previewSaving = link.room.request('preview', { preview: json }, 20_000).catch(() => {});
+          } else if (link.designId) {
+            previewSaving = api('designs', { action: 'preview', id: link.designId, preview: json }).catch(() => {});
+          }
         },
         async Java_orcloud_web_FileWindows_jsFileWindow(lib, x, y, w, h) {
           markFileWindow(x, y, w, h);
@@ -196,17 +203,33 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
 export async function startOpenRocket({ designId, screen, room, onReady, onExit }) {
   link.room = room;
   link.onReady = onReady;
+  link.designId = designId;
+  // The custom motor files of everyone the design is shared with, for the room's welcome: the
+  // room cannot read them (they are sealed), the designs function can. The local test hub sends
+  // its own.
+  link.motors = testHub() ? Promise.resolve(null) : api('designs', { action: 'motors', id: designId }).catch(() => null);
   await prepareJava(designId);
+  // What the room says reaches OpenRocket in order, a welcome with the motor files in it.
+  let order = Promise.resolve();
+  const forward = (make) => {
+    order = order.then(make).then((line) => line && toJava(line), () => {});
+  };
   // Listeners are added after an await: called from inside the room's "open" event, that event
   // would otherwise also reach the "open" listener added here and connect the bridge twice.
   for (const type of ['welcome', 'ops', 'ack', 'kick', 'error']) {
-    room.on(type, (msg, text) => toJava(`m${text ?? JSON.stringify(msg)}`));
+    room.on(type, (msg, text) => forward(async () => {
+      if (type === 'welcome' && !msg.motors?.length) {
+        const motors = await link.motors;
+        if (motors?.length) return `m${JSON.stringify({ ...msg, motors })}`;
+      }
+      return `m${text ?? JSON.stringify(msg)}`;
+    }));
   }
   room.on('ack', (msg) => unconfirmed.delete(msg.seq));
   room.on('ops', (msg) => msg.from === room.connectionId && unconfirmed.delete(msg.seq));
-  room.on('open', () => toJava('o'));
-  room.on('closed', (m) => toJava(`c${m.reason ?? ''}`));
-  if (room.open) toJava('o');
+  room.on('open', () => forward(() => 'o'));
+  room.on('closed', (m) => forward(() => `c${m.reason ?? ''}`));
+  if (room.open) forward(() => 'o');
 
   window.cheerpjCreateDisplay(-1, -1, screen);
   const code = await window.cheerpjRunMain('orcloud.bridge.WebMain', CLASSPATH);

@@ -3,7 +3,8 @@
 // program the way the design page runs OpenRocket. It reads a design and computes the flight
 // tables the engine (engine.js) flies with. The dashboard uses it to draw designs' previews.
 import { prepareJava } from '../java.js';
-import { withRoom } from '../room-client.js';
+import { api } from '../base44.js';
+import { testHub, withRoom } from '../room-client.js';
 import { exportOrk } from '../lib/ork.js';
 import { fromJson } from '../../../server/src/model.js';
 import { labRequest } from './lab-natives.js';
@@ -11,9 +12,14 @@ import { CLASSPATH } from '../lib/jars.js';
 let running = null;
 let files = 0;
 
-/** The design's content and the custom motors of everyone it is shared with, from its room. */
+/**
+ * The design's content, from its room, and the custom motors of everyone it is shared with, from
+ * the designs function (they are sealed, so the room cannot read them; the local test hub sends
+ * its own).
+ */
 export async function fetchDesign(designId) {
-  return withRoom(designId, (room) => new Promise((resolve, reject) => {
+  const motors = testHub() ? Promise.resolve(null) : api('designs', { action: 'motors', id: designId }).catch(() => null);
+  const design = await withRoom(designId, (room) => new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('The design did not answer. Try again.')), 60_000);
     room.on('welcome', (m) => {
       clearTimeout(t);
@@ -25,6 +31,8 @@ export async function fetchDesign(designId) {
     });
     room.send({ type: 'hello' });
   }));
+  const kept = await motors;
+  return kept?.length ? { ...design, motors: kept } : design;
 }
 
 /** Starts OpenRocket once; it then serves requests until the page closes. */

@@ -5,7 +5,7 @@ import { secrets } from "base44:runtime";
 import { ApiError } from "./api.js";
 import { sealer } from "./sealed.js";
 
-type Handler = (ctx: { db: any; s: ReturnType<typeof sealer>; me: { email: string; name: string } }, body: any) => Promise<unknown>;
+type Handler = (ctx: { db: any; s: ReturnType<typeof sealer>; me: { id: string; email: string; name: string } }, body: any) => Promise<unknown>;
 
 export function endpoint(name: string, handler: Handler) {
   return async (req: Request): Promise<Response> => {
@@ -14,7 +14,7 @@ export function endpoint(name: string, handler: Handler) {
     if (!user?.email) return Response.json({ error: "Please sign in." }, { status: 401 });
     try {
       const email = String(user.email).toLowerCase();
-      const me = { email, name: String(user.full_name || email.split("@")[0]) };
+      const me = { id: String(user.id ?? ""), email, name: String(user.full_name || email.split("@")[0]) };
       const body = await req.json().catch(() => ({}));
       const out = await handler({ db: base44.asServiceRole.entities, s: sealer(secrets.get("DATA_KEY")), me }, body);
       return Response.json(out);

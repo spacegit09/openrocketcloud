@@ -48,19 +48,42 @@ function fakeDb() {
       },
     };
   };
-  return { Design: table(), Motor: table(), SavedFlight: table() };
+  const User = table();
+  return { Design: table(), Motor: table(), SavedFlight: table(), User };
 }
 
+/** People with Base44 accounts (User records, as Base44 keeps them), and what each may call. */
 function setup() {
   const db = fakeDb();
   const s = sealer(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'));
-  const as = (email, name) => ({
-    designs: (body) => designsApi({ db, s, me: { email, name } }, body),
-    motors: (body) => motorsApi({ db, s, me: { email, name } }, body),
-    flights: (body) => flightsApi({ db, s, me: { email, name } }, body),
-  });
-  return { db, s, mina: as('mina@example.com', 'Mina Park'), joon: as('joon@example.com', 'Joon Lee'), sora: as('sora@example.com', 'Sora Kim') };
+  const ids = {};
+  const as = (email, name, { account = true } = {}) => {
+    const me = { id: '', email, name };
+    const join = async () => {
+      if (!me.id) me.id = (await db.User.create({ email, full_name: name })).id;
+      ids[email] = me.id;
+    };
+    const ready = account ? join() : Promise.resolve();
+    const call = (api) => async (body) => (await ready, api({ db, s, me }, body));
+    return { designs: call(designsApi), motors: call(motorsApi), flights: call(flightsApi), join, me };
+  };
+  return {
+    db, s, ids,
+    mina: as('mina@example.com', 'Mina Park'),
+    joon: as('joon@example.com', 'Joon Lee'),
+    sora: as('sora@example.com', 'Sora Kim'),
+    newcomer: as('new@example.com', 'Nova Park', { account: false }),
+  };
 }
+
+/** The room's access list for a design: [[email, role]], sorted. */
+async function accessOf(db, ids, room) {
+  const [r] = await db.Design.filter({ room });
+  const byId = Object.fromEntries(Object.entries(ids).map(([e, id]) => [id, e]));
+  return (r.access ?? []).map((a) => [byId[a.id] ?? a.id, a.role]).sort();
+}
+
+const DRAWING = JSON.stringify({ v: 1, box: [0, -20, 400, 40], s: [{ d: 'M 0 0 L 100 -10 L 380 -10 L 380 10 L 100 10 Z' }, { d: 'M 380 -5 L 400 -5 L 400 5 L 380 5 Z', m: 1 }] });
 
 const refused = (status) => (e) => e instanceof ApiError && e.status === status;
 
@@ -194,11 +217,12 @@ async function plainRecords(db) {
 }
 
 test('the move to sealed records keeps every id, person, role, motor and plan', async () => {
-  const { db, s, mina, joon, sora } = setup();
+  const { db, s, ids, mina, joon, sora } = setup();
+  await Promise.all([mina, joon, sora].map((p) => p.join()));
   const old = await plainRecords(db);
   const first = await migrateToSealed({ db, s });
   assert.deepEqual(first, {
-    designs: { plain: 2, copied: 2, refreshed: 0, removed: 0 },
+    designs: { plain: 2, copied: 2, refreshed: 0, removed: 0, access: 0 },
     motors: { plain: 1, copied: 1, removed: 0 },
     flights: { plain: 1, copied: 1, refreshed: 0, removed: 0 },
   });
@@ -209,6 +233,8 @@ test('the move to sealed records keeps every id, person, role, motor and plan', 
   assert.deepEqual(d.members, [{ email: 'joon@example.com', role: 'editor' }, { email: 'sora@example.com', role: 'viewer' }]);
   assert.equal(d.preview, '{"parts":[]}');
   assert.equal(d.version, 7);
+  assert.deepEqual(await accessOf(db, ids, old.design.id), [['joon@example.com', 'editor'], ['mina@example.com', 'owner'], ['sora@example.com', 'viewer']],
+    'the room knows everyone with an account');
   assert.equal((await sora.designs({ action: 'get', id: old.design.id })).name, 'Old two stage');
   assert.deepEqual((await joon.designs({ action: 'list' })).map((x) => x.id).sort(), [old.design.id, old.lone.id].sort());
   assert.deepEqual((await mina.motors({ action: 'list' })).map((m) => m.filename), ['old.eng']);
@@ -257,7 +283,7 @@ test('finishing the move deletes the plain records and leaves nothing personal i
   assert.equal((await mina.flights({ action: 'get', id: old.flight.id })).summary, PLAN.summary);
   assert.equal((await mina.motors({ action: 'list' })).length, 1);
   assert.deepEqual(await migrateToSealed({ db, s, finish: true }), {
-    designs: { plain: 0, copied: 0, refreshed: 0, removed: 0 },
+    designs: { plain: 0, copied: 0, refreshed: 0, removed: 0, access: 0 },
     motors: { plain: 0, copied: 0, removed: 0 },
     flights: { plain: 0, copied: 0, refreshed: 0, removed: 0 },
   });
@@ -271,4 +297,64 @@ test('a design\'s drawing is sealed apart from it and opened with it', async () 
   assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, '{"outline":[1,2,3]}');
   assert.ok(!JSON.stringify([...db.Design.rows.values()]).includes('outline'));
   assert.equal((await readDesign(s, { ...r, sealed_preview: undefined })).preview, null);
+});
+
+test('the room\'s access list follows the owner, sharing, leaving, and first visits', async () => {
+  const { db, ids, mina, joon, sora, newcomer } = setup();
+  const d = await mina.designs({ action: 'create', name: 'Pods' });
+  assert.deepEqual(await accessOf(db, ids, d.id), [['mina@example.com', 'owner']]);
+  await mina.designs({ action: 'share', id: d.id, members: [
+    { email: 'joon@example.com', role: 'editor' }, { email: 'sora@example.com', role: 'viewer' }, { email: 'new@example.com', role: 'editor' }] });
+  await joon.designs({ action: 'list' });
+  await sora.designs({ action: 'list' });
+  assert.deepEqual(await accessOf(db, ids, d.id), [['joon@example.com', 'editor'], ['mina@example.com', 'owner'], ['sora@example.com', 'viewer']],
+    'someone without an account is not in it yet');
+  // They sign up and open the design: from then on the room lets them in.
+  await newcomer.join();
+  await newcomer.designs({ action: 'get', id: d.id });
+  assert.deepEqual((await accessOf(db, ids, d.id)).find(([e]) => e === 'new@example.com'), ['new@example.com', 'editor']);
+  // A changed role reaches the room; leaving and being removed take people out.
+  await mina.designs({ action: 'share', id: d.id, members: [{ email: 'joon@example.com', role: 'viewer' }, { email: 'sora@example.com', role: 'viewer' }] });
+  assert.deepEqual(await accessOf(db, ids, d.id), [['joon@example.com', 'viewer'], ['mina@example.com', 'owner'], ['sora@example.com', 'viewer']]);
+  await sora.designs({ action: 'leave', id: d.id });
+  assert.deepEqual(await accessOf(db, ids, d.id), [['joon@example.com', 'viewer'], ['mina@example.com', 'owner']]);
+  // Nobody else gets in by asking.
+  await assert.rejects(sora.designs({ action: 'get', id: d.id }), refused(404));
+  assert.deepEqual(await accessOf(db, ids, d.id), [['joon@example.com', 'viewer'], ['mina@example.com', 'owner']]);
+});
+
+test('a design\'s custom motors: everyone it is shared with gets everyone\'s, others none', async () => {
+  const { mina, joon, sora } = setup();
+  const d = await mina.designs({ action: 'create', name: 'Motors' });
+  await mina.designs({ action: 'share', id: d.id, members: [{ email: 'joon@example.com', role: 'viewer' }] });
+  const m = await mina.motors({ action: 'add', filename: 'x 42.eng', content: 'X42 29 124 0 0.05 0.1 Team\n0.1 50\n', summary: '[]' });
+  await joon.motors({ action: 'add', filename: 'j9.eng', content: 'J9 29 124 0 0.05 0.1 Joon\n0.1 50\n', summary: '[]' });
+  await sora.motors({ action: 'add', filename: 'sora.eng', content: 'S1 29 124 0 0.05 0.1 Sora\n0.1 50\n', summary: '[]' });
+  const files = await joon.designs({ action: 'motors', id: d.id });
+  assert.deepEqual(files.map((f) => f.name.slice(9)).sort(), ['j9.eng', 'x_42.eng']);
+  assert.ok(files.find((f) => f.name === `${m.id.slice(0, 8)}-x_42.eng`).content.startsWith('X42 '));
+  await assert.rejects(sora.designs({ action: 'motors', id: d.id }), refused(404));
+});
+
+test('a design\'s drawing: kept sealed; a viewer may only fill in a missing one; bad ones refused', async () => {
+  const { db, mina, joon } = setup();
+  const d = await mina.designs({ action: 'create', name: 'Drawn' });
+  await mina.designs({ action: 'share', id: d.id, members: [{ email: 'joon@example.com', role: 'viewer' }] });
+  assert.deepEqual(await joon.designs({ action: 'preview', id: d.id, preview: DRAWING }), { kept: true }, 'a viewer fills in a missing one');
+  assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, JSON.stringify(JSON.parse(DRAWING)));
+  assert.deepEqual(await joon.designs({ action: 'preview', id: d.id, preview: JSON.stringify({ v: 1, s: [] }) }), { kept: false }, 'but cannot change it');
+  assert.deepEqual(await mina.designs({ action: 'preview', id: d.id, preview: JSON.stringify({ v: 1, s: [] }) }), { kept: true });
+  assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, '', 'an empty rocket');
+  assert.deepEqual(await mina.designs({ action: 'preview', id: d.id, preview: '<svg onload=alert(1)>' }), { kept: false });
+  assert.ok(!JSON.stringify([...db.Design.rows.values()]).includes('380'), 'the drawing is not stored in the clear');
+});
+
+test('the move gives sealed designs without one their room\'s access list', async () => {
+  const { db, s, ids, mina } = setup();
+  const d = await mina.designs({ action: 'create', name: 'Made before access lists' });
+  const [r] = await db.Design.filter({ room: d.id });
+  await db.Design.update(r.id, { access: undefined });
+  assert.equal((await migrateToSealed({ db, s })).designs.access, 1);
+  assert.deepEqual(await accessOf(db, ids, d.id), [['mina@example.com', 'owner']]);
+  assert.equal((await migrateToSealed({ db, s })).designs.access, 0);
 });

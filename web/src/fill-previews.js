@@ -1,8 +1,9 @@
 // Drawings for the designs that have none yet (not opened since previews began, or last opened
 // with an older version of the site): OpenRocket runs hidden in the dashboard and draws them one
-// by one (src/flight/openrocket.js), and each design's room keeps its drawing. A design that could
-// not be drawn is left until it changes.
-import { withRoom } from './room-client.js';
+// by one (src/flight/openrocket.js), and each design keeps its drawing (through the designs
+// function). A design that could not be drawn is left until it changes.
+import { api } from './base44.js';
+import { testHub, withRoom } from './room-client.js';
 
 const KEY = 'orc-preview-failed'; // design id -> its updated_date when drawing it failed
 let running = false;
@@ -47,7 +48,9 @@ export async function fillPreviews(designs, drawn) {
     for (const [d, f] of fetched) {
       try {
         const json = await drawInOpenRocket({ model: f.model, motors });
-        const { kept } = await withRoom(d.id, (room) => room.request('preview', { preview: json }, 30_000));
+        const { kept } = testHub()
+          ? await withRoom(d.id, (room) => room.request('preview', { preview: json }, 30_000))
+          : await api('designs', { action: 'preview', id: d.id, preview: json });
         if (kept) drawn(d, json);
         else remember(d);
       } catch (e) {

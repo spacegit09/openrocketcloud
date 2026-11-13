@@ -211,8 +211,10 @@ async function main() {
   const hub = testHub();
   me = hub ? { id: `local:${hub.user}`, email: hub.user, name: hub.name ?? hub.user } : await currentUser();
   if (!me) return signIn();
-  // The design is looked up while its room connects and OpenRocket starts.
+  // The design is looked up before its room connects (OpenRocket starts meanwhile): that also
+  // tells the room who you are, if it was shared with you by email and this is your first visit.
   const found = hub ? null : api('designs', { action: 'get', id: designId }).catch(() => null);
+  if (found) await found;
 
   room = new RoomClient(designId, { connectionId: connectionId() }).connect();
   let started = false;
