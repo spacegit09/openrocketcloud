@@ -1,0 +1,33 @@
+// A flight logbook: details and notes, flight data (entered, or from OpenRocket's simulations and
+// Launch Planner plans), photos and videos (Base44 private files), sealed (web/base44/shared/
+// sealed.js) so the dashboard shows only ciphertext and fingerprints. The site reaches it only
+// through the logbooks function (web/base44/shared/logbooks.js).
+{
+  "name": "Logbook",
+  "type": "object",
+  "description": "A flight logbook (encrypted)",
+  "properties": {
+    "people": {
+      "type": "array",
+      "description": "Keyed fingerprints of the owner's and members' email addresses (not reversible)",
+      "items": { "type": "string" }
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted title, people, details, notes and the lists of data sets and media (AES-256-GCM with the app's DATA_KEY secret)"
+    },
+    "sealed_data": {
+      "type": "string",
+      "description": "Encrypted flight data and media previews"
+    },
+    "version": { "type": "integer" },
+    "edited_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["sealed"],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

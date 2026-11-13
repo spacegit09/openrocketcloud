@@ -138,8 +138,8 @@ base44 deploy --build --yes                   # site, actor, records, Google sig
 ```
 
 **Privacy in the Base44 dashboard.** Design names, owners and members, design drawings, custom
-motor files and saved launch plans are stored sealed: encrypted (AES-256-GCM) with the app's
-`DATA_KEY` secret by the app's backend functions (`designs`, `motors`, `flights`), so the
+motor files, saved launch plans and logbooks are stored sealed: encrypted (AES-256-GCM) with the app's
+`DATA_KEY` secret by the app's backend functions (`designs`, `motors`, `flights`, `logbooks`), so the
 dashboard's Data pages show only ciphertext. Records are found by keyed fingerprints of email
 addresses, which cannot be turned back into addresses without the key, and are created by the
 service role, so their *Created by* is no one. The tables are closed to direct access from
@@ -148,7 +148,9 @@ app secrets, so the live-share room reads only what it needs in the clear: who m
 as Base44 user ids with their roles (`access`, kept by the `designs` function); browsers get the
 custom motor files and save drawings through the `designs` function. Errors are logged without
 their messages, which could quote a record. Designs' contents and edit histories live in the
-room's actor storage, which the dashboard does not show. What the dashboard still shows: on each
+room's actor storage, which the dashboard does not show. Logbook photos and videos are Base44
+private files under random names, reached only through links the `logbooks` function signs for an
+hour. What the dashboard still shows: on each
 Design record, which user ids may open it (not its name or anything in it); and Base44's own *Users*
 page (each person's name and Google email, and so the user count) and logs of function calls by
 person. This keeps personal data out of sight of anyone browsing the dashboard; whoever controls
@@ -364,6 +366,27 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   study (settings, forecast and results) among your launch plans, to open again later, or by its
   link; only you see your launch plans. Single-stage rockets only for now; predictions, not a substitute for
   the range safety officer.
+- **Logbook** (browser version; *Logbook* on the dashboard and the planner): a record of each flight,
+  kept as logbooks shown as cards (a photo or the flight's altitude curve). A logbook has the flight's
+  details (date, time, location, rocket, motor, weather, outcome), a description and notes, saved as
+  you type. **Flight data**: choose what your data has (time first, then altitude, velocity,
+  acceleration and custom columns of your own, each in its unit), and the logbook shows the exact
+  column order, an example and a CSV template; paste the text or open a CSV file, and every
+  mistake is listed by line (a wrong number of values, a decimal comma, a value that is not a
+  number, time going backwards) before anything is saved. It also brings in a design's OpenRocket
+  simulation (its stored results: choose the simulation, stage and quantities) and a Launch
+  Planner plan's nominal flight (filling in the date, time, place and rocket if empty). The graphs
+  overlay every source of each quantity (measured altitude against OpenRocket's and the planner's,
+  in metric or imperial units, with a readout under the pointer), each data set can be shifted in
+  time to line up, hidden or downloaded as CSV, and a table gives each column's highest and lowest
+  values. **Photos and videos** (JPEG, PNG, WebP up to 50 MB; MP4, MOV, WebM and more up to
+  100 MB; Base44's limits) are uploaded as Base44 private files under random names, with a small
+  preview made in the browser; each upload uses about one Base44 integration credit, and taking one
+  out of the logbook does not delete the stored file (Base44 offers no way to). **Share** with
+  editors and viewers like a design; **Export PDF** prints a report of it all (details, notes,
+  data, graphs, photos) through the browser's *Save as PDF*, so every language's text prints.
+  `web/test/logbook.test.mjs` and `logbook-api.test.mjs` check the format and its parser, the
+  imports (against OpenRocket's own example), the graphs and the access rules.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
 - **Who's here**: avatars show who has the design open and which part each person has selected.

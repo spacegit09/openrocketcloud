@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-const fail = (status, message) => {
+export const fail = (status, message) => {
   throw new ApiError(status, message);
 };
 
@@ -26,17 +26,17 @@ const MAX_FLIGHT_CHARS = 8_000_000;
 const NOT_FOUND = 'Design not found. It may have been deleted, or it is not shared with you.';
 
 /** A new design's id: 24 random hex digits, like the record ids designs had before (rooms, links). */
-function newRoom() {
+export function newRoom() {
   return [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-function cleanName(name) {
+export function cleanName(name) {
   const n = String(name ?? '').trim();
   if (!n) fail(400, 'Enter a name.');
   return n.slice(0, 200);
 }
 
-function cleanMembers(list, ownerEmail) {
+export function cleanMembers(list, ownerEmail) {
   if (!Array.isArray(list) || list.length > MAX_PEOPLE) fail(400, 'Invalid list of people.');
   const out = new Map();
   for (const m of list) {

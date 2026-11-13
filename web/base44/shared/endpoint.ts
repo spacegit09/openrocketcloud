@@ -5,7 +5,8 @@ import { secrets } from "base44:runtime";
 import { ApiError } from "./api.js";
 import { sealer } from "./sealed.js";
 
-type Handler = (ctx: { db: any; s: ReturnType<typeof sealer>; me: { id: string; email: string; name: string } }, body: any) => Promise<unknown>;
+type Files = { sign(uri: string): Promise<string | null> };
+type Handler = (ctx: { db: any; s: ReturnType<typeof sealer>; me: { id: string; email: string; name: string }; files: Files }, body: any) => Promise<unknown>;
 
 export function endpoint(name: string, handler: Handler) {
   return async (req: Request): Promise<Response> => {
@@ -16,7 +17,12 @@ export function endpoint(name: string, handler: Handler) {
       const email = String(user.email).toLowerCase();
       const me = { id: String(user.id ?? ""), email, name: String(user.full_name || email.split("@")[0]) };
       const body = await req.json().catch(() => ({}));
-      const out = await handler({ db: base44.asServiceRole.entities, s: sealer(secrets.get("DATA_KEY")), me }, body);
+      // Signed links (an hour) to Base44 private files, as the service role: anyone a logbook is
+      // shared with sees its photos, whoever uploaded them.
+      const files: Files = {
+        sign: async (uri) => (await base44.asServiceRole.integrations.Core.CreateFileSignedUrl({ file_uri: uri, expires_in: 3600 })).signed_url ?? null,
+      };
+      const out = await handler({ db: base44.asServiceRole.entities, s: sealer(secrets.get("DATA_KEY")), me, files }, body);
       return Response.json(out);
     } catch (e) {
       if (e instanceof ApiError) return Response.json({ error: e.message }, { status: e.status });

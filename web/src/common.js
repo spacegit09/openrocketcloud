@@ -46,6 +46,8 @@ const ICONS = {
   power: '<path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M20 17v5H6.5a2.5 2.5 0 0 1 0-5"/>',
   x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+  'eye-off': '<path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a17.6 17.6 0 0 1-2.16 3.19M6.6 6.6C3.9 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24M2 2l20 20"/>',
   flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
   folder: '<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>',
   refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
@@ -146,7 +148,11 @@ export function download(url) {
 }
 
 /** Share dialog (used on both pages): who the design is shared with, kept on its Design record. */
-export async function shareDialog(designId, me, onChange) {
+/**
+ * Sharing a design (or, with `kind`, a logbook): who has it, and for its owner, inviting people as
+ * editors or viewers, changing their access and removing them.
+ */
+export async function shareDialog(designId, me, onChange, kind = SHARE_DESIGN) {
   const list = h('div', { class: 'list' });
   const email = h('input', { type: 'email', placeholder: 'friend@gmail.com', 'aria-label': 'Email address' });
   const role = h('select', { 'aria-label': 'Access' }, h('option', { value: 'editor' }, 'Can edit'), h('option', { value: 'viewer' }, 'Can view'));
@@ -154,19 +160,19 @@ export async function shareDialog(designId, me, onChange) {
   const error = h('div', { class: 'error' });
   const form = h('form', { class: 'row' }, email, role, add);
   const done = h('button', {}, 'Done');
-  const { close } = modal('Share this design', [
-    h('p', { class: 'hint', style: 'margin:0' }, 'People you add can open the design with their Google account and work on it with you in real time.'),
+  const { close } = modal(kind.title, [
+    h('p', { class: 'hint', style: 'margin:0' }, kind.intro),
     form, error, list,
   ], [done]);
   done.onclick = close;
 
   let design;
   const save = async (members) => {
-    design = await api('designs', { action: 'share', id: designId, members });
+    design = await api(kind.fn, { action: 'share', id: designId, members });
     onChange?.(design);
   };
   const render = async () => {
-    design = await api('designs', { action: 'get', id: designId });
+    design = await api(kind.fn, { action: kind.get, id: designId });
     const owner = design.owner_email === me.email;
     form.hidden = !owner;
     const people = [{ email: design.owner_email, name: design.owner_name, role: 'owner' }, ...(design.members ?? [])];
@@ -221,6 +227,19 @@ export async function shareDialog(designId, me, onChange) {
   };
   await render();
 }
+
+const SHARE_DESIGN = {
+  fn: 'designs',
+  get: 'get',
+  title: 'Share this design',
+  intro: 'People you add can open the design with their Google account and work on it with you in real time.',
+};
+export const SHARE_LOGBOOK = {
+  fn: 'logbooks',
+  get: 'people',
+  title: 'Share this logbook',
+  intro: 'People you add can open the logbook with their Google account: editors can change it and add data, photos and videos; viewers can read it and save it as a PDF.',
+};
 
 export const ROCKET_SVG = `<svg viewBox="0 0 300 80" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round">
   <path d="M30 40 C 60 18, 90 22, 110 26 L 250 26 L 250 54 L 110 54 C 90 58, 60 62, 30 40 Z" fill="currentColor" fill-opacity=".12"/>
