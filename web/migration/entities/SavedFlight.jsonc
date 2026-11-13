@@ -1,0 +1,31 @@
+// A Launch Planner study someone saved (its settings, the forecast it flew in and its results,
+// packed: see web/src/flight/saved.js), sealed (web/base44/shared/sealed.js). Only its owner sees
+// it, through the flights function.
+{
+  "name": "SavedFlight",
+  "type": "object",
+  "description": "A saved Launch Planner study (encrypted)",
+  "properties": {
+    "owner": {
+      "type": "string",
+      "description": "Keyed fingerprint of the owner's email address (not reversible)"
+    },
+    "ref": {
+      "type": "string",
+      "description": "Its id before records were sealed, if it was moved (links still work)"
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted name, design, launch time, summary and study (AES-256-GCM with the app's DATA_KEY secret)"
+    }
+  },
+  "required": [
+    "sealed"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

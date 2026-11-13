@@ -3,7 +3,7 @@
 // and time; the flight engine flies it hundreds of times with the uncertain things varied; the map
 // shows the flight and where it is likely to land.
 import './style.css';
-import { currentUser, db } from './base44.js';
+import { api, currentUser } from './base44.js';
 import { $, h, avatar, icon, toast, confirmDialog, promptDialog, timeAgo } from './common.js';
 import { fetchDesign, openInOpenRocket } from './flight/openrocket.js';
 import { environment, fly } from './flight/engine.js';
@@ -390,7 +390,7 @@ async function saveCurrent({ over = null }) {
   for (const b of document.querySelectorAll('#save-area button')) b.disabled = true;
   try {
     const summary = headline(current, currentStats);
-    const record = over ? await updateFlight(over, current, summary) : await saveFlight(name, current, summary, me);
+    const record = over ? await updateFlight(over, current, summary) : await saveFlight(name, current, summary);
     savedAs = { ...over, ...record, name: record?.name ?? name };
     basedOn = null;
     toast(over ? `Saved the changes to “${savedAs.name}”.` : 'Saved. Open it any time from your launch plans.');
@@ -533,7 +533,7 @@ async function renamePlan(f) {
   const name = await promptDialog('Rename launch plan', 'Name', f.name, 'Rename');
   if (!name || name === f.name) return;
   try {
-    await db.SavedFlight.update(f.id, { name });
+    await api('flights', { action: 'rename', id: f.id, name });
     await loadPlans();
   } catch (e) {
     toast(e.message);
@@ -624,7 +624,7 @@ async function main() {
   $('#replay').onclick = () => mapReady.then((m) => m.replay(1));
 
   try {
-    const designs = (await db.Design.list('-updated_date', 500)).sort((a, b) => a.name.localeCompare(b.name));
+    const designs = (await api('designs', { action: 'list' })).sort((a, b) => a.name.localeCompare(b.name));
     $('#design').replaceChildren(h('option', { value: '' }, designs.length ? 'Choose a design' : 'No designs yet'),
       ...designs.map((d) => h('option', { value: d.id }, d.owner_email === me.email ? d.name : `${d.name} (${d.owner_name ?? d.owner_email})`)));
     const id = params.get('id');

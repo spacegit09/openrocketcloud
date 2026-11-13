@@ -1,7 +1,10 @@
-// The DesignRoom actor: one session per design (session id = Design record id). The live-share
-// logic is in room.js; this file connects it to Base44 (storage, connections, entities).
+// The DesignRoom actor: one session per design (session id = the Design record's room). The
+// live-share logic is in room.js; this file connects it to Base44 (storage, connections, and the
+// sealed Design and Motor records, see shared/sealed.js).
+import { secrets } from "base44:runtime";
 import { Actor } from "base44:runtime/actors";
 import { Room } from "./room.js";
+import { readDesign, readMotor, roleIn, sealer } from "./lib/sealed.js";
 
 type Person = { id: string; email: string; name: string };
 
@@ -34,6 +37,8 @@ export default class DesignRoom extends Actor {
   room: Room | null = null;
   people = new Map<string, Promise<Person | null>>();
   record: ((fresh?: boolean) => Promise<any>) | null = null;
+  /** The Design record's own id (the session's id is its room). */
+  recordId: string | null = null;
   motorList: (() => Promise<{ name: string; content: string }[]>) | null = null;
 
   async ensureRoom(): Promise<Room> {
@@ -49,25 +54,36 @@ export default class DesignRoom extends Actor {
 
   // (Not named env: the Actor base class already has an env property.)
   roomEnv() {
-    // Looked up when used: the session's client is only available inside handlers.
+    // Looked up when used: the session's client and secrets are only available inside handlers.
     const db = () => this.client.asServiceRole.entities;
-    const designId = this.instanceId;
+    let s: ReturnType<typeof sealer> | null = null;
+    const seal = () => (s ??= sealer(secrets.get("DATA_KEY")));
+    const room = this.instanceId;
     // A lookup that fails throws (the room then keeps everyone's access as it was, and tries again).
-    const design = (this.record ??= shared(RECORD_MS, () => db().Design.get(designId)));
-    const roleIn = (d: any, user: Person) => {
-      if (!d) return null;
-      const same = (email: string) => String(email ?? "").toLowerCase() === user.email;
-      const role = same(d.owner_email)
-        ? "owner"
-        : (d.members ?? []).find((m: any) => same(m.email))?.role;
+    const design = (this.record ??= shared(RECORD_MS, async () => {
+      const [r] = await db().Design.filter({ room });
+      if (!r) return null;
+      this.recordId = r.id;
+      return readDesign(seal(), r);
+    }));
+    const accessOf = (d: any, user: Person) => {
+      const role = d ? roleIn(d, user.email) : null;
       return role ? { role, name: d.name } : null;
     };
+    const recordId = async () => this.recordId ?? (await design(true), this.recordId);
     const motors = (this.motorList ??= shared(MOTORS_MS, async () => {
       const d = await design().catch(() => null);
       if (!d) return [];
-      const emails = [d.owner_email, ...(d.members ?? []).map((m: any) => m.email)];
-      const lists = await Promise.all(emails.map((email: string) => db().Motor.filter({ owner_email: email })));
-      return lists.flat().map((m: any) => ({ name: motorFileName(m), content: m.content }));
+      const emails = [d.owner_email, ...d.members.map((m: any) => m.email)];
+      const keys = await Promise.all(emails.map((e: string) => seal().lookupKey(e)));
+      const lists = await Promise.all(keys.map((owner) => db().Motor.filter({ owner })));
+      const out = [];
+      for (const r of lists.flat()) {
+        if (!keys.includes(r.owner)) continue;
+        const m = await readMotor(seal(), r);
+        out.push({ name: motorFileName(m), content: m.content });
+      }
+      return out;
     }));
     return {
       storage: this.storage,
@@ -92,16 +108,20 @@ export default class DesignRoom extends Actor {
       // From a record a moment old; before refusing someone, from a fresh one (they may just have
       // been added).
       access: async (user: Person, { fresh = false } = {}) =>
-        roleIn(await design(), user) ?? (fresh ? roleIn(await design(true), user) : null),
+        accessOf(await design(), user) ?? (fresh ? accessOf(await design(true), user) : null),
       motors: () => motors(),
-      touch: ({ version }: { version: number }) =>
-        db().Design.update(designId, { version, edited_at: new Date().toISOString() }),
+      touch: async ({ version }: { version: number }) => {
+        const id = await recordId();
+        if (id) await db().Design.update(id, { version, edited_at: new Date().toISOString() });
+      },
       preview: async (preview: string, { onlyIfMissing = false } = {}) => {
         if (onlyIfMissing) {
           const d = await design(true).catch(() => null);
           if (!d || d.preview != null) return false;
         }
-        await db().Design.update(designId, { preview });
+        const id = await recordId();
+        if (!id) return false;
+        await db().Design.update(id, { sealed_preview: await seal().seal(preview) });
         return true;
       },
     };
@@ -113,7 +133,7 @@ export default class DesignRoom extends Actor {
       const refused = await room.handleConnect(conn);
       if (refused) conn.reject(4003, refused);
     } catch (e) {
-      console.error("DesignRoom connect failed", e);
+      console.error("DesignRoom connect failed", e instanceof Error ? e.name : "error");
       conn.reject(1011, "The design could not be opened.");
     }
   }

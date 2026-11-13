@@ -9,7 +9,18 @@ export const base44 = createClient({
   appBaseUrl: import.meta.env.VITE_BASE44_APP_BASE_URL,
 });
 
-export const db = base44.entities;
+/**
+ * Calls one of the app's backend functions ('designs', 'motors', 'flights') and returns its result.
+ * Designs, motors and saved launch plans are stored sealed, so these functions are the only way to
+ * read or change them.
+ */
+export async function api(name, body) {
+  try {
+    return (await base44.functions.invoke(name, body)).data;
+  } catch (e) {
+    throw new Error(e.response?.data?.error ?? e.message);
+  }
+}
 
 /** The signed-in person ({ id, email, full_name }), or null. */
 export async function currentUser() {

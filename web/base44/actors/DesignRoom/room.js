@@ -257,7 +257,7 @@ export class Room {
         }
       }
     })()
-      .catch((e) => console.error('access check failed', e))
+      .catch((e) => console.error('access check failed', e?.name ?? 'error'))
       .finally(() => {
         this.rechecking = null;
       });
@@ -548,7 +548,8 @@ export class Room {
       }
     } catch (e) {
       if (e instanceof RevertError) return fail(e.message);
-      console.error('request failed', msg.type, e);
+      // Only the kind of error: a message could quote the design or a record.
+      console.error('request failed', msg.type, e?.name ?? 'error');
       return fail('Something went wrong.');
     }
   }

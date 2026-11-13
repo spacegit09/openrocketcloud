@@ -1,41 +1,98 @@
-// A shared OpenRocket design. Its content, edit history and saved copies live in the
-// DesignRoom actor session with the same id; this record is for listing and sharing.
+// Transition schema while records move to sealed form (web/base44/functions/migrateSealed):
+// the sealed fields beside the old plain ones, access rules as before. The final schema, with
+// only the sealed fields and closed to direct access, is web/migration/entities/Design.jsonc.
 {
   "name": "Design",
   "type": "object",
-  "description": "A shared OpenRocket design",
+  "description": "A shared OpenRocket design (name, people and drawing encrypted)",
   "properties": {
-    "name": { "type": "string", "maxLength": 200 },
-    "owner_email": { "type": "string" },
-    "owner_name": { "type": "string" },
+    "room": {
+      "type": "string",
+      "description": "The design's id in links and its live-share room"
+    },
+    "people": {
+      "type": "array",
+      "description": "Keyed fingerprints of the owner's and members' email addresses (not reversible)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted name, owner and members (AES-256-GCM with the app's DATA_KEY secret)"
+    },
+    "sealed_preview": {
+      "type": "string",
+      "description": "Encrypted drawing of the rocket for its card (AES-256-GCM with the app's DATA_KEY secret)"
+    },
+    "version": {
+      "type": "integer"
+    },
+    "edited_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "owner_name": {
+      "type": "string"
+    },
     "members": {
       "type": "array",
       "description": "People it is shared with (the owner not included)",
       "items": {
         "type": "object",
         "properties": {
-          "email": { "type": "string" },
-          "role": { "type": "string", "enum": ["editor", "viewer"] }
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "editor",
+              "viewer"
+            ]
+          }
         }
       }
     },
     "member_emails": {
       "type": "array",
       "description": "Owner and members, for listing designs shared with someone",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
-    "version": { "type": "integer" },
-    "edited_at": { "type": "string", "format": "date-time" },
     "preview": {
       "type": "string",
       "description": "OpenRocket's side view of the rocket for the design's card (JSON; see server/src/preview.js)"
     }
   },
-  "required": ["name", "owner_email"],
+  "required": [],
   "rls": {
-    "create": { "data.owner_email": "{{user.email}}" },
-    "read": { "$or": [{ "data.owner_email": "{{user.email}}" }, { "data.member_emails": "{{user.email}}" }] },
-    "update": { "data.owner_email": "{{user.email}}" },
-    "delete": { "data.owner_email": "{{user.email}}" }
+    "create": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "read": {
+      "$or": [
+        {
+          "data.owner_email": "{{user.email}}"
+        },
+        {
+          "data.member_emails": "{{user.email}}"
+        }
+      ]
+    },
+    "update": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "delete": {
+      "data.owner_email": "{{user.email}}"
+    }
   }
 }

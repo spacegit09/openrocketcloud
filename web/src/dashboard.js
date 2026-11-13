@@ -1,7 +1,7 @@
 // The dashboard: sign in, list your designs and the ones shared with you, create (blank, from an
 // OpenRocket example, upload), share, download, edit history, saved copies, custom motors.
 import './style.css';
-import { base44, currentUser, db, signIn, signOut } from './base44.js';
+import { api, currentUser, signIn, signOut } from './base44.js';
 import {
   $, h, icon, avatar, timeAgo, toast, modal, confirmDialog, promptDialog, shareDialog, editHistoryDialog, ROCKET_SVG,
 } from './common.js';
@@ -71,7 +71,7 @@ const roleOf = (d) => (d.owner_email === me.email ? 'owner' : (d.members ?? []).
 const editedAt = (d) => Date.parse(d.edited_at ?? d.updated_date ?? d.created_date) || Date.now();
 
 async function load() {
-  designs = (await db.Design.list('-updated_date', 500)).sort((a, b) => editedAt(b) - editedAt(a));
+  designs = (await api('designs', { action: 'list' })).sort((a, b) => editedAt(b) - editedAt(a));
   render();
   // Designs without OpenRocket's drawing yet get one in the background, card by card.
   setTimeout(() => fillPreviews(designs, (d, json) => {
@@ -180,22 +180,14 @@ function setupNewMenu() {
   });
 }
 
-/** Creates the Design record (yours, shared with no one), hands the content to its room, and opens it. */
+/** Creates the design (yours, shared with no one), hands the content to its room, and opens it. */
 async function createDesign(name, model, { open = true } = {}) {
   toast('Creating the design…');
-  const d = await db.Design.create({
-    name,
-    owner_email: me.email,
-    owner_name: me.name,
-    members: [],
-    member_emails: [me.email],
-    version: 0,
-    edited_at: new Date().toISOString(),
-  });
+  const d = await api('designs', { action: 'create', name });
   try {
     await withRoom(d.id, (room) => room.request('init', { model: toJson(model) }, 120_000));
   } catch (e) {
-    await db.Design.delete(d.id).catch(() => {});
+    await api('designs', { action: 'delete', id: d.id }).catch(() => {});
     throw e;
   }
   if (open) location.href = `/design.html?id=${d.id}`;
@@ -325,7 +317,7 @@ async function savedCopies(d) {
 async function rename(d) {
   const name = await promptDialog('Rename design', 'Name', d.name);
   if (!name) return;
-  await db.Design.update(d.id, { name });
+  await api('designs', { action: 'rename', id: d.id, name });
   load();
 }
 
@@ -336,7 +328,7 @@ async function remove(d) {
   } catch {
     // Its content may already be gone; the record goes regardless.
   }
-  await db.Design.delete(d.id);
+  await api('designs', { action: 'delete', id: d.id });
   toast('Design deleted');
   load();
 }
@@ -344,10 +336,10 @@ async function remove(d) {
 async function leave(d) {
   if (!(await confirmDialog('Leave design?', `You will lose access to “${d.name}” until someone shares it with you again.`, 'Leave', true))) return;
   try {
-    await base44.functions.invoke('leaveDesign', { designId: d.id });
+    await api('designs', { action: 'leave', id: d.id });
     load();
   } catch (e) {
-    toast(e.response?.data?.error ?? e.message);
+    toast(e.message);
   }
 }
 
@@ -360,14 +352,14 @@ async function motorsDialog() {
   const add = h('button', { class: 'primary' }, icon('upload'), 'Add .eng / .rse files');
   const done = h('button', {}, 'Done');
   const render = async () => {
-    const files = await db.Motor.list('-created_date', 200);
+    const files = await api('motors', { action: 'list' });
     list.replaceChildren(...(files.length ? files.map((f) => {
       const motors = JSON.parse(f.summary || '[]');
       const dl = h('button', { class: 'ghost icon', title: `Download ${f.filename}`, 'aria-label': `Download ${f.filename}` }, icon('download'));
       dl.onclick = () => saveFile(new TextEncoder().encode(f.content), f.filename);
       const rm = h('button', { class: 'ghost icon', title: 'Remove', 'aria-label': `Remove ${f.filename}` }, icon('trash'));
       rm.onclick = async () => {
-        await db.Motor.delete(f.id);
+        await api('motors', { action: 'delete', id: f.id });
         render();
       };
       const m = motors[0] ?? {};
@@ -384,7 +376,7 @@ async function motorsDialog() {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const text = new TextDecoder().decode(bytes);
         const { motors } = readMotorFile(file.name, Object.assign(bytes, { toString: () => text }));
-        await db.Motor.create({ owner_email: me.email, filename: file.name, content: text, summary: JSON.stringify(motors) });
+        await api('motors', { action: 'add', filename: file.name, content: text, summary: JSON.stringify(motors) });
       } catch (err) {
         error.textContent = `${file.name}: ${err.message}`;
       }

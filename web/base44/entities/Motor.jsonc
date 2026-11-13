@@ -1,20 +1,50 @@
-// A custom motor file (.eng RASP or .rse RockSim). OpenRocket gets the motors of everyone a
-// design is shared with, so collaborators always see the same motors.
+// Transition schema while records move to sealed form (web/base44/functions/migrateSealed):
+// the sealed fields beside the old plain ones, access rules as before. The final schema, with
+// only the sealed fields and closed to direct access, is web/migration/entities/Motor.jsonc.
 {
   "name": "Motor",
   "type": "object",
-  "description": "A custom motor file",
+  "description": "A custom motor file (encrypted)",
   "properties": {
-    "owner_email": { "type": "string" },
-    "filename": { "type": "string", "maxLength": 200 },
-    "content": { "type": "string" },
-    "summary": { "type": "string" }
+    "owner": {
+      "type": "string",
+      "description": "Keyed fingerprint of the owner's email address (not reversible)"
+    },
+    "ref": {
+      "type": "string",
+      "description": "Its id before records were sealed, if it was moved (links still work)"
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted file name, contents and summary (AES-256-GCM with the app's DATA_KEY secret)"
+    },
+    "owner_email": {
+      "type": "string"
+    },
+    "filename": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "content": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    }
   },
-  "required": ["owner_email", "filename", "content"],
+  "required": [],
   "rls": {
-    "create": { "data.owner_email": "{{user.email}}" },
-    "read": { "data.owner_email": "{{user.email}}" },
-    "update": { "data.owner_email": "{{user.email}}" },
-    "delete": { "data.owner_email": "{{user.email}}" }
+    "create": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "read": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "update": {
+      "data.owner_email": "{{user.email}}"
+    },
+    "delete": {
+      "data.owner_email": "{{user.email}}"
+    }
   }
 }

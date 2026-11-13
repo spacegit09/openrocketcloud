@@ -7,15 +7,29 @@ log('signed in as', email);
 let ok = true;
 const check = (cond, what) => { log(cond ? 'PASS' : 'FAIL', what); if (!cond) ok = false; };
 
-const d = await base44.entities.Design.create({ name: 'Live check (delete me)', owner_email: email, owner_name: me.full_name ?? email, members: [], member_emails: [email], version: 0 });
-check(Boolean(d?.id), 'create own Design record');
+const call = async (fn, body) => (await base44.functions.invoke(fn, body)).data;
+const d = await call('designs', { action: 'create', name: 'Live check (delete me)' });
+check(Boolean(d?.id) && d.owner_email === email, 'create a design through the designs function');
+check((await call('designs', { action: 'list' })).some((x) => x.id === d.id), 'it is listed for its owner');
 let denied = false;
 try {
-  await base44.entities.Design.create({ name: 'x', owner_email: 'someone@else.example', member_emails: ['someone@else.example'] });
+  await base44.entities.Design.create({ room: crypto.randomUUID(), people: [], sealed: 'x' });
 } catch {
   denied = true;
 }
-check(denied, 'creating a Design in someone else\'s name is refused');
+check(denied, 'the Design table refuses direct writes');
+const motor = await call('motors', { action: 'add', filename: 'live-check.eng', content: 'X42 29 124 0 0.05 0.1 LiveCheck\n0.1 50\n0.2 0\n', summary: '[]' });
+check(Boolean(motor?.id), 'add a motor through the motors function');
+const plan = await call('flights', { action: 'create', name: 'Live check plan (delete me)', design_id: d.id, design_name: d.name, launch_time: new Date().toISOString(), summary: 'live check', data: 'H4sIAAAAAAAAA6uuBQBDv6ajAgAAAA==' });
+check(plan?.name === 'Live check plan (delete me)', 'save a launch plan through the flights function');
+check((await call('flights', { action: 'get', id: plan.id })).data === 'H4sIAAAAAAAAA6uuBQBDv6ajAgAAAA==', 'it opens again as saved');
+let unread = false;
+try {
+  unread = (await base44.entities.SavedFlight.list('-created_date', 50)).every((r) => !r.sealed);
+} catch {
+  unread = true;
+}
+check(unread, 'sealed launch plans are not readable from the table directly');
 
 // A direct WebSocket (the exec environment does not always hand the sign-in to the SDK's actor
 // connections): token from the authenticated mint endpoint, then the socket it names.
@@ -86,6 +100,7 @@ try {
   conn.send({ type: 'hello' });
   const w = await next((m) => m.type === 'welcome');
   check(Object.keys(w.model.objs).length === Object.keys(MODEL.objs).length, `welcome carries the design (${Object.keys(w.model.objs).length} objects)`);
+  check(w.motors.some((m) => m.name.endsWith('live-check.eng') && m.content.includes('LiveCheck')), 'welcome carries the owner\'s motor');
   const stage = Object.entries(w.model.objs).find(([, o]) => o.t === 'stage')[0];
   const t1 = Date.now();
   conn.send({ type: 'ops', seq: 1, ops: [{ op: 'set', id: stage, v: { name: '<name>Live booster</name>' } }] });
@@ -108,7 +123,10 @@ try {
   check(false, `actor: ${e.message}`);
 } finally {
   conn.close();
-  await base44.entities.Design.delete(d.id).catch(() => {});
+  await call('designs', { action: 'delete', id: d.id }).catch(() => {});
+  await call('motors', { action: 'delete', id: motor?.id }).catch(() => {});
+  await call('flights', { action: 'delete', id: plan?.id }).catch(() => {});
+  check(!(await call('designs', { action: 'list' })).some((x) => x.id === d.id), 'deleted design is gone from the list');
 }
 log(ok ? 'LIVE CHECK PASSED' : 'LIVE CHECK FAILED');
 Deno.exit(ok ? 0 : 1);

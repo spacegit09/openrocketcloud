@@ -1,7 +1,7 @@
 // The design page: OpenRocket running in this browser (CheerpJ), live-shared through the design's
 // room, with who's here, recent changes, sharing, edit history and .ork download.
 import './style.css';
-import { currentUser, db, signIn } from './base44.js';
+import { api, currentUser, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
 import { closeOpenRocket, editsSaved, onJavaDownload, previewSaved, prepareJava, startOpenRocket } from './java.js';
@@ -212,7 +212,7 @@ async function main() {
   me = hub ? { id: `local:${hub.user}`, email: hub.user, name: hub.name ?? hub.user } : await currentUser();
   if (!me) return signIn();
   // The design is looked up while its room connects and OpenRocket starts.
-  const found = hub ? null : db.Design.get(designId).catch(() => null);
+  const found = hub ? null : api('designs', { action: 'get', id: designId }).catch(() => null);
 
   room = new RoomClient(designId, { connectionId: connectionId() }).connect();
   let started = false;

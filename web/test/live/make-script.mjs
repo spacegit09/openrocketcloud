@@ -2,7 +2,7 @@
 //   node test/live/make-script.mjs && cat test/live/actor-check.js | base44 exec
 //   node test/live/landing.mjs https://<app>.base44.app
 // Writes test/live/actor-check.js: a script for `base44 exec` that checks the deployed
-// DesignRoom actor and the Design access rules as the signed-in developer.
+// DesignRoom actor and the designs and motors functions as the signed-in developer.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { importOrk } from '../../src/lib/ork.js';

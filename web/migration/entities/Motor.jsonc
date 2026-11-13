@@ -1,0 +1,31 @@
+// A custom motor file (.eng RASP or .rse RockSim), sealed (web/base44/shared/sealed.js). OpenRocket
+// gets the motors of everyone a design is shared with; the site reaches them only through the
+// motors function, the room as the service role.
+{
+  "name": "Motor",
+  "type": "object",
+  "description": "A custom motor file (encrypted)",
+  "properties": {
+    "owner": {
+      "type": "string",
+      "description": "Keyed fingerprint of the owner's email address (not reversible)"
+    },
+    "ref": {
+      "type": "string",
+      "description": "Its id before records were sealed, if it was moved (links still work)"
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted file name, contents and summary (AES-256-GCM with the app's DATA_KEY secret)"
+    }
+  },
+  "required": [
+    "sealed"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
