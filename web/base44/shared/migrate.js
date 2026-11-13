@@ -3,10 +3,12 @@
 // into a sealed one created by the service role, so no person shows as its creator: a design keeps
 // its id as its room (links, content and history stay), a motor and a saved flight keep their old
 // id as `ref`. Safe to run more than once: a copy is refreshed only from a plain record changed
-// since it was made (never over a newer copy). With finish, it then deletes the plain records,
-// each after its copy. Reports counts only, nothing personal.
+// since it was made (never over a newer copy). A sealed design without its room's access list
+// (by user id, see api.js) gets one. With finish, it then deletes the plain records, each after
+// its copy. Reports counts only, nothing personal.
 //   db = service-role entities, s = sealer(DATA_KEY)
-import { designFields, flightFields, motorFields } from './sealed.js';
+import { accessFor } from './api.js';
+import { designFields, flightFields, motorFields, readDesign } from './sealed.js';
 
 const lower = (e) => String(e ?? '').trim().toLowerCase();
 const newer = (a, b) => Date.parse(a?.updated_date ?? '') > Date.parse(b?.updated_date ?? '');
@@ -14,7 +16,7 @@ const isPlain = (r) => !r.sealed && Boolean(r.owner_email);
 
 export async function migrateToSealed({ db, s, finish = false }) {
   const report = {
-    designs: { plain: 0, copied: 0, refreshed: 0, removed: 0 },
+    designs: { plain: 0, copied: 0, refreshed: 0, removed: 0, access: 0 },
     motors: { plain: 0, copied: 0, removed: 0 },
     flights: { plain: 0, copied: 0, refreshed: 0, removed: 0 },
   };
@@ -38,6 +40,7 @@ export async function migrateToSealed({ db, s, finish = false }) {
       const fields = {
         version: Math.max(r.version ?? 0, copy?.version ?? 0),
         edited_at: [r.edited_at, r.updated_date, copy?.edited_at].filter(Boolean).sort().pop(),
+        access: await accessFor(db, d),
         ...(await designFields(s, d)),
       };
       if (r.preview != null) fields.sealed_preview = await s.seal(r.preview);
@@ -53,6 +56,13 @@ export async function migrateToSealed({ db, s, finish = false }) {
       await db.Design.delete(r.id);
       report.designs.removed++;
     }
+  }
+
+  // Sealed designs made before rooms checked access by user id (or by the move without it).
+  for (const r of await db.Design.list('-created_date', 5000)) {
+    if (!r.sealed || r.access) continue;
+    await db.Design.update(r.id, { access: await accessFor(db, await readDesign(s, r)) });
+    report.designs.access++;
   }
 
   // Motors never change: one copy each.

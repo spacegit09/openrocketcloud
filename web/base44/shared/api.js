@@ -3,7 +3,8 @@
 // direct access, so the backend functions (functions/designs, functions/motors, functions/flights)
 // are the only way in; they are thin wrappers around these handlers, which test/api.test.mjs runs
 // against an in-memory stand-in for Base44.
-//   ctx = { db: service-role entities, s: sealer(DATA_KEY), me: { email (lower case), name } }
+//   ctx = { db: service-role entities, s: sealer(DATA_KEY), me: { id, email (lower case), name } }
+import { cleanPreview } from './preview.js';
 import { designFields, flightFields, motorFields, readDesign, readFlight, readMotor, roleIn } from './sealed.js';
 
 export class ApiError extends Error {
@@ -47,21 +48,47 @@ function cleanMembers(list, ownerEmail) {
   return [...out.values()];
 }
 
-/** Designs: list, get, create, rename, share, leave, delete. Returns designs as readDesign() shapes them. */
+/**
+ * Who may open a design's room, as the room checks it: [{ id, role }] by Base44 user id. The room
+ * cannot read sealed records (Base44 gives actors no app secrets), so this is the one thing about
+ * a design it can see: who has which role, by opaque ids. People are shared with by email; one
+ * without an account yet is added the first time they look (designsApi's own()).
+ */
+export async function accessFor(db, d) {
+  const out = [];
+  for (const [email, role] of [[d.owner_email, 'owner'], ...d.members.map((m) => [m.email, m.role])]) {
+    const [u] = await db.User.filter({ email: String(email).toLowerCase() }).catch(() => []);
+    if (u?.id && !out.some((a) => a.id === u.id)) out.push({ id: u.id, role });
+  }
+  return out;
+}
+
+/**
+ * Designs: list, get, create, rename, share, leave, delete; motors (the custom motor files of
+ * everyone a design is shared with, for OpenRocket) and preview (keep OpenRocket's drawing of it).
+ * Returns designs as readDesign() shapes them.
+ */
 export async function designsApi({ db, s, me }, body) {
+  // The design's room knows people by user id: make sure it knows this one, with this role.
+  const own = async (r, role) => {
+    const access = r.access ?? [];
+    if (!me.id || access.some((a) => a.id === me.id && a.role === role)) return;
+    await db.Design.update(r.id, { access: [...access.filter((a) => a.id !== me.id), { id: me.id, role }] });
+  };
   const find = async (id) => {
     const room = String(id ?? '');
     const [r] = room ? await db.Design.filter({ room }) : [];
     const d = r ? await readDesign(s, r) : null;
     const role = d ? roleIn(d, me.email) : null;
     if (!role) fail(404, NOT_FOUND);
+    await own(r, role);
     return { r, d, role };
   };
   const ownerOnly = (role) => {
     if (role !== 'owner') fail(403, 'Only the owner can do that.');
   };
-  const save = async (r, d) => {
-    await db.Design.update(r.id, await designFields(s, d));
+  const save = async (r, d, { people = false } = {}) => {
+    await db.Design.update(r.id, { ...(await designFields(s, d)), ...(people ? { access: await accessFor(db, d) } : {}) });
     return d;
   };
 
@@ -72,7 +99,10 @@ export async function designsApi({ db, s, me }, body) {
       for (const r of await db.Design.filter({ people: key }, '-edited_at', 500)) {
         if (!r.people?.includes(key)) continue;
         const d = await readDesign(s, r);
-        if (roleIn(d, me.email)) out.push(d);
+        const role = roleIn(d, me.email);
+        if (!role) continue;
+        await own(r, role);
+        out.push(d);
       }
       return out;
     }
@@ -84,6 +114,7 @@ export async function designsApi({ db, s, me }, body) {
         room: newRoom(),
         version: 0,
         edited_at: new Date().toISOString(),
+        access: me.id ? [{ id: me.id, role: 'owner' }] : [],
         ...(await designFields(s, d)),
       });
       return readDesign(s, r);
@@ -96,12 +127,12 @@ export async function designsApi({ db, s, me }, body) {
     case 'share': {
       const { r, d, role } = await find(body.id);
       ownerOnly(role);
-      return save(r, { ...d, members: cleanMembers(body.members, d.owner_email) });
+      return save(r, { ...d, members: cleanMembers(body.members, d.owner_email) }, { people: true });
     }
     case 'leave': {
       const { r, d, role } = await find(body.id);
       if (role === 'owner') fail(400, 'You own this design. Delete it instead.');
-      await save(r, { ...d, members: d.members.filter((m) => m.email.toLowerCase() !== me.email) });
+      await save(r, { ...d, members: d.members.filter((m) => m.email.toLowerCase() !== me.email) }, { people: true });
       return { ok: true };
     }
     case 'delete': {
@@ -110,10 +141,34 @@ export async function designsApi({ db, s, me }, body) {
       await db.Design.delete(r.id);
       return { ok: true };
     }
+    case 'motors': {
+      const { r } = await find(body.id);
+      const lists = await Promise.all((r.people ?? []).map((owner) => db.Motor.filter({ owner })));
+      const out = [];
+      for (const m of lists.flat()) {
+        if (!r.people.includes(m.owner)) continue;
+        const f = await readMotor(s, m);
+        out.push({ name: motorFileName(f), content: f.content });
+      }
+      return out;
+    }
+    case 'preview': {
+      // As the room kept it: checked, empty for an empty rocket; someone who can only view the
+      // design may fill in a missing drawing, not change one.
+      const { r, role } = await find(body.id);
+      const clean = cleanPreview(body.preview);
+      if (!clean) return { kept: false };
+      if (role === 'viewer' && r.sealed_preview) return { kept: false };
+      await db.Design.update(r.id, { sealed_preview: await s.seal(clean.s.length ? JSON.stringify(clean) : '') });
+      return { kept: true };
+    }
     default:
       return fail(400, 'Unknown action.');
   }
 }
+
+/** A custom motor file's name in OpenRocket's file system: unique per record. */
+export const motorFileName = (m) => `${String(m.id).slice(0, 8)}-${String(m.filename).replace(/[^A-Za-z0-9._-]/g, '_')}`;
 
 /** The signed-in person's custom motor files: list, add, delete. */
 export async function motorsApi({ db, s, me }, body) {

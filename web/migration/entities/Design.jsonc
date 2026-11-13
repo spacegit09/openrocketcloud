@@ -1,7 +1,8 @@
 // A shared OpenRocket design. Its content, edit history and saved copies live in the DesignRoom
 // actor session named by `room`; this record is for listing and sharing. Its name, people and
-// drawing are sealed (web/base44/shared/sealed.js), so the dashboard shows only ciphertext and
-// fingerprints; the site reaches it only through the designs function, the room as the service role.
+// drawing are sealed (web/base44/shared/sealed.js), so the dashboard shows only ciphertext,
+// fingerprints, and who may open the room by user id; the site reaches it only through the
+// designs function, the room as the service role.
 {
   "name": "Design",
   "type": "object",
@@ -16,6 +17,26 @@
       "description": "Keyed fingerprints of the owner's and members' email addresses (not reversible)",
       "items": {
         "type": "string"
+      }
+    },
+    "access": {
+      "type": "array",
+      "description": "Who may open its live-share room, by Base44 user id and role (the room cannot read the sealed fields)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor",
+              "viewer"
+            ]
+          }
+        }
       }
     },
     "sealed": {

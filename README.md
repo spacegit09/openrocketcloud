@@ -139,18 +139,21 @@ base44 deploy --build --yes                   # site, actor, records, Google sig
 
 **Privacy in the Base44 dashboard.** Design names, owners and members, design drawings, custom
 motor files and saved launch plans are stored sealed: encrypted (AES-256-GCM) with the app's
-`DATA_KEY` secret by the app's backend functions (`designs`, `motors`, `flights`) and the
-live-share room, so the dashboard's Data pages show only ciphertext. Records are found by keyed
-fingerprints of email addresses, which cannot be turned back into addresses without the key, and
-are created by the service role, so their *Created by* is no one. The tables are closed to
-direct access from browsers; the functions check who may do what (`web/base44/shared/api.js`).
-Errors are logged without their messages, which could quote a record. Designs' contents and edit
-histories live in the room's actor storage, which the dashboard does not show. What the dashboard
-still shows is Base44's own: the *Users* page (each person's name and Google email, and so the user
-count), and logs of function calls by person. This keeps personal data out of sight of anyone
-browsing the dashboard; whoever controls the app's code and secrets could still deploy code that
-reads it. Keep a copy of `DATA_KEY` somewhere safe: Base44 cannot show it again, and without it the
-sealed records cannot be read.
+`DATA_KEY` secret by the app's backend functions (`designs`, `motors`, `flights`), so the
+dashboard's Data pages show only ciphertext. Records are found by keyed fingerprints of email
+addresses, which cannot be turned back into addresses without the key, and are created by the
+service role, so their *Created by* is no one. The tables are closed to direct access from
+browsers; the functions check who may do what (`web/base44/shared/api.js`). Base44 gives actors no
+app secrets, so the live-share room reads only what it needs in the clear: who may open a design,
+as Base44 user ids with their roles (`access`, kept by the `designs` function); browsers get the
+custom motor files and save drawings through the `designs` function. Errors are logged without
+their messages, which could quote a record. Designs' contents and edit histories live in the
+room's actor storage, which the dashboard does not show. What the dashboard still shows: on each
+Design record, which user ids may open it (not its name or anything in it); and Base44's own *Users*
+page (each person's name and Google email, and so the user count) and logs of function calls by
+person. This keeps personal data out of sight of anyone browsing the dashboard; whoever controls
+the app's code and secrets could still deploy code that reads it. Keep a copy of `DATA_KEY`
+somewhere safe: Base44 cannot show it again, and without it the sealed records cannot be read.
 
 To try changes before deploying, run the design page on your computer:
 

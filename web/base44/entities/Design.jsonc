@@ -17,6 +17,26 @@
         "type": "string"
       }
     },
+    "access": {
+      "type": "array",
+      "description": "Who may open its live-share room, by Base44 user id and role (the room cannot read the sealed fields)",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "editor",
+              "viewer"
+            ]
+          }
+        }
+      }
+    },
     "sealed": {
       "type": "string",
       "description": "Encrypted name, owner and members (AES-256-GCM with the app's DATA_KEY secret)"
