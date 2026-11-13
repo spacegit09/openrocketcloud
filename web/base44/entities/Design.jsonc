@@ -1,6 +1,8 @@
-// Transition schema while records move to sealed form (web/base44/functions/migrateSealed):
-// the sealed fields beside the old plain ones, access rules as before. The final schema, with
-// only the sealed fields and closed to direct access, is web/migration/entities/Design.jsonc.
+// A shared OpenRocket design. Its content, edit history and saved copies live in the DesignRoom
+// actor session named by `room`; this record is for listing and sharing. Its name, people and
+// drawing are sealed (web/base44/shared/sealed.js), so the dashboard shows only ciphertext,
+// fingerprints, and who may open the room by user id; the site reaches it only through the
+// designs function, the room as the service role.
 {
   "name": "Design",
   "type": "object",
@@ -51,68 +53,15 @@
     "edited_at": {
       "type": "string",
       "format": "date-time"
-    },
-    "name": {
-      "type": "string",
-      "maxLength": 200
-    },
-    "owner_email": {
-      "type": "string"
-    },
-    "owner_name": {
-      "type": "string"
-    },
-    "members": {
-      "type": "array",
-      "description": "People it is shared with (the owner not included)",
-      "items": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string",
-            "enum": [
-              "editor",
-              "viewer"
-            ]
-          }
-        }
-      }
-    },
-    "member_emails": {
-      "type": "array",
-      "description": "Owner and members, for listing designs shared with someone",
-      "items": {
-        "type": "string"
-      }
-    },
-    "preview": {
-      "type": "string",
-      "description": "OpenRocket's side view of the rocket for the design's card (JSON; see server/src/preview.js)"
     }
   },
-  "required": [],
+  "required": [
+    "sealed"
+  ],
   "rls": {
-    "create": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "read": {
-      "$or": [
-        {
-          "data.owner_email": "{{user.email}}"
-        },
-        {
-          "data.member_emails": "{{user.email}}"
-        }
-      ]
-    },
-    "update": {
-      "data.owner_email": "{{user.email}}"
-    },
-    "delete": {
-      "data.owner_email": "{{user.email}}"
-    }
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
   }
 }

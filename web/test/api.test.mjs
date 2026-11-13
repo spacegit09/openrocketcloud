@@ -1,10 +1,9 @@
-// Who may do what with designs, motors and saved launch plans (base44/shared/api.js), and the move
-// of plain records to sealed ones (base44/shared/migrate.js), against an in-memory stand-in for
-// Base44's entities; and that the stored records hold no personal data in the clear.
+// Who may do what with designs, motors and saved launch plans (base44/shared/api.js), against an
+// in-memory stand-in for Base44's entities; and that the stored records hold no personal data in
+// the clear.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ApiError, designsApi, flightsApi, motorsApi } from '../base44/shared/api.js';
-import { migrateToSealed } from '../base44/shared/migrate.js';
 import { readDesign, sealer } from '../base44/shared/sealed.js';
 
 /** Base44-like entity tables: equality filters (an array field matches any element, an array value means any of). */
@@ -202,93 +201,6 @@ test('stored launch plans hold no names, emails, places or results in the clear'
   }
 });
 
-/** Plain records as the site kept them before sealing, created by people (with created_by). */
-async function plainRecords(db) {
-  const design = await db.Design.create({
-    name: 'Old two stage', owner_email: 'Mina@example.com', owner_name: 'Mina Park', created_by: 'mina@example.com',
-    members: [{ email: 'Joon@example.com', role: 'editor' }, { email: 'sora@example.com', role: 'viewer' }],
-    member_emails: ['mina@example.com', 'joon@example.com', 'sora@example.com'], version: 7, edited_at: '2025-12-01T00:00:00.000Z',
-    preview: '{"parts":[]}',
-  });
-  const lone = await db.Design.create({ name: 'Old glider', owner_email: 'joon@example.com', owner_name: 'Joon Lee', members: [], member_emails: ['joon@example.com'], version: 2 });
-  const motor = await db.Motor.create({ owner_email: 'mina@example.com', filename: 'old.eng', content: 'X42 29 124 0 0.05 0.1 Old\n0.1 50\n', summary: '[]', created_by: 'mina@example.com' });
-  const flight = await db.SavedFlight.create({ owner_email: 'mina@example.com', ...PLAN, created_by: 'mina@example.com' });
-  return { design, lone, motor, flight };
-}
-
-test('the move to sealed records keeps every id, person, role, motor and plan', async () => {
-  const { db, s, ids, mina, joon, sora } = setup();
-  await Promise.all([mina, joon, sora].map((p) => p.join()));
-  const old = await plainRecords(db);
-  const first = await migrateToSealed({ db, s });
-  assert.deepEqual(first, {
-    designs: { plain: 2, copied: 2, refreshed: 0, removed: 0, access: 0 },
-    motors: { plain: 1, copied: 1, removed: 0 },
-    flights: { plain: 1, copied: 1, refreshed: 0, removed: 0 },
-  });
-  // The sealed copies are what the functions see; ids (rooms, links) stay.
-  const d = await mina.designs({ action: 'get', id: old.design.id });
-  assert.equal(d.name, 'Old two stage');
-  assert.equal(d.owner_email, 'mina@example.com');
-  assert.deepEqual(d.members, [{ email: 'joon@example.com', role: 'editor' }, { email: 'sora@example.com', role: 'viewer' }]);
-  assert.equal(d.preview, '{"parts":[]}');
-  assert.equal(d.version, 7);
-  assert.deepEqual(await accessOf(db, ids, old.design.id), [['joon@example.com', 'editor'], ['mina@example.com', 'owner'], ['sora@example.com', 'viewer']],
-    'the room knows everyone with an account');
-  assert.equal((await sora.designs({ action: 'get', id: old.design.id })).name, 'Old two stage');
-  assert.deepEqual((await joon.designs({ action: 'list' })).map((x) => x.id).sort(), [old.design.id, old.lone.id].sort());
-  assert.deepEqual((await mina.motors({ action: 'list' })).map((m) => m.filename), ['old.eng']);
-  assert.equal((await mina.flights({ action: 'get', id: old.flight.id })).name, PLAN.name, 'a plan opens by its old id');
-  assert.deepEqual((await mina.flights({ action: 'list' })).map((x) => x.id), [old.flight.id]);
-  // Again: nothing copied twice.
-  const again = await migrateToSealed({ db, s });
-  assert.equal(again.designs.copied + again.designs.refreshed + again.motors.copied + again.flights.copied + again.flights.refreshed, 0);
-});
-
-test('the move refreshes a copy from a plain record changed since, never over a newer copy', async () => {
-  const { db, s, mina } = setup();
-  const old = await plainRecords(db);
-  await migrateToSealed({ db, s });
-  // The old site renames a design after it was copied: the next run brings that over.
-  await db.Design.update(old.design.id, { name: 'Renamed on the old site' });
-  assert.equal((await migrateToSealed({ db, s })).designs.refreshed, 1);
-  assert.equal((await mina.designs({ action: 'get', id: old.design.id })).name, 'Renamed on the old site');
-  // The new site renames it: the plain record, now older, does not overwrite that.
-  await mina.designs({ action: 'rename', id: old.design.id, name: 'Renamed on the new site' });
-  await mina.flights({ action: 'rename', id: old.flight.id, name: 'New plan name' });
-  const run = await migrateToSealed({ db, s });
-  assert.equal(run.designs.refreshed + run.flights.refreshed, 0);
-  assert.equal((await mina.designs({ action: 'get', id: old.design.id })).name, 'Renamed on the new site');
-  assert.equal((await mina.flights({ action: 'get', id: old.flight.id })).name, 'New plan name');
-});
-
-test('finishing the move deletes the plain records and leaves nothing personal in the clear', async () => {
-  const { db, s, mina, joon } = setup();
-  const old = await plainRecords(db);
-  await migrateToSealed({ db, s });
-  const done = await migrateToSealed({ db, s, finish: true });
-  assert.deepEqual([done.designs.removed, done.motors.removed, done.flights.removed], [2, 1, 1]);
-  for (const t of ['Design', 'Motor', 'SavedFlight']) {
-    for (const r of db[t].rows.values()) {
-      assert.ok(r.sealed, `${t}: only sealed records are left`);
-      assert.equal(r.created_by, undefined, `${t}: made by the service role, so no creator`);
-    }
-  }
-  const stored = JSON.stringify(['Design', 'Motor', 'SavedFlight'].flatMap((t) => [...db[t].rows.values()]));
-  for (const plain of ['example.com', 'mina', 'Mina', 'joon', 'Joon Lee', 'Old two stage', 'Old glider', 'old.eng', 'Saturday', 'parts']) {
-    assert.ok(!stored.includes(plain), `found "${plain}" in stored records`);
-  }
-  // Everything still works for everyone.
-  assert.equal((await joon.designs({ action: 'get', id: old.design.id })).name, 'Old two stage');
-  assert.equal((await mina.flights({ action: 'get', id: old.flight.id })).summary, PLAN.summary);
-  assert.equal((await mina.motors({ action: 'list' })).length, 1);
-  assert.deepEqual(await migrateToSealed({ db, s, finish: true }), {
-    designs: { plain: 0, copied: 0, refreshed: 0, removed: 0, access: 0 },
-    motors: { plain: 0, copied: 0, removed: 0 },
-    flights: { plain: 0, copied: 0, refreshed: 0, removed: 0 },
-  });
-});
-
 test('a design\'s drawing is sealed apart from it and opened with it', async () => {
   const { db, s, mina } = setup();
   const d = await mina.designs({ action: 'create', name: 'Drawn' });
@@ -347,14 +259,4 @@ test('a design\'s drawing: kept sealed; a viewer may only fill in a missing one;
   assert.equal((await mina.designs({ action: 'get', id: d.id })).preview, '', 'an empty rocket');
   assert.deepEqual(await mina.designs({ action: 'preview', id: d.id, preview: '<svg onload=alert(1)>' }), { kept: false });
   assert.ok(!JSON.stringify([...db.Design.rows.values()]).includes('380'), 'the drawing is not stored in the clear');
-});
-
-test('the move gives sealed designs without one their room\'s access list', async () => {
-  const { db, s, ids, mina } = setup();
-  const d = await mina.designs({ action: 'create', name: 'Made before access lists' });
-  const [r] = await db.Design.filter({ room: d.id });
-  await db.Design.update(r.id, { access: undefined });
-  assert.equal((await migrateToSealed({ db, s })).designs.access, 1);
-  assert.deepEqual(await accessOf(db, ids, d.id), [['mina@example.com', 'owner']]);
-  assert.equal((await migrateToSealed({ db, s })).designs.access, 0);
 });
