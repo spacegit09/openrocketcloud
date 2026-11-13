@@ -889,18 +889,21 @@ async function makePreview(file, kind) {
     [w, h2] = [video.videoWidth, video.videoHeight];
     source = video;
   }
-  const out = { w, h: h2, duration, preview: null };
-  for (const max of [960, 720, 480]) {
-    const scale = Math.min(1, max / Math.max(w, h2));
-    canvas.width = Math.max(1, Math.round(w * scale));
-    canvas.height = Math.max(1, Math.round(h2 * scale));
-    canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
-    const url = canvas.toDataURL('image/jpeg', 0.78);
-    if (url.length <= 280_000) {
-      out.preview = url;
-      break;
+  const out = { w, h: h2, duration, preview: null, thumb: null };
+  // A JPEG of the picture at most `max` pixels across, if one fits in `chars`.
+  const jpeg = (sizes, quality, chars) => {
+    for (const max of sizes) {
+      const scale = Math.min(1, max / Math.max(w, h2));
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h2 * scale));
+      canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+      const url = canvas.toDataURL('image/jpeg', quality);
+      if (url.length <= chars) return url;
     }
-  }
+    return null;
+  };
+  out.preview = jpeg([960, 720, 480], 0.78, 280_000); // the gallery and the PDF
+  out.thumb = jpeg([320, 240, 160], 0.7, 15_000); // the logbook's card
   if (kind === 'video') URL.revokeObjectURL(source.src);
   return out;
 }

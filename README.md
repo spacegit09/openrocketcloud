@@ -156,6 +156,11 @@ page (each person's name and Google email, and so the user count) and logs of fu
 person. This keeps personal data out of sight of anyone browsing the dashboard; whoever controls
 the app's code and secrets could still deploy code that reads it. Keep a copy of `DATA_KEY`
 somewhere safe: Base44 cannot show it again, and without it the sealed records cannot be read.
+Base44 refuses a record over about 20,000 characters, so sealed values over a kilobyte are
+compressed before they are encrypted, and any still longer than 12,000 characters (flight data,
+big launch plans and motor files, detailed drawings, photo previews) are kept in `SealedPart`
+records of 12,000 characters each (`web/base44/shared/parts.js`); the tests' stand-in for Base44
+refuses big records the same way.
 
 To try changes before deploying, run the design page on your computer:
 

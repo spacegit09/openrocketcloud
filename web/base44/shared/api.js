@@ -4,6 +4,7 @@
 // are the only way in; they are thin wrappers around these handlers, which test/api.test.mjs runs
 // against an in-memory stand-in for Base44.
 //   ctx = { db: service-role entities, s: sealer(DATA_KEY), me: { id, email (lower case), name } }
+import { withParts } from './parts.js';
 import { cleanPreview } from './preview.js';
 import { designFields, flightFields, motorFields, readDesign, readFlight, readMotor, roleIn } from './sealed.js';
 
@@ -68,7 +69,8 @@ export async function accessFor(db, d) {
  * everyone a design is shared with, for OpenRocket) and preview (keep OpenRocket's drawing of it).
  * Returns designs as readDesign() shapes them.
  */
-export async function designsApi({ db, s, me }, body) {
+export async function designsApi({ db: raw, s, me }, body) {
+  const db = withParts(raw); // long sealed values in parts (Base44 refuses big records)
   // The design's room knows people by user id: make sure it knows this one, with this role.
   const own = async (r, role) => {
     const access = r.access ?? [];
@@ -171,7 +173,8 @@ export async function designsApi({ db, s, me }, body) {
 export const motorFileName = (m) => `${String(m.id).slice(0, 8)}-${String(m.filename).replace(/[^A-Za-z0-9._-]/g, '_')}`;
 
 /** The signed-in person's custom motor files: list, add, delete. */
-export async function motorsApi({ db, s, me }, body) {
+export async function motorsApi({ db: raw, s, me }, body) {
+  const db = withParts(raw);
   const key = await s.lookupKey(me.email);
   switch (body?.action) {
     case 'list': {
@@ -199,7 +202,8 @@ export async function motorsApi({ db, s, me }, body) {
 }
 
 /** The signed-in person's saved launch plans: list, get, create, update, rename, delete. */
-export async function flightsApi({ db, s, me }, body) {
+export async function flightsApi({ db: raw, s, me }, body) {
+  const db = withParts(raw);
   const key = await s.lookupKey(me.email);
   // A plan moved from before records were sealed is still found by its old id.
   const find = async (id) => {

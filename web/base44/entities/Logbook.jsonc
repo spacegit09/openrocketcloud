@@ -18,7 +18,7 @@
     },
     "sealed_data": {
       "type": "string",
-      "description": "Encrypted flight data and media previews"
+      "description": "Encrypted flight data and media previews, for logbooks saved before 2026-11-14 (since then kept on their own in SealedPart)"
     },
     "version": { "type": "integer" },
     "edited_at": { "type": "string", "format": "date-time" }

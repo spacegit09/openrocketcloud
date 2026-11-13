@@ -1,16 +1,20 @@
 // Flight logbooks: who may do what, checked here for the signed-in person (the logbooks function
 // wraps this; test/logbook-api.test.mjs runs it against an in-memory stand-in for Base44).
 //
-// Logbook record: { id, people, sealed, sealed_data, version, edited_at }, sealed (sealed.js):
-//   people       lookup keys of the owner and members
-//   sealed       { title, owner_email, owner_name, members, details, description, notes,
-//                  datasets: [descriptor without rows], media: [item without preview], spark, cover }
-//   sealed_data  { rows: { datasetId: [[t, v...]] }, previews: { mediaId: data URL } }
-// Listing opens only `sealed`. The owner shares and deletes; editors change the rest; viewers read.
+// Logbook record: { id, people, sealed, version, edited_at }, sealed (sealed.js):
+//   people   lookup keys of the owner and members
+//   sealed   { title, owner_email, owner_name, members, details, description, notes,
+//              datasets: [descriptor, data], media: [item, look, thumb], spark, cover }
+// Each data set's rows and each picture's preview are sealed and kept on their own (parts.js:
+// `data`, `look`), so that a logbook's record stays small (Base44 refuses big ones) and a change
+// rewrites only what changed. Listing opens only `sealed`. Logbooks saved before kept rows and
+// previews together in `sealed_data` ({ rows: {id: rows}, previews: {id: data URL} }); they are
+// read from there. The owner shares and deletes; editors change the rest; viewers read.
 // Photos and videos are Base44 private files: the page uploads them and records them here; their
 // signed links come from here (files.sign), for everyone the logbook is shared with.
 //   ctx = { db, s: sealer(DATA_KEY), me: { id, email, name }, files: { sign(uri) -> url } }
 import { cleanMembers, fail, newRoom } from './api.js';
+import { drop, loadAll, store, withParts } from './parts.js';
 import { roleIn } from './sealed.js';
 
 const NOT_FOUND = 'Logbook not found. It may have been deleted, or it is not shared with you.';
@@ -21,9 +25,10 @@ const MAX_TEXT = 20_000;
 const MAX_DATASETS = 20;
 const MAX_COLUMNS = 12;
 const MAX_ROWS = 50_000;
-const MAX_DATA_CHARS = 8_000_000;
+const MAX_DATA_CHARS = 3_000_000; // a data set, sealed (compressed)
 const MAX_MEDIA = 50;
 const MAX_PREVIEW_CHARS = 300_000;
+const MAX_THUMB_CHARS = 16_000;
 
 const str = (v, max) => String(v ?? '').slice(0, max);
 const newId = () => newRoom().slice(0, 12);
@@ -75,7 +80,8 @@ function cleanMedia(m) {
   if (!m || typeof m !== 'object') fail(400, 'No file.');
   const uri = str(m.file_uri, 500);
   if (!uri) fail(400, 'The file was not uploaded.');
-  const preview = typeof m.preview === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(m.preview) && m.preview.length <= MAX_PREVIEW_CHARS ? m.preview : null;
+  const image = (v, max) => (typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length <= max ? v : null);
+  const preview = image(m.preview, MAX_PREVIEW_CHARS);
   return {
     item: {
       id: newId(),
@@ -88,15 +94,16 @@ function cleanMedia(m) {
       h: Number(m.h) || null,
       duration: Number(m.duration) || null,
       caption: str(m.caption, 500),
+      thumb: image(m.thumb, MAX_THUMB_CHARS),
     },
     preview,
   };
 }
 
 /** A small curve of the first altitude column (or the first column) for the logbook's card. */
-function sparkline(datasets, rows) {
+async function sparkline(datasets, rowsOf) {
   const ds = datasets.find((d) => d.columns.some((c) => c.q === 'altitude')) ?? datasets[0];
-  const data = ds ? rows[ds.id] : null;
+  const data = ds ? await rowsOf(ds) : null;
   if (!data || data.length < 2) return null;
   const j = Math.max(0, ds.columns.findIndex((c) => c.q === 'altitude')) + 1;
   const n = Math.min(48, data.length);
@@ -120,8 +127,8 @@ function full(r, meta, data, role) {
     details: meta.details ?? {},
     description: meta.description ?? '',
     notes: meta.notes ?? '',
-    datasets: (meta.datasets ?? []).map((d) => ({ ...d, rows: data.rows?.[d.id] ?? [] })),
-    media: (meta.media ?? []).map((m) => ({ ...m, preview: data.previews?.[m.id] ?? null })),
+    datasets: (meta.datasets ?? []).map(({ data: _kept, ...d }) => ({ ...d, rows: data.rows?.[d.id] ?? [] })),
+    media: (meta.media ?? []).map(({ look: _kept, file_uri: _uri, ...m }) => ({ ...m, preview: data.previews?.[m.id] ?? null })),
     version: r.version ?? 0,
     edited_at: r.edited_at ?? r.updated_date,
     created_date: r.created_date,
@@ -150,24 +157,40 @@ function card(r, meta, role) {
   };
 }
 
-export async function logbooksApi({ db, s, me, files }, body) {
-  const find = async (id, { data = false } = {}) => {
+export async function logbooksApi({ db: raw, s, me, files }, body) {
+  const db = withParts(raw);
+  // Sealed rows and previews, each kept on its own (parts.js).
+  const keep = async (value) => store(raw, await s.seal(value), { always: true });
+  const find = async (id) => {
     const rid = String(id ?? '');
     const r = rid ? await db.Logbook.get(rid).catch(() => null) : null;
     if (!r?.sealed) fail(404, NOT_FOUND);
     const meta = await s.open(r.sealed);
     const role = roleIn({ owner_email: meta.owner_email, members: meta.members ?? [] }, me.email);
     if (!role) fail(404, NOT_FOUND);
-    return { r, meta, data: data ? (r.sealed_data ? await s.open(r.sealed_data) : { rows: {}, previews: {} }) : null, role };
+    return { r, meta, role };
   };
+  // Every data set's rows and picture's preview, read together (and from `sealed_data` for a
+  // logbook saved before they were kept on their own).
+  const contents = async (r, meta) => {
+    const old = r.sealed_data ? await s.open(r.sealed_data) : { rows: {}, previews: {} };
+    const sets = (meta.datasets ?? []).filter((d) => d.data);
+    const looks = (meta.media ?? []).filter((m) => m.look);
+    const texts = await loadAll(raw, [...sets.map((d) => d.data), ...looks.map((m) => m.look)]);
+    const data = { rows: { ...(old.rows ?? {}) }, previews: { ...(old.previews ?? {}) } };
+    for (const [i, d] of sets.entries()) data.rows[d.id] = await s.open(texts[i]);
+    for (const [i, m] of looks.entries()) data.previews[m.id] = await s.open(texts[sets.length + i]);
+    return data;
+  };
+  const rowsOf = async (r, d) => (d.data ? s.open((await loadAll(raw, [d.data]))[0]) : (r.sealed_data ? (await s.open(r.sealed_data)).rows?.[d.id] : null));
   const editor = (role) => {
     if (role === 'viewer') fail(403, 'You can view this logbook but not change it.');
   };
   const owner = (role) => {
     if (role !== 'owner') fail(403, 'Only the owner can do that.');
   };
-  // Saves the logbook (people, data and all), one version later.
-  const save = async (r, meta, data) => {
+  // Saves the logbook's record (people and the sealed logbook), one version later.
+  const save = async (r, meta) => {
     const people = [meta.owner_email, ...(meta.members ?? []).map((m) => m.email)];
     const fields = {
       people: await Promise.all(people.map((e) => s.lookupKey(e))),
@@ -175,20 +198,18 @@ export async function logbooksApi({ db, s, me, files }, body) {
       version: (r.version ?? 0) + 1,
       edited_at: new Date().toISOString(),
     };
-    if (data) {
-      const sealedData = await s.seal(data);
-      if (sealedData.length > MAX_DATA_CHARS * 1.4) fail(413, 'This logbook is full: remove a data set or some photos first.');
-      fields.sealed_data = sealedData;
-    }
     const updated = await db.Logbook.update(r.id, fields);
     return { ...r, ...fields, ...(updated ?? {}) };
   };
-  // Data sets and photos changed: the card's curve and cover follow.
-  const refresh = (meta, data) => {
-    meta.spark = sparkline(meta.datasets ?? [], data.rows ?? {});
-    const photo = (meta.media ?? []).find((m) => m.kind === 'photo' && data.previews?.[m.id])
-      ?? (meta.media ?? []).find((m) => data.previews?.[m.id]);
-    meta.cover = photo ? data.previews[photo.id] : null;
+  // The logbook as the page sees it, after a change.
+  const after = async (r, meta, role) => {
+    const saved = await save(r, meta);
+    return full(saved, meta, await contents(saved, meta), role);
+  };
+  // The card's cover: the first photo's thumbnail (or any picture's).
+  const cover = (meta) => {
+    const m = (meta.media ?? []).find((x) => x.kind === 'photo' && x.thumb) ?? (meta.media ?? []).find((x) => x.thumb);
+    meta.cover = m ? m.thumb : null;
   };
 
   switch (body?.action) {
@@ -204,8 +225,8 @@ export async function logbooksApi({ db, s, me, files }, body) {
       return out;
     }
     case 'get': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
-      return full(r, meta, data, role);
+      const { r, meta, role } = await find(body.id);
+      return full(r, meta, await contents(r, meta), role);
     }
     case 'create': {
       const meta = {
@@ -221,76 +242,78 @@ export async function logbooksApi({ db, s, me, files }, body) {
         spark: null,
         cover: null,
       };
-      const data = { rows: {}, previews: {} };
       const people = [await s.lookupKey(me.email)];
-      const r = await db.Logbook.create({ people, sealed: await s.seal(meta), sealed_data: await s.seal(data), version: 0, edited_at: new Date().toISOString() });
-      return full(r, meta, data, 'owner');
+      const r = await db.Logbook.create({ people, sealed: await s.seal(meta), version: 0, edited_at: new Date().toISOString() });
+      return full(r, meta, { rows: {}, previews: {} }, 'owner');
     }
     case 'update': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
       if ('title' in body) meta.title = cleanTitle(body.title);
       if ('details' in body) meta.details = cleanDetails(body.details, meta.details);
       if ('description' in body) meta.description = str(body.description, MAX_TEXT);
       if ('notes' in body) meta.notes = str(body.notes, MAX_TEXT);
-      return full(await save(r, meta, null), meta, data, role);
+      return after(r, meta, role);
     }
     case 'addDataset': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
       if ((meta.datasets ?? []).length >= MAX_DATASETS) fail(400, `A logbook holds up to ${MAX_DATASETS} data sets.`);
       const { descriptor, rows } = cleanDataset(body.dataset);
+      const sealed = await s.seal(rows);
+      if (sealed.length > MAX_DATA_CHARS) fail(413, 'This data set is too large: thin it out first (every second or tenth row).');
+      descriptor.data = await store(raw, sealed, { always: true });
       meta.datasets = [...(meta.datasets ?? []), descriptor];
-      data.rows = { ...(data.rows ?? {}), [descriptor.id]: rows };
-      refresh(meta, data);
-      return full(await save(r, meta, data), meta, data, role);
+      meta.spark = await sparkline(meta.datasets, (d) => (d.id === descriptor.id ? rows : rowsOf(r, d)));
+      return after(r, meta, role);
     }
     case 'updateDataset': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
       const d = (meta.datasets ?? []).find((x) => x.id === body.datasetId);
       if (!d) fail(404, 'That data set is no longer in this logbook.');
       if ('name' in body) d.name = str(body.name, 120).trim() || d.name;
       if ('offset' in body && Number.isFinite(Number(body.offset))) d.offset = Number(body.offset);
       if ('hidden' in body) d.hidden = Boolean(body.hidden);
-      return full(await save(r, meta, null), meta, data, role);
+      return after(r, meta, role);
     }
     case 'removeDataset': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
+      const gone = (meta.datasets ?? []).find((x) => x.id === body.datasetId);
       meta.datasets = (meta.datasets ?? []).filter((x) => x.id !== body.datasetId);
-      const { [body.datasetId]: _gone, ...rest } = data.rows ?? {};
-      data.rows = rest;
-      refresh(meta, data);
-      return full(await save(r, meta, data), meta, data, role);
+      meta.spark = await sparkline(meta.datasets, (d) => rowsOf(r, d));
+      const out = await after(r, meta, role);
+      if (gone?.data) await drop(raw, gone.data);
+      return out;
     }
     case 'addMedia': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
       if ((meta.media ?? []).length >= MAX_MEDIA) fail(400, `A logbook holds up to ${MAX_MEDIA} photos and videos.`);
       const { item, preview } = cleanMedia(body.item);
+      if (preview) item.look = await keep(preview);
       meta.media = [...(meta.media ?? []), item];
-      if (preview) data.previews = { ...(data.previews ?? {}), [item.id]: preview };
-      refresh(meta, data);
-      const out = full(await save(r, meta, data), meta, data, role);
-      return { ...out, added: item.id };
+      cover(meta);
+      return { ...(await after(r, meta, role)), added: item.id };
     }
     case 'updateMedia': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
       const m = (meta.media ?? []).find((x) => x.id === body.mediaId);
       if (!m) fail(404, 'That photo or video is no longer in this logbook.');
       m.caption = str(body.caption, 500);
-      return full(await save(r, meta, null), meta, data, role);
+      return after(r, meta, role);
     }
     case 'removeMedia': {
-      const { r, meta, data, role } = await find(body.id, { data: true });
+      const { r, meta, role } = await find(body.id);
       editor(role);
+      const gone = (meta.media ?? []).find((x) => x.id === body.mediaId);
       meta.media = (meta.media ?? []).filter((x) => x.id !== body.mediaId);
-      const { [body.mediaId]: _gone, ...rest } = data.previews ?? {};
-      data.previews = rest;
-      refresh(meta, data);
-      return full(await save(r, meta, data), meta, data, role);
+      cover(meta);
+      const out = await after(r, meta, role);
+      if (gone?.look) await drop(raw, gone.look);
+      return out;
     }
     case 'mediaUrls': {
       // Links for an hour to the logbook's photos and videos (Base44 private files).
@@ -311,20 +334,21 @@ export async function logbooksApi({ db, s, me, files }, body) {
       const { r, meta, role } = await find(body.id);
       owner(role);
       meta.members = cleanMembers(body.members, meta.owner_email);
-      await save(r, meta, null);
+      await save(r, meta);
       return { owner_email: meta.owner_email, owner_name: meta.owner_name, members: meta.members };
     }
     case 'leave': {
       const { r, meta, role } = await find(body.id);
       if (role === 'owner') fail(400, 'You own this logbook. Delete it instead.');
       meta.members = (meta.members ?? []).filter((m) => m.email.toLowerCase() !== me.email);
-      await save(r, meta, null);
+      await save(r, meta);
       return { ok: true };
     }
     case 'delete': {
-      const { r, role } = await find(body.id);
+      const { r, meta, role } = await find(body.id);
       owner(role);
       await db.Logbook.delete(r.id);
+      for (const v of [...(meta.datasets ?? []).map((d) => d.data), ...(meta.media ?? []).map((m) => m.look)]) await drop(raw, v);
       return { ok: true };
     }
     default:
