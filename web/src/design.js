@@ -4,7 +4,7 @@ import './style.css';
 import { api, currentUser, signIn } from './base44.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
-import { closeOpenRocket, editsSaved, onJavaDownload, previewSaved, prepareJava, startOpenRocket } from './java.js';
+import { closeOpenRocket, editsSaved, onJavaDownload, prefetchOpenRocket, previewSaved, prepareJava, startOpenRocket } from './java.js';
 import { exportOrk, fileName, saveFile } from './lib/ork.js';
 import { fromJson } from '../../server/src/model.js';
 
@@ -207,6 +207,7 @@ async function main() {
   renderState();
   if (!designId) return ended('Design not found', 'The link is incomplete.');
   // Fetch and start the Java runtime while the sign-in, the design and its room are looked up.
+  prefetchOpenRocket();
   prepareJava(designId).catch(() => {}); // a failure is reported when OpenRocket starts
   const hub = testHub();
   me = hub ? { id: `local:${hub.user}`, email: hub.user, name: hub.name ?? hub.user } : await currentUser();
