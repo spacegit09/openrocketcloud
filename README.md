@@ -70,6 +70,14 @@ and live sharing. Nothing runs on your own computer or server.
   jar by removing only what a browser cannot use: native libraries for Windows, macOS and Linux,
   the GraalJS engine behind the *Scripting* simulation extension, and Photo Studio's sky images.
   Simulation results match desktop OpenRocket (checked to 8–13 significant digits).
+- **Quick to open.** CheerpJ reads a jar in 128 KB pieces as Java asks for classes. The files
+  OpenRocket reads while it starts (`scripts/openrocket-startup.txt`, about 7 MB, found with
+  `scripts/startup-order.py`) are written first in `OpenRocket-web.jar`, and the design page has
+  its service worker (`web/public/sw.js`) download them, with the jar's directory, in parallel as
+  soon as the page opens; the worker keeps them for later visits. Before, start-up read 20 MB of
+  the jar in about 120 requests, one after another. CheerpJ 5.0 runs OpenRocket's start-up about 20%
+  faster than 4.3. `web/test/perf.mjs` measures start-up (`PERF_NET` and `PERF_CPU` emulate a slow
+  connection or computer); on 150 ms / 10 Mbit/s it went from 64 s to 36 s.
 - **Same live sharing.** The bridge from `worker/bridge` runs unchanged; in the browser its
   connection goes through the page (`worker/bridge/web/orcloud/bridge/BrowserLink.java`) to the
   `DesignRoom` Base44 actor, which runs the same merge and edit-history code as the Node hub
@@ -119,7 +127,7 @@ and live sharing. Nothing runs on your own computer or server.
   about 10 KB for 500 flights); ground heights from the Terrain Tiles on AWS Open Data; the map is
   CesiumJS with Esri World Imagery (set `VITE_ARCGIS_API_KEY` in `web/.env` to your ArcGIS
   Location Platform key, restricted to your site's addresses).
-- **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 20–30 s to open the first time; simulations
+- **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 15–25 s to open on a fast connection and computer, longer on slow ones, because CheerpJ downloads about 25 MB of its Java runtime from its CDN on each visit (browsers keep little of it); simulations
   run about 15× slower than desktop (1–4 s each), so "Update flight estimates in design window"
   and "Run out-dated simulations when you open the simulation tab" are kept off and left out of
   the settings; *Save As* and exports download straight to your computer. CheerpJ's free Community

@@ -7,9 +7,9 @@ import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
 import { latestPlacement, menuRowNatives } from './menu-row.js';
 import { labNatives } from './flight/lab-natives.js';
-import { CLASSPATH } from './lib/jars.js';
+import { CLASSPATH, OPENROCKET_JAR, OPENROCKET_STARTUP } from './lib/jars.js';
 
-const CHEERPJ = 'https://cjrtnc.leaningtech.com/4.3/loader.js';
+const CHEERPJ = 'https://cjrtnc.leaningtech.com/5.0/loader.js';
 const MAX_MODEL_BYTES = 100 * 1024 * 1024;
 
 /** How far the Java runtime's download has got (CheerpJ's preload): { done, total }, or null. */
@@ -111,6 +111,18 @@ function toJava(event) {
 }
 
 let runtime = null;
+
+
+/**
+ * Has the service worker (public/sw.js) download the parts of OpenRocket's jar it starts with, in
+ * parallel, while the Java runtime loads: OpenRocket then finds them waiting instead of fetching them
+ * a block at a time as it starts. On a first visit the worker takes a moment to install first.
+ */
+export function prefetchOpenRocket() {
+  navigator.serviceWorker?.ready
+    .then((reg) => reg.active?.postMessage({ type: 'prefetch', url: OPENROCKET_JAR, ranges: OPENROCKET_STARTUP }))
+    .catch(() => {});
+}
 
 /**
  * Downloads and starts the Java runtime (CheerpJ) for `designId`. It needs neither the sign-in nor

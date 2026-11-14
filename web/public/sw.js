@@ -43,47 +43,17 @@ const total = (res) => Number(/\/(\d+)$/.exec(res.headers.get('content-range') ?
 
 async function serve(url, jar, start, end) {
   const cache = await caches.open(CACHE);
-  const sized = await cache.match(keyOf(jar, 'size'));
-  if (!sized) {
+  let size = await knownSize(cache, jar);
+  if (!size) {
     // The first request for this version: from the network, as usual; it tells the file's size.
     const res = await fetch(url.href, { headers: { Range: `bytes=${start}-${end}` } });
-    const size = total(res);
-    if (res.status === 206 && size > 0) {
-      await forgetOthers(cache, jar);
-      await cache.put(keyOf(jar, 'size'), new Response(String(size))).catch(() => {});
-    }
+    await learnSize(cache, jar, res);
     return res;
   }
-  const size = Number(await sized.text());
-  if (!(size > 0) || start > end || start >= size) throw new Error('bad range');
+  if (start > end || start >= size) throw new Error('bad range');
   end = Math.min(end, size - 1);
   const first = Math.floor(start / BLOCK);
-  const last = Math.floor(end / BLOCK);
-  const blocks = [];
-  for (let i = first; i <= last; i++) {
-    const hit = await cache.match(keyOf(jar, i));
-    blocks.push(hit ? new Uint8Array(await hit.arrayBuffer()) : null);
-  }
-  // The missing blocks, a run of neighbours at a time.
-  for (let i = 0; i < blocks.length; i++) {
-    if (blocks[i]) continue;
-    let j = i;
-    while (j + 1 < blocks.length && !blocks[j + 1]) j++;
-    const from = (first + i) * BLOCK;
-    const to = Math.min((first + j + 1) * BLOCK, size) - 1;
-    const res = await fetch(url.href, { headers: { Range: `bytes=${from}-${to}` } });
-    if (res.status !== 206 || total(res) !== size || !(res.headers.get('content-range') ?? '').startsWith(`bytes ${from}-`)) {
-      throw new Error('unexpected answer'); // not the file this version was: the network answers instead
-    }
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.length !== to - from + 1) throw new Error('short answer');
-    for (let k = i; k <= j; k++) {
-      const block = bytes.slice((k - i) * BLOCK, Math.min((k - i + 1) * BLOCK, bytes.length));
-      blocks[k] = block;
-      await cache.put(keyOf(jar, first + k), new Response(block)).catch(() => {}); // full storage: just not kept
-    }
-    i = j;
-  }
+  const blocks = await blocksOf(cache, url, jar, size, first, Math.floor(end / BLOCK));
   const out = new Uint8Array(end - start + 1);
   for (let k = 0; k < blocks.length; k++) {
     const at = (first + k) * BLOCK;
@@ -100,6 +70,112 @@ async function serve(url, jar, start, end) {
       'Accept-Ranges': 'bytes',
     },
   });
+}
+
+async function knownSize(cache, jar) {
+  const sized = await cache.match(keyOf(jar, 'size'));
+  const size = sized ? Number(await sized.text()) : NaN;
+  return size > 0 ? size : null;
+}
+
+/** Keeps the size a range answer gives for this version (and drops older versions' blocks). */
+async function learnSize(cache, jar, res) {
+  const size = total(res);
+  if (res.status === 206 && size > 0 && !(await knownSize(cache, jar))) {
+    await forgetOthers(cache, jar);
+    await cache.put(keyOf(jar, 'size'), new Response(String(size))).catch(() => {});
+  }
+  return size;
+}
+
+// Blocks being downloaded now, by cache key: a second request for one waits for that download
+// instead of starting another (the page's prefetch and OpenRocket ask for the same blocks).
+const pending = new Map();
+
+/**
+ * Blocks first..last of the jar: kept ones, ones on their way, and the rest downloaded now, a run of
+ * neighbours per request.
+ */
+async function blocksOf(cache, url, jar, size, first, last) {
+  const out = [];
+  for (let i = first; i <= last; i++) {
+    const key = keyOf(jar, i);
+    if (pending.has(key)) {
+      out.push(pending.get(key));
+      continue;
+    }
+    const hit = await cache.match(key);
+    out.push(hit ? hit.arrayBuffer().then((b) => new Uint8Array(b)) : null);
+  }
+  // Blocks another request started downloading while these were looked up are waited for too.
+  for (let k = 0; k < out.length; k++) if (!out[k] && pending.has(keyOf(jar, first + k))) out[k] = pending.get(keyOf(jar, first + k));
+  for (let k = 0; k < out.length; k++) {
+    if (out[k]) continue;
+    let j = k;
+    while (j + 1 < out.length && !out[j + 1]) j++;
+    const run = download(cache, url, jar, size, first + k, first + j);
+    for (let m = k; m <= j; m++) {
+      const key = keyOf(jar, first + m);
+      const block = run.then((bs) => bs[m - k]);
+      pending.set(key, block);
+      block.catch(() => {}).finally(() => pending.get(key) === block && pending.delete(key));
+      out[m] = block;
+    }
+    k = j;
+  }
+  return Promise.all(out);
+}
+
+/** Downloads blocks a..b in one request, keeps them, and returns them. */
+async function download(cache, url, jar, size, a, b) {
+  const from = a * BLOCK;
+  const to = Math.min((b + 1) * BLOCK, size) - 1;
+  const res = await fetch(url.href, { headers: { Range: `bytes=${from}-${to}` } });
+  if (res.status !== 206 || total(res) !== size || !(res.headers.get('content-range') ?? '').startsWith(`bytes ${from}-`)) {
+    throw new Error('unexpected answer'); // not the file this version was: the network answers instead
+  }
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length !== to - from + 1) throw new Error('short answer');
+  const blocks = [];
+  for (let i = a; i <= b; i++) {
+    const block = bytes.slice((i - a) * BLOCK, Math.min((i - a + 1) * BLOCK, bytes.length));
+    blocks.push(block);
+    await cache.put(keyOf(jar, i), new Response(block)).catch(() => {}); // full storage: just not kept
+  }
+  return blocks;
+}
+
+// The design page asks for the parts of OpenRocket's jar it starts with (src/lib/jars.js) as it
+// opens: downloaded here 1 MB at a time, four at once, and kept, so OpenRocket finds them waiting
+// instead of fetching 128 KB blocks one after another as it starts.
+const PREFETCH_BLOCKS = 8;
+const PREFETCH_PARALLEL = 4;
+
+self.addEventListener('message', (event) => {
+  const m = event.data;
+  if (m?.type !== 'prefetch' || !Array.isArray(m.ranges)) return;
+  event.waitUntil(prefetch(new URL(m.url, self.location.origin), m.ranges).catch(() => {}));
+});
+
+async function prefetch(url, ranges) {
+  const jar = versioned(url);
+  if (!jar) return;
+  const cache = await caches.open(CACHE);
+  const size = (await knownSize(cache, jar)) ?? (await learnSize(cache, jar, await fetch(url.href, { headers: { Range: 'bytes=0-0' } })));
+  if (!(size > 0)) return;
+  const chunks = [];
+  for (const [start, end] of ranges) {
+    const last = Math.floor(Math.min(end, size - 1) / BLOCK);
+    for (let i = Math.floor(start / BLOCK); i <= last; i += PREFETCH_BLOCKS) chunks.push([i, Math.min(i + PREFETCH_BLOCKS - 1, last)]);
+  }
+  let next = 0;
+  const worker = async () => {
+    while (next < chunks.length) {
+      const [a, b] = chunks[next++];
+      await blocksOf(cache, url, jar, size, a, b).catch(() => {});
+    }
+  };
+  await Promise.all(Array.from({ length: PREFETCH_PARALLEL }, worker));
 }
 
 /** Drops the kept blocks of other versions of the same jar. */
