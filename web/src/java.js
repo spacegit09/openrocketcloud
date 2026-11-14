@@ -112,6 +112,27 @@ function toJava(event) {
 
 let runtime = null;
 
+/**
+ * Files OpenRocket writes in /files/downloads, CheerpJ hands to the browser as downloads each time
+ * one is closed. Some of OpenRocket's exports create the file empty before writing it, which made
+ * the browser download an empty copy first ("sims.csv", then "sims (1).csv"): downloads of empty
+ * files are skipped. (Saves of designs, which went through a temporary file, are fixed on the Java
+ * side: worker/bridge/web/info/openrocket/core/file/GeneralRocketSaver.java.)
+ */
+function skipEmptyDownloads() {
+  const empty = new Set();
+  const createObjectURL = URL.createObjectURL.bind(URL);
+  URL.createObjectURL = (obj) => {
+    const url = createObjectURL(obj);
+    if (obj instanceof Blob && obj.size === 0) empty.add(url);
+    return url;
+  };
+  const click = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function () {
+    if (this.hasAttribute('download') && empty.delete(this.href)) return undefined;
+    return click.call(this);
+  };
+}
 
 /**
  * Has the service worker (public/sw.js) download the parts of OpenRocket's jar it starts with, in
@@ -130,6 +151,7 @@ export function prefetchOpenRocket() {
  */
 export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json' } = {}) {
   runtime ??= (async () => {
+    skipEmptyDownloads();
     // Runtime files to fetch up front (recorded with cjGetRuntimeResources): Java threads then never
     // wait on the network halfway through loading a class, which CheerpJ handles badly.
     const [preload] = await Promise.all([

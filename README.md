@@ -407,6 +407,9 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
   imports (against OpenRocket's own example), the graphs and the access rules.
 - **Files**: anything you save or export inside OpenRocket (simulation CSV, PDF reports, RockSim
   or 3D exports, Save As) appears under the folder button, ready to download.
+  In the browser version they download straight to your computer, once each, under the name you
+  chose (OpenRocket saves designs through a temporary file, which the browser used to download instead:
+  `worker/bridge/web/info/openrocket/core/file/GeneralRocketSaver.java`; empty files are not downloaded).
 - **Who's here**: avatars show who has the design open and which part each person has selected.
   The bar shows recent changes ("Mina edited Fin set").
 - **Mac keyboards**: ⌘-shortcuts are sent as Ctrl-shortcuts, which is what OpenRocket expects on
