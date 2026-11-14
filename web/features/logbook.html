@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flight logbook: data, graphs, photos — Rocket in Cloud</title>
+  <meta name="description" content="Keep every rocket flight in a logbook: altimeter data in a checked format, graphs against OpenRocket’s simulation and the Launch Planner’s prediction, photos, videos, sharing and PDF export.">
+  <meta name="theme-color" content="#060a14">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Rocket in Cloud">
+  <meta property="og:title" content="Flight logbook: data, graphs, photos — Rocket in Cloud">
+  <meta property="og:description" content="Keep every rocket flight in a logbook: altimeter data in a checked format, graphs against OpenRocket’s simulation and the Launch Planner’s prediction, photos, videos, sharing and PDF export.">
+  <meta property="og:url" content="https://rocketincloud.com/features/logbook.html">
+  <meta property="og:image" content="https://rocketincloud.com/tour/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="/favicon.png?v=2">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+</head>
+<body class="tour-page">
+<div class="tour">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></symbol><symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></symbol><symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol><symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol><symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol><symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol><symbol id="i-chute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12a10 10 0 0 0-20 0Z"/><path d="M2 12l10 9 10-9M7 12l5 9 5-9"/></symbol><symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol><symbol id="i-wind" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></symbol><symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol><symbol id="i-cube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol><symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol><symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol><symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol><symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol><symbol id="i-mountain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></symbol><symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l14 9-14 9V3z"/></symbol><symbol id="i-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol><symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol><symbol id="i-filecheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M9 15l2 2 4-4"/></symbol><symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol><symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></symbol><symbol id="i-filetext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8M10 9H8"/></symbol><symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol><symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol><symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol><symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol><symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-shift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol><symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol></svg>
+  <header class="t-nav">
+    <div class="t-wrap">
+      <a class="t-brand" href="/"><img src="/logo-dark.png?v=2" alt="" width="30" height="30">Rocket in Cloud</a>
+      <nav class="t-links" aria-label="Features"><a href="/features/openrocket.html">OpenRocket</a><a href="/features/launch-planner.html">Launch Planner</a><a href="/features/logbook.html" aria-current="page">Logbook</a></nav>
+      <span class="t-spacer"></span>
+      <button type="button" class="t-btn small primary" data-signin data-signed-in="Open the app"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span><span class="long">Sign in with </span>Google</span></button>
+    </div>
+  </header>
+  <main>
+  <section class="t-hero">
+    <div class="t-wrap">
+      <span class="t-eyebrow"><b>Logbook</b> · every flight, kept</span>
+      <h1>Every flight, <span class="t-grad-soft">on the record.</span></h1>
+      <p class="t-lead">Keep each flight’s details, your altimeter’s data, photos and videos in one logbook — and see your real flight next to OpenRocket’s simulation and the Launch Planner’s prediction.</p>
+      <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button><a class="t-btn" href="#data">See how <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
+      <div class="t-stage t-reveal">
+        <figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Logbook</span></div><img class="" src="/tour/lb-overview.webp" alt="A logbook for a certification flight: date, place, rocket, motor, weather, notes, and graphs of altitude and velocity from three sources" width="1800" height="1490" decoding="async"></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section" id="data">
+    <div class="t-wrap">
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Flight data</span>
+          <h2>A fixed format, so mistakes can’t slip in.</h2>
+          <p>Choose what your data has, and the logbook tells you exactly how to lay it out — then checks every line before anything is saved.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Time first, then altitude, velocity, acceleration or columns of your own, each in its unit</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The exact column order, an example and a CSV template to download</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Paste the text or open a CSV file — thousands of rows are fine</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Every mistake listed by line: a missing value, a decimal comma, time going backwards</span></li></ul>
+        </div>
+        <div class="media"><div class="t-pair"><figure class="t-shot flat"><img class="" src="/tour/lb-format.webp" alt="Choosing the data’s columns: time, altitude and velocity, with the column order and an example" width="1100" height="1229" loading="lazy" decoding="async"></figure><figure class="t-shot flat"><img class="" src="/tour/lb-data.webp" alt="The data checked: 1,326 rows, highest altitude 573 m at 10.2 s" width="1100" height="1229" loading="lazy" decoding="async"></figure></div></div>
+      </div>
+      <div class="t-feature rev t-reveal">
+        <div class="text">
+          <span class="t-kicker">Prediction vs. reality</span>
+          <h2>Your flight, OpenRocket and the planner — on one graph.</h2>
+          <p>Bring in a design’s OpenRocket simulation and a Launch Planner plan with one click each. Every graph overlays every source of the same quantity, so you see at a glance how close the prediction came.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Altitude, velocity, acceleration and drift, each on its own graph</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Shift a data set in time to line the curves up</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Metric or imperial units, and a readout under the pointer</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Highest and lowest values of every column in a table</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Hide a data set, or download it again as CSV</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Logbook</span></div><img class="" src="/tour/lb-graphs.webp" alt="Graphs of altitude and velocity from the flight computer, OpenRocket’s simulation and the Launch Planner, overlaid" width="1700" height="1074" loading="lazy" decoding="async"></figure></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section alt">
+    <div class="t-wrap">
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Photos and videos</span>
+          <h2>The pictures belong with the data.</h2>
+          <p>Add the build photos, the launch video and the recovery shots to the flight they belong to, with a caption each.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Photos up to 50 MB and videos up to 100 MB</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Stored privately, visible only to the people you share the logbook with</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Each logbook’s card shows its photo or its altitude curve</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot flat"><img class="" src="/tour/lb-media.webp" alt="Two photos in a logbook, with captions" width="1500" height="421" loading="lazy" decoding="async"></figure></div>
+      </div>
+      <div class="t-feature rev t-reveal">
+        <div class="text">
+          <span class="t-kicker">Share and export</span>
+          <h2>Share it with the team. Print it for the judges.</h2>
+          <p>Logbooks are shared like designs, with editors and viewers. When you need it on paper, Export PDF puts it all in one clean report.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Details, notes, data, graphs and photos in one PDF</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Saved as you type — there is nothing to forget</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Prints any language, straight from your browser</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>Logbook — Export PDF</span></div><img class="" src="/tour/lb-report.webp" alt="The printed report of a logbook: flight details, notes, data sets and graphs" width="1100" height="1375" loading="lazy" decoding="async"></figure></div>
+      </div>
+      <div style="margin-top:96px">
+        <div class="t-next"><a href="/features/openrocket.html"><span><small>Back to</small><b>OpenRocket</b></span><span class="arrow"><svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></span></a><a href="/features/launch-planner.html"><span><small>Back to</small><b>Launch Planner</b></span><span class="arrow"><svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></span></a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-final">
+    <div class="t-wrap">
+      <div class="box t-reveal">
+        <h2>Start your team’s flight record.</h2>
+        <p>Sign in with Google and keep every flight — the numbers, the pictures and the lessons — in one place.</p>
+        <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button></div>
+        <p class="t-fine">Free · Sign in with a Google account · Nothing to install</p>
+      </div>
+    </div>
+  </section>
+  </main>
+  <footer class="t-foot">
+    <div class="t-wrap">
+      <div class="cols">
+        <div>
+          <a class="t-brand" href="/"><img src="/logo-dark.png?v=2" alt="" width="30" height="30">Rocket in Cloud</a>
+          <p>The real OpenRocket in your browser, with live teamwork, a launch planner that flies your rocket in the forecast, and a flight logbook.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul><li><a href="/features/openrocket.html">OpenRocket</a></li><li><a href="/features/launch-planner.html">Launch Planner</a></li><li><a href="/features/logbook.html">Logbook</a></li></ul>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <ul><li><a href="https://github.com/spacegit09/openrocketcloud" target="_blank" rel="noopener">Source code</a></li><li><a href="https://github.com/spacegit09/openrocketcloud/issues" target="_blank" rel="noopener">Feedback</a></li></ul>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <ul><li><a href="/privacy.html">Privacy Policy</a></li><li><a href="/terms.html">Terms of Service</a></li></ul>
+        </div>
+      </div>
+      <div class="t-legal">
+        <a href="https://cheerpj.com" target="_blank" rel="noopener">Built with CheerpJ</a>
+        <span>Runs <a href="https://openrocket.info" target="_blank" rel="noopener">OpenRocket</a> © the OpenRocket team (GPL-3.0); not affiliated with the OpenRocket project.</span>
+      </div>
+    </div>
+  </footer>
+</div>
+<script type="module" src="/src/tour-page.js"></script>
+</body>
+</html>

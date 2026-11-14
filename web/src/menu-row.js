@@ -38,7 +38,18 @@ function placement() {
 // The header takes the menu bar's look, and lets clicks through to it, once Java shows the menus.
 function setInRow(on) {
   inRow = on;
-  $('.sbar').classList.toggle('merged', inRow && shown);
+  const merged = inRow && shown;
+  $('.sbar').classList.toggle('merged', merged);
+  // The logo for the header's background: OpenRocket's own once merged (light in its usual theme,
+  // whatever the browser's), the site's otherwise.
+  const source = $('.sbar picture source');
+  if (source) source.media = merged && menus ? (isDark(menus.background) ? 'all' : 'not all') : '(prefers-color-scheme: dark)';
+}
+
+/** Whether a "#rrggbb" colour is dark (relative luminance under one half). */
+function isDark(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(String(hex).slice(i, i + 2), 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.5;
 }
 
 /**

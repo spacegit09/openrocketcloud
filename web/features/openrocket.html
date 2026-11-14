@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenRocket in your browser, built for teams — Rocket in Cloud</title>
+  <meta name="description" content="The official OpenRocket 24.12 in your browser, with live co-editing, edit history, sharing, and built-in parachute, ejection charge, ballast and fin flutter tools.">
+  <meta name="theme-color" content="#060a14">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Rocket in Cloud">
+  <meta property="og:title" content="OpenRocket in your browser, built for teams — Rocket in Cloud">
+  <meta property="og:description" content="The official OpenRocket 24.12 in your browser, with live co-editing, edit history, sharing, and built-in parachute, ejection charge, ballast and fin flutter tools.">
+  <meta property="og:url" content="https://rocketincloud.com/features/openrocket.html">
+  <meta property="og:image" content="https://rocketincloud.com/tour/og.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="/favicon.png?v=2">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+</head>
+<body class="tour-page">
+<div class="tour">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol><symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></symbol><symbol id="i-rocket" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></symbol><symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol><symbol id="i-book" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></symbol><symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol><symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol><symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol><symbol id="i-cloud" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol><symbol id="i-chute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12a10 10 0 0 0-20 0Z"/><path d="M2 12l10 9 10-9M7 12l5 9 5-9"/></symbol><symbol id="i-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol><symbol id="i-wind" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></symbol><symbol id="i-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol><symbol id="i-cube" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol><symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65M22 12.65l-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol><symbol id="i-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol><symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol><symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol><symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol><symbol id="i-mountain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></symbol><symbol id="i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l14 9-14 9V3z"/></symbol><symbol id="i-bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></symbol><symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/></symbol><symbol id="i-filecheck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M9 15l2 2 4-4"/></symbol><symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></symbol><symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98M15.41 6.51l-6.82 3.98"/></symbol><symbol id="i-filetext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8M10 9H8"/></symbol><symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/></symbol><symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol><symbol id="i-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/></symbol><symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol><symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="i-shift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></symbol><symbol id="i-ruler" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2M11.5 9.5l2-2M8.5 6.5l2-2M17.5 15.5l2-2"/></symbol></svg>
+  <header class="t-nav">
+    <div class="t-wrap">
+      <a class="t-brand" href="/"><img src="/logo-dark.png?v=2" alt="" width="30" height="30">Rocket in Cloud</a>
+      <nav class="t-links" aria-label="Features"><a href="/features/openrocket.html" aria-current="page">OpenRocket</a><a href="/features/launch-planner.html">Launch Planner</a><a href="/features/logbook.html">Logbook</a></nav>
+      <span class="t-spacer"></span>
+      <button type="button" class="t-btn small primary" data-signin data-signed-in="Open the app"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span><span class="long">Sign in with </span>Google</span></button>
+    </div>
+  </header>
+  <main>
+  <section class="t-hero">
+    <div class="t-wrap">
+      <span class="t-eyebrow"><b>OpenRocket</b> · in your browser</span>
+      <h1>The OpenRocket you know — <span class="t-grad-soft">with everything it was missing.</span></h1>
+      <p class="t-lead">This is the official OpenRocket 24.12: the same simulator, the same windows, its physics unchanged. Rocket in Cloud runs it in your browser, then adds what teams have always had to work around — live co-editing, history, sharing, and tools for recovery, ballast and fin flutter.</p>
+      <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button><a class="t-btn" href="#compare">What’s new <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
+      <div class="t-stage t-reveal">
+        <figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Falcon II two-stage</span></div><img class="" src="/tour/or-live.webp" alt="A two-stage rocket in OpenRocket’s 3D view, with three people editing it together" width="1800" height="1125" decoding="async"></figure>
+        <img class="t-float t-people" src="/tour/or-people.webp" alt="Who is here and what each person has selected" width="660" height="720" loading="lazy" decoding="async">
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section" id="compare">
+    <div class="t-wrap">
+      <div class="t-head t-reveal">
+        <span class="t-kicker">Only in Rocket in Cloud</span>
+        <h2>Desktop OpenRocket, and a lot more.</h2>
+        <p>Everything OpenRocket does, it still does. This is what you get on top.</p>
+      </div>
+      <div class="t-compare t-reveal">
+        <table>
+          <thead><tr><th>Feature</th><th>Desktop OpenRocket</th><th class="us">Rocket in Cloud</th></tr></thead>
+          <tbody>
+            <tr><td>Runs in the browser, nothing to install</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Several people editing one design at the same time</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Saved online as you work, on every device</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Edit history: who changed what, and undo one person’s changes</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Share a design as “Can edit” or “Can view”</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Custom motors shared with everyone on a design</td><td><small>Your own folder</small></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Parachute size and ejection charge calculator</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Nose weight (ballast) for a target stability</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Fin flutter check against every simulation</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>3D-printed parts from STL files, as mass and balance</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Fin airfoils and root fillets in the 3D view and 3D exports</td><td><span class="no">—</span></td><td class="us"><span class="yes"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg></span></td></tr>
+            <tr><td>Rocket optimization on OpenRocket’s examples</td><td><small>Up to 19% short of the best</small></td><td class="us"><small style="color:#e8edf6">Within 0.03%</small></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section alt">
+    <div class="t-wrap">
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Live co-editing</span>
+          <h2>Edit together, live.</h2>
+          <p>Open a design and your teammates are right there with you. Every change appears for everyone the moment it is made — no files to pass around, no “final_v7.ork”.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Avatars show who is here and which part each person has selected</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The header tells you what just changed: “Joon Lee edited Trapezoidal Fin Set”</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Invite people by their Google email as <b>Can edit</b> or <b>Can view</b></span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Viewers can look around freely; nothing they touch changes the design</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Share this design</span></div><img class="" src="/tour/or-share.webp" alt="Sharing a design with three teammates, two who can edit and one who can view" width="900" height="820" loading="lazy" decoding="async"></figure><img class="t-float left" src="/tour/or-people.webp" alt="Who is here now, and the recent changes" width="660" height="720" loading="lazy" decoding="async"></div>
+      </div>
+      <div class="t-feature rev t-reveal">
+        <div class="text">
+          <span class="t-kicker">Edit history</span>
+          <h2>Every change, on the record.</h2>
+          <p>The history lists every change in plain words — “Nose cone · Length: 32.4 cm → 35.6 cm” — with who made it and when. Mistakes are never permanent.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Undo one person’s changes, keeping everything changed since</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Restore the whole design to how it was at any moment</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Undone changes stay listed, and can be redone</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>A downloadable copy is saved every 10 minutes while people edit</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Edit history</span></div><img class="" src="/tour/or-history.webp" alt="The edit history: changes by Joon Lee, Sora Kim and Mina Park with undo and restore buttons" width="1100" height="1102" loading="lazy" decoding="async"></figure></div>
+      </div>
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Your designs, everywhere</span>
+          <h2>Always saved. Always with you.</h2>
+          <p>Your designs live online and open on any computer you sign in to, with a drawing of each rocket on its card. Start from one of OpenRocket’s examples, or upload the .ork files you already have.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Saving is continuous — there is no Save button to forget</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Download any design as an .ork file that opens in desktop OpenRocket</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Upload custom motors (.eng, .rse) once; everyone on a design gets them</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Duplicate a design to try an idea without touching the original</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com</span></div><img class="" src="/tour/or-dashboard.webp" alt="The designs page with six rocket designs, each with its drawing" width="1600" height="758" loading="lazy" decoding="async"></figure><img class="t-float" src="/tour/or-motors.webp" alt="Custom motors added from .eng files" width="900" height="618" loading="lazy" decoding="async"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section">
+    <div class="t-wrap">
+      <div class="t-head t-reveal">
+        <span class="t-kicker">Built-in engineering tools</span>
+        <h2>The calculations you used to do in a spreadsheet.</h2>
+        <p>Added to OpenRocket’s Tools menu and to every fin set — working from your design, so the answers change when the rocket does.</p>
+      </div>
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Recovery</span>
+          <h2>Parachutes and ejection charges, sized for your rocket.</h2>
+          <p>Tools → Recovery works out what each parachute brings down from the design itself — its stage after burnout, the other devices open with it, and the air at your landing site.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The diameter for the descent rate you want, and the landing energy (competitions cap it at 75 ft·lbf)</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>One click sets the parachute in the design</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Black powder for the bay at your pressure, measured from the design</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Allows for how full the parachute packs the bay, from published ground tests (NARCON 2025)</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Checks your shear pins break with a 2× margin</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Tools → Recovery</span></div><img class="" src="/tour/or-ejection.webp" alt="The ejection charge calculator: 1.72 g of black powder for a 237 mm bay, with the force on the bulkhead and shear pin check" width="1100" height="980" loading="lazy" decoding="async"></figure><img class="t-float" src="/tour/or-parachute.webp" alt="The parachute calculator: 1113 mm for 5 m/s" width="1100" height="980" loading="lazy" decoding="async"></div>
+      </div>
+      <div class="t-feature rev t-reveal">
+        <div class="text">
+          <span class="t-kicker">Ballast</span>
+          <h2>Nose weight, worked out.</h2>
+          <p>Tools → Ballast finds the nose weight that gives every motor configuration at least the stability you want, using OpenRocket’s own mass and stability calculation.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Choose the stability you want and where the weight sits in the nose</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>See each motor configuration’s stability now, and the weight it needs</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Add it to the nose cone in one click; change or remove it the same way</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Every change can be undone, like any other edit</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Tools → Ballast</span></div><img class="" src="/tour/or-ballast.webp" alt="The Ballast tool: 136 g of nose weight for 3 calibers with both motor configurations" width="1000" height="722" loading="lazy" decoding="async"></figure></div>
+      </div>
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Fin flutter</span>
+          <h2>Catch fin flutter before your fins do.</h2>
+          <p>Every fin set gets a Flutter tab: the speed at which its fins would start to flutter, from their shape, thickness and material — checked against every simulation, in that flight’s own air.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Flutter speed from Martin’s NACA boundary, as corrected for rockets</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The margin for each simulation, and where in the flight it is closest</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Clear warnings when a flight goes faster than its fins can take</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Typical stiffness for OpenRocket’s materials, or enter your own</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Fin set → Flutter</span></div><img class="" src="/tour/or-flutter.webp" alt="The Flutter tab warning that two simulations fly faster than the fins’ flutter speed" width="1200" height="898" loading="lazy" decoding="async"></figure></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section alt">
+    <div class="t-wrap">
+      <div class="t-head t-reveal">
+        <span class="t-kicker">And more</span>
+        <h2>Small things that add up.</h2>
+      </div>
+      <div class="t-grid">
+        <div class="t-card t-reveal"><h3>3D view in the browser</h3><p>See the rocket in 3D, turn it, and click a part to select or edit it — no graphics drivers to set up.</p></div>
+        <div class="t-card t-reveal"><h3>3D-printed parts</h3><p>Import a part from an STL file — printed walls and infill, solid or hollow — as its real mass and centre of gravity, drawn as the model itself.</p></div>
+        <div class="t-card t-reveal"><h3>Airfoils and fillets</h3><p>Fin cross sections and root fillets show in the 3D view and go into 3D exports, ready for your printer.</p></div>
+        <div class="t-card t-reveal"><h3>A sharper optimizer</h3><p>Rocket optimization lands within 0.03% of the best known design on OpenRocket’s examples, where the original can fall up to 19% short.</p></div>
+        <div class="t-card t-reveal"><h3>Exports at your fingertips</h3><p>Simulation CSVs, PDF reports and 3D exports you make in OpenRocket are kept under the folder button, ready to download.</p></div>
+        <div class="t-card t-reveal"><h3>At home on a Mac</h3><p>⌘ shortcuts and ⌘-click selection work as in desktop OpenRocket for Mac; copy and paste go through your clipboard.</p></div>
+      </div>
+      <div style="margin-top:72px">
+        <div class="t-next"><a href="/features/launch-planner.html"><span><small>Next</small><b>Launch Planner</b></span><span class="arrow"><svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></span></a><a href="/features/logbook.html"><span><small>Then</small><b>Logbook</b></span><span class="arrow"><svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></span></a></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-final">
+    <div class="t-wrap">
+      <div class="box t-reveal">
+        <h2>Bring your team into the same rocket.</h2>
+        <p>Sign in with Google, open one of OpenRocket’s examples or upload your .ork file, and share it with your team.</p>
+        <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button></div>
+        <p class="t-fine">Free · Sign in with a Google account · Nothing to install</p>
+      </div>
+    </div>
+  </section>
+  </main>
+  <footer class="t-foot">
+    <div class="t-wrap">
+      <div class="cols">
+        <div>
+          <a class="t-brand" href="/"><img src="/logo-dark.png?v=2" alt="" width="30" height="30">Rocket in Cloud</a>
+          <p>The real OpenRocket in your browser, with live teamwork, a launch planner that flies your rocket in the forecast, and a flight logbook.</p>
+        </div>
+        <div>
+          <h4>Product</h4>
+          <ul><li><a href="/features/openrocket.html">OpenRocket</a></li><li><a href="/features/launch-planner.html">Launch Planner</a></li><li><a href="/features/logbook.html">Logbook</a></li></ul>
+        </div>
+        <div>
+          <h4>Project</h4>
+          <ul><li><a href="https://github.com/spacegit09/openrocketcloud" target="_blank" rel="noopener">Source code</a></li><li><a href="https://github.com/spacegit09/openrocketcloud/issues" target="_blank" rel="noopener">Feedback</a></li></ul>
+        </div>
+        <div>
+          <h4>Legal</h4>
+          <ul><li><a href="/privacy.html">Privacy Policy</a></li><li><a href="/terms.html">Terms of Service</a></li></ul>
+        </div>
+      </div>
+      <div class="t-legal">
+        <a href="https://cheerpj.com" target="_blank" rel="noopener">Built with CheerpJ</a>
+        <span>Runs <a href="https://openrocket.info" target="_blank" rel="noopener">OpenRocket</a> © the OpenRocket team (GPL-3.0); not affiliated with the OpenRocket project.</span>
+      </div>
+    </div>
+  </footer>
+</div>
+<script type="module" src="/src/tour-page.js"></script>
+</body>
+</html>

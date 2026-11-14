@@ -1,7 +1,7 @@
 // The dashboard: sign in, list your designs and the ones shared with you, create (blank, from an
 // OpenRocket example, upload), share, download, edit history, saved copies, custom motors.
 import './style.css';
-import { api, currentUser, signIn, signOut } from './base44.js';
+import { api, currentUser, signOut } from './base44.js';
 import {
   $, h, icon, avatar, timeAgo, toast, modal, confirmDialog, promptDialog, shareDialog, editHistoryDialog, ROCKET_SVG,
 } from './common.js';
@@ -11,6 +11,7 @@ import { RemoteZip } from './lib/zip.js';
 import { fromJson, toJson } from '../../server/src/model.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { previewSvg } from './card-preview.js';
+import { setupTour } from './tour.js';
 import { fillPreviews } from './fill-previews.js';
 import { OPENROCKET_JAR } from './lib/jars.js';
 
@@ -27,6 +28,10 @@ const ERRORS = {
 async function main() {
   me = await currentUser();
   if (!me) return showLanding();
+  // Signed in after all (index.html showed the tour early when it found no saved sign-in).
+  document.documentElement.classList.remove('tour-first');
+  document.body.classList.remove('tour-page');
+  $('#landing').hidden = true;
   const out = h('button', { class: 'ghost', title: 'Sign out' }, icon('logout'), 'Sign out');
   out.onclick = signOut;
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name), out);
@@ -40,29 +45,15 @@ async function main() {
 }
 
 function showLanding() {
+  // The tour (src/tour.css, src/tour.js): always dark, with its own header and footer.
+  document.body.classList.add('tour-page');
   $('#landing').hidden = false;
-  $('#hero-art').innerHTML = `<svg viewBox="0 0 420 260" fill="none" font-family="system-ui" font-size="11">
-    <rect x="1" y="1" width="418" height="258" rx="2" fill="var(--surface-2)" stroke="var(--border)"/>
-    <rect x="1" y="1" width="418" height="22" rx="2" fill="var(--surface)"/>
-    <circle cx="14" cy="12" r="4" fill="#ff5f57"/><circle cx="27" cy="12" r="4" fill="#febc2e"/><circle cx="40" cy="12" r="4" fill="#28c840"/>
-    <rect x="12" y="34" width="120" height="214" rx="1" fill="var(--surface)" stroke="var(--border)"/>
-    <g fill="var(--muted)"><text x="22" y="52">Rocket</text><text x="32" y="68">Sustainer</text><text x="42" y="84">Nose cone</text><text x="42" y="100">Body tube</text><text x="52" y="116">Fin set</text><text x="52" y="132">Parachute</text></g>
-    <rect x="38" y="90" width="88" height="14" rx="1" fill="#1c7ed6" fill-opacity=".18" stroke="#1c7ed6"/>
-    <rect x="48" y="106" width="78" height="14" rx="1" fill="#1e3a8a" fill-opacity=".18" stroke="#1e3a8a"/>
-    <g transform="translate(150 70)" stroke="var(--text)" stroke-width="1.6">
-      <path d="M0 40 C 30 20, 55 22, 70 24 L 230 24 L 230 56 L 70 56 C 55 58, 30 60, 0 40 Z" fill="var(--surface)"/>
-      <path d="M70 24 V56 M160 24 V56"/>
-      <path d="M190 24 L 222 2 L 238 2 L 230 24 M190 56 L 222 78 L 238 78 L 230 56" fill="var(--accent)" fill-opacity=".25"/>
-    </g>
-    <g font-weight="700" fill="#fff"><rect x="282" y="168" width="124" height="22" rx="2" fill="#1c7ed6"/><text x="294" y="183">Mina · Body tube</text>
-    <rect x="238" y="200" width="168" height="22" rx="2" fill="#1e3a8a"/><text x="250" y="215">Joon edited Fin set</text></g>
-  </svg>`;
   const err = new URLSearchParams(location.search).get('error');
   if (err) {
     $('#signin-error').textContent = ERRORS[err] ?? 'Sign-in failed. Please try again.';
     $('#signin-error').hidden = false;
   }
-  $('#google-signin').onclick = signIn;
+  setupTour();
 }
 
 // ------------------------------------------------------------------ list
