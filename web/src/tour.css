@@ -109,7 +109,7 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 .t-shot-bar { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; background: #111a2e; border-bottom: 1px solid var(--t-line); }
 .t-shot-bar i { width: 11px; height: 11px; border-radius: 50%; background: #2a3550; }
 .t-shot-bar i:nth-child(1) { background: #ff5f57; } .t-shot-bar i:nth-child(2) { background: #febc2e; } .t-shot-bar i:nth-child(3) { background: #28c840; }
-.t-shot-bar span { margin: 0 auto; transform: translateX(-24px); font-size: 12px; color: var(--t-dim); background: rgba(255, 255, 255, 0.04); padding: 3px 14px; border-radius: 6px; }
+.t-shot-bar span { margin: 0 auto; transform: translateX(-24px); min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; color: var(--t-dim); background: rgba(255, 255, 255, 0.04); padding: 3px 14px; border-radius: 6px; }
 .t-shot img { width: 100%; height: auto; }
 .t-shot.flat { border-radius: 12px; }
 .t-float {
@@ -180,9 +180,12 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 .t-feature ul { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 12px; }
 .t-feature li { display: flex; gap: 12px; color: #cbd5e1; font-size: 15.5px; }
 .t-feature li svg { color: var(--t-dim); margin-top: 4px; }
+.t-feature .text, .t-feature .media { min-width: 0; }
 .t-feature .media { position: relative; }
 .t-feature .media .t-float { width: 46%; right: -18px; bottom: -34px; }
 .t-feature .media .t-float.left { right: auto; left: -18px; }
+.t-feature .media .t-float.wide { width: 60%; bottom: -96px; }
+.t-feature .media .t-float.small { width: 30%; }
 .t-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* ---------- small feature grid */
@@ -282,4 +285,5 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
   .t-flow { grid-template-columns: 1fr; }
   .t-nav .t-btn.small span.long { display: none; }
   .t-feature .media .t-float { display: none; }
+  .t-shot-bar span { transform: none; margin: 0 0 0 6px; }
 }

@@ -139,16 +139,50 @@
     </div>
   </section>
 
-  <section class="t-section alt">
+  <section class="t-section alt" id="3d">
+    <div class="t-wrap">
+      <div class="t-head t-reveal">
+        <span class="t-kicker">3D and 3D printing</span>
+        <h2>Made for rockets you print.</h2>
+        <p>See the rocket in 3D in any browser, bring the parts you print into the design, and export fins the way they really are.</p>
+      </div>
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">3D view</span>
+          <h2>See it in 3D, in any browser.</h2>
+          <p>Desktop OpenRocket draws its 3D views with OpenGL, which a browser can’t run. Rocket in Cloud redraws them from OpenRocket’s own 3D shapes, so the 3D Figure, 3D Unfinished and 3D Finished views work on any computer, with your paint and decals.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Pick 3D Figure, 3D Unfinished or 3D Finished under the rocket figure, as in OpenRocket</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Drag to turn the rocket, right-drag to move the light, scroll to zoom</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Click a part to select it, shift-click to add more, double-click to edit it</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>3D Figure shows what is inside: parachutes, bulkheads, motor mounts and your printed parts</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Falcon II two-stage, 3D Finished</span></div><img src="/tour/or-3d.webp" alt="The two-stage rocket in the 3D Finished view at a three-quarter angle, with its booster fin set selected and outlined in red" width="1800" height="614" loading="lazy" decoding="async"></figure><img class="t-float left small" src="/tour/or-3d-views.webp" alt="The view list: Top, Side and Back view, then 3D Figure, 3D Unfinished and 3D Finished" width="600" height="330" loading="lazy" decoding="async"></div>
+      </div>
+      <div class="t-feature rev t-reveal">
+        <div class="text">
+          <span class="t-kicker">3D-printed parts</span>
+          <h2>Bring in the parts you print.</h2>
+          <p>Tools → Import 3D model (STL) turns a printed part, such as an avionics sled, a bulkhead or a camera shroud, into real mass and balance, so the stability and every simulation account for it. Aerodynamics still come from OpenRocket’s own shapes.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Set the file’s units, which axis runs along the rocket and which end faces the nose</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Printed walls and infill, solid, or a hollow shell — or enter the mass you weighed</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Add it as a new part, or give its mass and centre of gravity to the part you selected</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Drawn as the model itself in the 2D and 3D views, shared with your team and kept in downloaded .ork files</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Tools → Import 3D model (STL)</span></div><img src="/tour/or-stl.webp" alt="Importing avionics-sled.stl: 22 by 22 by 80 mm, PLA printed with 1.2 mm walls and 20% infill, giving 9.87 g, as a new part 25 mm inside the body tube" width="1300" height="801" loading="lazy" decoding="async"></figure><img class="t-float wide" src="/tour/or-stl-side.webp" alt="The imported sled drawn inside the see-through body tube in the 3D Figure view, outlined in red" width="1200" height="259" loading="lazy" decoding="async"></div>
+      </div>
+      <div class="t-feature t-reveal">
+        <div class="text">
+          <span class="t-kicker">Fins</span>
+          <h2>Airfoils and fillets, drawn and exported.</h2>
+          <p>OpenRocket uses each fin set’s cross section in its drag and its root fillets in its mass, but leaves both out of its 3D shapes. Rocket in Cloud puts them in: rounded and airfoil fins, and fillets on both sides of every fin that run out at the fin’s edges.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>See the real fin shape in the 3D view before you print</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>3D exports (OBJ) include the cross section and the fillets, ready for your slicer</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Fillets take the radius set in each fin set’s dialog</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Fixes OpenRocket 24.12’s “3D printing” export, which failed on some designs such as its pod examples</span></li></ul>
+        </div>
+        <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — 3D Finished</span></div><img src="/tour/or-fins3d.webp" alt="Close-up of the airfoil fins of a 3D-printable rocket, with fillets where each fin meets the body" width="1500" height="730" loading="lazy" decoding="async"></figure><img class="t-float left" src="/tour/or-fin-dialog.webp" alt="The fin set dialog: fin cross section Airfoil, 4 mm thick" width="644" height="124" loading="lazy" decoding="async"><img class="t-float" src="/tour/or-fillet.webp" alt="The fin set dialog: root fillets of 6 mm radius" width="598" height="116" loading="lazy" decoding="async"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="t-section">
     <div class="t-wrap">
       <div class="t-head t-reveal">
         <span class="t-kicker">And more</span>
         <h2>Small things that add up.</h2>
       </div>
       <div class="t-grid">
-        <div class="t-card t-reveal"><h3>3D view in the browser</h3><p>See the rocket in 3D, turn it, and click a part to select or edit it — no graphics drivers to set up.</p></div>
-        <div class="t-card t-reveal"><h3>3D-printed parts</h3><p>Import a part from an STL file — printed walls and infill, solid or hollow — as its real mass and centre of gravity, drawn as the model itself.</p></div>
-        <div class="t-card t-reveal"><h3>Airfoils and fillets</h3><p>Fin cross sections and root fillets show in the 3D view and go into 3D exports, ready for your printer.</p></div>
         <div class="t-card t-reveal"><h3>A sharper optimizer</h3><p>Rocket optimization lands within 0.03% of the best known design on OpenRocket’s examples, where the original can fall up to 19% short.</p></div>
         <div class="t-card t-reveal"><h3>Exports at your fingertips</h3><p>Simulation CSVs, PDF reports and 3D exports you make in OpenRocket are kept under the folder button, ready to download.</p></div>
         <div class="t-card t-reveal"><h3>At home on a Mac</h3><p>⌘ shortcuts and ⌘-click selection work as in desktop OpenRocket for Mac; copy and paste go through your clipboard.</p></div>
