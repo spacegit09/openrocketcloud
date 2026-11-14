@@ -93,6 +93,9 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 .t-ctas { margin-top: 34px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .t-fine { margin-top: 16px; color: var(--t-dim); font-size: 13.5px; }
 .t-fine + .t-fine { margin-top: 6px; }
+/* Links inside sentences sit in their own box: Base44 re-indents the home page's HTML, which puts
+   spaces inside them that would otherwise be underlined. */
+.tour .t-fine a, .t-foot .t-legal a { display: inline-block; }
 .tour .t-fine a { color: var(--t-muted); text-decoration: underline; text-underline-offset: 2px; }
 .t-notice { margin: 0 auto 18px; max-width: 520px; padding: 10px 14px; border-radius: 10px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: #fecaca; font-size: 14px; }
 
