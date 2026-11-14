@@ -32,8 +32,9 @@ export async function currentUser() {
   }
 }
 
-export function signIn() {
-  const url = new URL(location.href);
+/** Signs in with Google, then comes back to `to` (this page by default). */
+export function signIn(to = location.href) {
+  const url = new URL(to, location.href);
   url.searchParams.delete('access_token');
   base44.auth.loginWithProvider('google', url.toString());
 }

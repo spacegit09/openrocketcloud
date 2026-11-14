@@ -113,20 +113,6 @@ svg.i { width: 16px; height: 16px; flex: none; }
 .avatars { display: flex; }
 .avatars .avatar + .avatar { margin-left: -8px; }
 
-/* ---------- landing */
-.landing { max-width: 960px; margin: 0 auto; padding: 72px 20px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
-.landing h1 { font-size: 40px; line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em; }
-.landing p { color: var(--muted); font-size: 16px; margin: 0 0 24px; }
-.landing ul { padding: 0; margin: 0 0 28px; list-style: none; display: grid; gap: 10px; }
-.landing li { display: flex; gap: 10px; align-items: flex-start; }
-.landing li svg { color: var(--accent); margin-top: 2px; }
-.google-btn { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; font-weight: 600; padding: 10px 16px; gap: 10px; }
-.google-btn:hover { background: #f8f9fa; }
-.hero-art { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 18px; }
-.hero-art svg { width: 100%; height: auto; display: block; }
-.dev-login { margin-top: 18px; display: flex; gap: 8px; }
-.notice { padding: 10px 12px; border-radius: var(--radius-sm); background: var(--accent-soft); color: var(--text); margin-bottom: 18px; }
-
 /* ---------- dashboard */
 .page { max-width: 1120px; margin: 0 auto; padding: 28px 20px 60px; }
 .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -193,8 +179,6 @@ dialog footer { padding: 12px 20px 16px; display: flex; justify-content: flex-en
 }
 
 @media (max-width: 760px) {
-  .landing { grid-template-columns: 1fr; padding-top: 40px; }
-  .landing h1 { font-size: 32px; }
   .search { width: 100%; order: 3; }
   .topbar { padding: 0 12px; }
   .me .name { display: none; }
@@ -368,8 +352,6 @@ table.winds th { color: var(--muted); font-weight: 600; }
 .legal a { color: var(--accent); }
 .legal-summary { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 18px 6px; margin: 20px 0 8px; }
 .legal-summary h2 { margin-top: 14px; }
-.landing .fine { font-size: 12.5px; margin: 14px 0 0; }
-.landing .fine a { color: inherit; text-decoration: underline; }
 
 .plan-top { display: flex; align-items: flex-start; gap: 10px; }
 .plan-top .plan-intro { flex: 1; }

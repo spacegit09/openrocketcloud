@@ -214,6 +214,10 @@ public final class RecoveryHelpers {
 				refreshing = false;
 			}
 			if (isShowing()) {
+				// Labels and buttons whose text changed are laid out again now; in the browser the
+				// window otherwise kept their old sizes and cut the longer text off ("Add i...").
+				validate();
+				repaint();
 				java.awt.Dimension want = getPreferredSize(), have = getSize();
 				if (want.width > have.width || want.height > have.height) {
 					setSize(Math.max(want.width, have.width), Math.max(want.height, have.height));
