@@ -13,6 +13,8 @@ export default defineConfig({
         design: resolve(import.meta.dirname, 'design.html'),
         planner: resolve(import.meta.dirname, 'planner.html'),
         logbook: resolve(import.meta.dirname, 'logbook.html'),
+        privacy: resolve(import.meta.dirname, 'privacy.html'),
+        terms: resolve(import.meta.dirname, 'terms.html'),
       },
     },
   },
