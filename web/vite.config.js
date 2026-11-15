@@ -16,6 +16,7 @@ export default defineConfig({
         account: resolve(import.meta.dirname, 'account.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
         terms: resolve(import.meta.dirname, 'terms.html'),
+        refunds: resolve(import.meta.dirname, 'refunds.html'),
         tourOpenrocket: resolve(import.meta.dirname, 'features/openrocket.html'),
         tourPlanner: resolve(import.meta.dirname, 'features/launch-planner.html'),
         tourLogbook: resolve(import.meta.dirname, 'features/logbook.html'),

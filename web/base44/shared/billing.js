@@ -457,12 +457,28 @@ async function endMonthly(ctx, user) {
   }
 }
 
-/** A refund or chargeback: a one-time plan refunded in full, or charged back, is taken away (and given back if the chargeback is reversed). */
+/**
+ * A refund or chargeback: a one-time plan refunded in full, or charged back, is taken away (and
+ * given back if the chargeback is reversed). A monthly payment refunded in full cancels the monthly
+ * plan at once (the Refund Policy, refunds.html); its own events then say it has ended.
+ */
 async function applyAdjustment(ctx, adj) {
   const txn = adj?.transaction_id;
-  // A monthly payment's refund: the subscription's own state says what is left of it.
-  if (!txn || adj.subscription_id) return 'ignored';
+  if (!txn) return 'ignored';
   const full = adj.type === 'full' || (adj.type == null && (adj.items ?? []).length > 0 && adj.items.every((i) => i.type === 'full'));
+  if (adj.subscription_id) {
+    if (adj.action !== 'refund' || adj.status !== 'approved' || !full || !ctx.paddle) return 'ignored';
+    let sub;
+    try {
+      sub = await ctx.paddle.post(`/subscriptions/${adj.subscription_id}/cancel`, { effective_from: 'immediately' });
+    } catch (e) {
+      // Already cancelled (a repeat of this event, say): nothing to do. Anything else: Paddle sends it again.
+      if (e instanceof PaddleError && e.status >= 400 && e.status < 500) return 'already ended';
+      throw e;
+    }
+    if (sub) await applySubscription(ctx, sub);
+    return 'ok';
+  }
   let refunded;
   if (adj.action === 'refund' && adj.status === 'approved' && full) refunded = true;
   else if (adj.action === 'chargeback') refunded = true;

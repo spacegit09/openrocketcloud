@@ -42,8 +42,8 @@ function render() {
   renderGroup();
   renderPlans();
   $('#fine').replaceChildren(
-    'Prices are in US dollars. Payments are handled by Paddle, which sells the plans on our behalf (merchant of record): its checkout shows the price in your currency where it can, and adds VAT or sales tax where your country requires it. Paddle emails your receipt. You can ask for a refund within 14 days of a payment; see the ',
-    h('a', { href: '/terms.html#plans' }, 'Terms'), '.');
+    'Prices are in US dollars. Payments are handled by Paddle, which sells the plans on our behalf (merchant of record): its checkout shows the price in your currency where it can, and adds VAT or sales tax where your country requires it. Paddle emails your receipt. You can ask for a refund within 14 days of a payment: see the ',
+    h('a', { href: '/refunds.html' }, 'Refund Policy'), '. Questions: ', h('a', { href: 'mailto:flykim73@gmail.com' }, 'flykim73@gmail.com'), '.');
 }
 
 /** Runs `fn` (a call that returns the new status) with `button` busy; shows what went wrong. */

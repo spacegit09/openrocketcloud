@@ -260,6 +260,24 @@ test('monthly: a failed renewal keeps the plan while Paddle retries; giving up e
   assert.equal((await joon.status()).access.kind, 'none');
 });
 
+test('monthly: a monthly payment refunded in full cancels the plan at once; a partial refund does not', async () => {
+  const { fp, person, deliver } = setup();
+  const joon = await person('joon@example.com');
+  await joon.endTrial();
+  await deliver((await joon.buy('monthly')).events);
+  const sub = [...fp.subscriptions.values()][0];
+  const payment = [...fp.transactions.values()].find((t) => t.subscription_id === sub.id);
+  await deliver(fp.refund(payment.id, { type: 'partial' }));
+  assert.equal((await joon.status()).access.kind, 'monthly');
+  const refund = fp.refund(payment.id);
+  await deliver(refund);
+  assert.equal(fp.subscriptions.get(sub.id).status, 'canceled');
+  await deliver(fp.takeEvents());
+  assert.equal((await joon.status()).access.kind, 'none');
+  // The same event again: nothing more to do, and no failure (Paddle would send it again and again).
+  await deliver(refund);
+});
+
 test('monthly: a missed webhook is caught up when the person opens the site', async () => {
   const { db, fp, person, deliver } = setup();
   const sora = await person('sora@example.com');
