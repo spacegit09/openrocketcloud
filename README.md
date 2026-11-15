@@ -170,6 +170,61 @@ big launch plans and motor files, detailed drawings, photo previews) are kept in
 records of 12,000 characters each (`web/base44/shared/parts.js`); the tests' stand-in for Base44
 refuses big records the same way.
 
+### Plans and payments
+
+The live site is paid: every new account gets a **free week**, then needs a plan. Accounts made
+before plans began (15 November 2026, `FREE_BEFORE`) and the app's admins keep using it free.
+
+| Plan | Price | |
+|---|---|---|
+| Monthly | US$1 a month | a subscription, cancelled at any time on the plan page |
+| Individual | US$4 once | for one person, for good |
+| Group | US$10 once | the buyer and 9 people they add by Google address on the plan page |
+| Extra place | US$3 once each | one more person in a group |
+
+[Paddle](https://www.paddle.com) sells the plans as merchant of record: its checkout opens over the
+plan page (`web/account.html`), shows the price in the buyer's currency where it can, and collects
+and pays VAT and sales tax in every country. The rules are in `web/base44/shared/billing.js`. The
+`billing` function gives the page its status, makes a Paddle transaction for the plan chosen,
+records it as soon as the buyer has paid, keeps a group's people, and cancels or keeps a monthly
+plan. The `paddleWebhook` function hears from Paddle about payments, renewals, cancellations,
+refunds and chargebacks. Paddle signs each event, and events may come twice, late or out of order;
+each one is applied as the latest news about its purchase, and older news is ignored. These records
+are all closed to browsers, and none holds a card number:
+- `Account`: when someone's free week started, and their Paddle customer id.
+- `Purchase`: one per subscription or one-time purchase.
+- `Group`: its places and members. Members' addresses are sealed. The members it lets in are kept
+  by keyed fingerprint for the functions, and by user id for the actors.
+
+Without a plan, people can still list, download, leave and delete their work. Everything else is
+refused:
+- the functions answer 402 with `code: plan_required`, and the page shows the plans;
+- the design room lets them download a design and its saved copies, but not open it;
+- the Forecasts actor turns them away.
+
+Setting it up (once with a Paddle sandbox account to try it, then with the live account):
+
+```bash
+cd web
+PADDLE_API_KEY=pdl_sdbx_apikey_… node scripts/paddle-setup.mjs --site https://rocketincloud.com \
+  --webhook https://rocketincloud.base44.app/functions/paddleWebhook
+base44 secrets set PADDLE_API_KEY=…          # the three it prints
+base44 secrets set PADDLE_CLIENT_TOKEN=…
+base44 secrets set PADDLE_WEBHOOK_SECRET=…
+```
+
+Until `PLANS_START` in `web/base44/shared/billing.js` is set, nobody needs a plan. The pricing,
+the plan page and the Terms can then go live first, for Paddle to review the site. Once the live
+account takes payments, set `PLANS_START` to the time plans begin and deploy. Everyone's free week
+counts from then at the earliest.
+
+The script makes the product and its four prices, sets the default payment link (the plan page),
+makes the webhook and a client-side token for Paddle.js, and prints the secrets to set. Running it
+again finds what it made before. Without the secrets the site still works: the free week runs and
+the plan page says payments open soon. A live Paddle account must have the site's domain approved
+before checkouts open there. Test cards for the sandbox are in
+[Paddle's sandbox docs](https://developer.paddle.com/sdks/sandbox).
+
 To try changes before deploying, run the design page on your computer:
 
 ```bash
@@ -188,7 +243,22 @@ flight engine; the engine's comparison with OpenRocket needs the fixtures `scrip
 writes) and `node test/e2e.mjs` (two headless Chrome
 windows running the real OpenRocket against a local stand-in for the actor). `node test/motors-e2e.mjs`
 opens designs with custom motors that are missing, changed, unreadable or messily written, and two
-people of whom only one has the motor's file. `node test/perf.mjs`
+people of whom only one has the motor's file. `node test/billing-e2e.mjs` opens the home page, the
+dashboard, the plan page, the design page, the planner and the logbook as people with each kind of
+plan. It buys, cancels and keeps plans through a stand-in for Paddle's checkout, and fills, overfills
+and changes a group. The billing functions run for real over in-memory stand-ins for Base44 and
+Paddle (`test/fake-paddle.mjs`); `test/billing.test.mjs` covers the same rules with Paddle's events
+arriving twice, late, out of order or forged. `node test/paddle-sandbox-e2e.mjs` makes real purchases in
+your Paddle sandbox (set it up with `scripts/paddle-setup.mjs --webhook none`, and set
+`PADDLE_API_KEY` and `PADDLE_CLIENT_TOKEN`). It goes through Paddle's real checkout with its test
+cards:
+- a declined card;
+- the individual plan;
+- the monthly plan, cancelled and kept;
+- a group plan with two more places.
+
+It then runs Paddle's own records of those purchases through the webhook code and checks they give
+the same plans. `node test/perf.mjs`
 times how long a design takes to open, what it downloads, and how long an edit takes to arrive.
 
 ## Installing the self-hosted version
@@ -472,7 +542,8 @@ worker/            OpenRocket session image
   rootfs/          session entrypoint (Xvnc + openbox + OpenRocket), window manager config
 web/               browser version (Base44 project)
   base44/          DesignRoom actor (room.js), sealed Design, Motor and SavedFlight records and
-                   the functions that reach them (shared/: sealing, access rules), sign-in settings
+                   the functions that reach them (shared/: sealing, access rules), sign-in settings;
+                   plans and payments (shared/billing.js, functions billing and paddleWebhook)
   src/             dashboard and design page (vanilla JS), .ork zip handling, CheerpJ start-up
   test/            room tests, access rules and sealing, local stand-in for the actor,
                    two-browser end-to-end test

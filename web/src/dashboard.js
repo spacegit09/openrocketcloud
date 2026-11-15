@@ -14,12 +14,17 @@ import { previewSvg } from './card-preview.js';
 import { setupTour } from './tour.js';
 import { fillPreviews } from './fill-previews.js';
 import { OPENROCKET_JAR } from './lib/jars.js';
+import { allowClosingWall, dateText, daysLeft, planStatus, showPlanWall } from './plan.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
 const JAR = OPENROCKET_JAR;
 let me = null;
 let designs = [];
+// Their free week has ended and they have no plan (src/plan.js): designs can be downloaded, not opened.
+let locked = false;
+/** `fn`, or the plans notice when they need a plan for it. */
+const withPlan = (fn) => (...args) => (locked ? showPlanWall() : fn(...args));
 
 const ERRORS = {
   not_allowed: 'This Google account is not allowed to use this site.',
@@ -34,14 +39,44 @@ async function main() {
   $('#landing').hidden = true;
   const out = h('button', { class: 'ghost', title: 'Sign out' }, icon('logout'), 'Sign out');
   out.onclick = signOut;
-  $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name), out);
+  const plan = h('a', { class: 'btn ghost', href: '/account.html', title: 'Your plan, and billing' }, icon('card'), 'Plan');
+  $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name), plan, out);
   $('#me').hidden = false;
   $('#dashboard').hidden = false;
   setupNewMenu();
-  $('#motors-btn').onclick = motorsDialog;
+  $('#motors-btn').onclick = withPlan(motorsDialog);
+  for (const a of document.querySelectorAll('#dashboard .page-head a.btn')) {
+    a.addEventListener('click', (e) => {
+      if (!locked) return;
+      e.preventDefault();
+      showPlanWall();
+    });
+  }
   $('#search').oninput = render;
+  planStatus().then(showPlan, () => {}); // not known: nothing shown, the functions check
   await load();
   setInterval(() => load().catch(() => {}), 30_000);
+}
+
+/** Their plan, above their designs: the days left of their free week, or that they need a plan. */
+function showPlan(st) {
+  const a = st.access;
+  locked = !a.ok;
+  if (locked) allowClosingWall();
+  const banner = $('#plan-banner');
+  const show = (text, label, ended = false) => {
+    banner.replaceChildren(h('span', {}, text), h('a', { class: `btn${ended ? ' primary' : ''}`, href: '/account.html' }, label));
+    banner.classList.toggle('ended', ended);
+    banner.hidden = false;
+  };
+  if (!a.ok) show('Your free week has ended. Choose a plan to open designs, plan launches and keep logbooks. You can still download your designs.', 'See plans', true);
+  else if (a.kind === 'trial') {
+    const n = daysLeft(a.trialEnds);
+    show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month.`, 'See plans');
+  } else if (a.kind === 'monthly' && st.monthly?.status === 'past_due') show('Your last monthly payment did not go through. Update your card to keep your plan.', 'Plan & billing', true);
+  else if (a.kind === 'monthly' && st.monthly?.cancelAt) show(`Your monthly plan ends on ${dateText(st.monthly.cancelAt)}.`, 'Plan & billing');
+  else banner.hidden = true;
+  render();
 }
 
 function showLanding() {
@@ -82,7 +117,7 @@ function render() {
 
 function card(d) {
   const role = roleOf(d);
-  const open = () => { location.href = `/design.html?id=${d.id}`; };
+  const open = withPlan(() => { location.href = `/design.html?id=${d.id}`; });
   const more = h('button', { class: 'ghost icon', title: 'More', 'aria-label': `More actions for ${d.name}` }, icon('more'));
   const menu = h('div', { class: 'menu', hidden: true });
   const item = (ic, label, fn, cls) => {
@@ -95,11 +130,11 @@ function card(d) {
     return b;
   };
   menu.append(
-    item('target', 'Plan a launch', () => { location.href = `/planner.html?id=${encodeURIComponent(d.id)}`; }),
-    item('copy', 'Duplicate', () => duplicate(d)),
+    item('target', 'Plan a launch', withPlan(() => { location.href = `/planner.html?id=${encodeURIComponent(d.id)}`; })),
+    item('copy', 'Duplicate', withPlan(() => duplicate(d))),
     item('history', 'Edit history', () => historyFor(d, role)),
     item('download', 'Saved copies', () => savedCopies(d)),
-    ...(role === 'owner' ? [item('edit', 'Rename', () => rename(d))] : []),
+    ...(role === 'owner' ? [item('edit', 'Rename', withPlan(() => rename(d)))] : []),
     h('hr'),
     role === 'owner'
       ? item('trash', 'Delete', () => remove(d), 'danger')
@@ -116,7 +151,7 @@ function card(d) {
     }
   };
   const shareBtn = h('button', { class: 'ghost', title: 'Share' }, icon('share'), 'Share');
-  shareBtn.onclick = () => shareDialog(d.id, me, () => load());
+  shareBtn.onclick = withPlan(() => shareDialog(d.id, me, () => load()));
   const dl = h('button', { class: 'ghost', title: 'Download .ork' }, icon('download'));
   dl.onclick = () => download(d);
   // OpenRocket's drawing of the rocket; until it has one (see fillPreviews), a generic rocket.
@@ -124,7 +159,7 @@ function card(d) {
   const thumb = drawing ? h('div', { class: 'thumb' }, drawing) : h('div', { class: 'thumb', html: ROCKET_SVG });
   thumb.onclick = open;
   const people = 1 + (d.members?.length ?? 0);
-  return h('article', { class: 'card', 'data-id': d.id },
+  return h('article', { class: `card${locked ? ' locked' : ''}`, 'data-id': d.id },
     thumb,
     h('div', { class: 'body', onclick: open },
       h('h3', { title: d.name }, d.name),
@@ -148,6 +183,7 @@ function setupNewMenu() {
   const menu = $('#new-menu');
   $('#new-btn').onclick = (e) => {
     e.stopPropagation();
+    if (locked) return showPlanWall();
     menu.hidden = !menu.hidden;
   };
   menu.onclick = (e) => e.stopPropagation();
@@ -167,7 +203,8 @@ function setupNewMenu() {
   document.addEventListener('drop', (e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files?.[0];
-    if (file) uploadDesign(file);
+    if (file && locked) showPlanWall();
+    else if (file) uploadDesign(file);
   });
 }
 

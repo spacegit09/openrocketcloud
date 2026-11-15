@@ -5,10 +5,18 @@
 // room reads only what it needs in the clear: who may open it, by user id and role (`access`,
 // kept by the designs function), and it keeps the version and edit time. Browsers get the custom
 // motor files and save the design's drawing through the designs function instead.
+//
+// Someone without a plan (lib/billing.js, copied from shared/ by scripts/prebuild.mjs) is let in
+// `locked`: they can download the design and its saved copies, not open it in OpenRocket.
 import { Actor } from "base44:runtime/actors";
+import { lookAccess } from "./lib/billing.js";
 import { Room } from "./room.js";
 
-type Person = { id: string; email: string; name: string };
+type Person = { id: string; email: string; name: string; created: string | null; role: string | null };
+
+// Plans looked up again after a minute for someone who has one, sooner for someone who has not.
+const PLAN_OK_MS = 60_000;
+const PLAN_NONE_MS = 15_000;
 
 // Each lookup of the record takes a fraction of a second, so the room shares it: the design's
 // record (who may open it) for everyone checking their access within a couple of seconds.
@@ -33,6 +41,7 @@ function shared<T>(ms: number, look: () => Promise<T>) {
 export default class DesignRoom extends Actor {
   room: Room | null = null;
   people = new Map<string, Promise<Person | null>>();
+  plans = new Map<string, { at: number; ok: boolean }>();
   record: ((fresh?: boolean) => Promise<any>) | null = null;
   /** The Design record's own id (the session's id is its room). */
   recordId: string | null = null;
@@ -66,6 +75,18 @@ export default class DesignRoom extends Actor {
       return role ? { role, name: null } : null;
     };
     const recordId = async () => this.recordId ?? (await design(true), this.recordId);
+    // Whether someone has a plan; if it cannot be looked up, they are let in.
+    // With `fresh`, looked up again (someone without a plan a moment ago may just have bought one).
+    const hasPlan = async (user: Person, fresh = false) => {
+      const kept = this.plans.get(user.id);
+      if (kept && Date.now() - kept.at < (kept.ok ? PLAN_OK_MS : fresh ? 0 : PLAN_NONE_MS)) return kept.ok;
+      const ok = await lookAccess(db(), user).then((a: any) => a.ok, (e: unknown) => {
+        console.error("DesignRoom plan lookup failed", e instanceof Error ? e.name : "error");
+        return true;
+      });
+      this.plans.set(user.id, { at: Date.now(), ok });
+      return ok;
+    };
     return {
       storage: this.storage,
       connections: () => this.getConnections(),
@@ -77,7 +98,7 @@ export default class DesignRoom extends Actor {
             (u: any) => {
               if (!u?.email) return null;
               const email = String(u.email).toLowerCase();
-              return { id, email, name: u.full_name || email.split("@")[0] };
+              return { id, email, name: u.full_name || email.split("@")[0], created: u.created_date ?? null, role: u.role ?? null };
             },
             () => null,
           );
@@ -88,8 +109,10 @@ export default class DesignRoom extends Actor {
       },
       // From a record a moment old; before refusing someone, from a fresh one (they may just have
       // been added).
-      access: async (user: Person, { fresh = false } = {}) =>
-        accessOf(await design(), user) ?? (fresh ? accessOf(await design(true), user) : null),
+      access: async (user: Person, { fresh = false } = {}) => {
+        const a = accessOf(await design(), user) ?? (fresh ? accessOf(await design(true), user) : null);
+        return a ? { ...a, locked: !(await hasPlan(user, fresh)) } : null;
+      },
       // Browsers get the motor files and keep the drawing through the designs function.
       motors: async () => [],
       touch: async ({ version }: { version: number }) => {

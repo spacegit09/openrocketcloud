@@ -1,0 +1,47 @@
+// A group plan (web/base44/shared/billing.js): its buyer, how many people it has places for, and
+// who they are. The members' addresses are sealed (web/base44/shared/sealed.js); the members let in
+// are kept by keyed fingerprint (for the functions) and by Base44 user id (for the live-share room
+// and the forecasts, which cannot read sealed data).
+{
+  "name": "Group",
+  "type": "object",
+  "description": "A group plan: its places and members (addresses encrypted)",
+  "properties": {
+    "owner_id": {
+      "type": "string",
+      "description": "The buyer's Base44 user id"
+    },
+    "seats": {
+      "type": "integer",
+      "description": "Places in the group, the buyer's included"
+    },
+    "people": {
+      "type": "array",
+      "description": "Keyed fingerprints of the members let in (not reversible)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "access": {
+      "type": "array",
+      "description": "Base44 user ids of the members let in who have an account",
+      "items": {
+        "type": "string"
+      }
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted buyer's name and address and the members' addresses (AES-256-GCM with the app's DATA_KEY secret)"
+    }
+  },
+  "required": [
+    "owner_id",
+    "sealed"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

@@ -29,7 +29,8 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
         const d = designs.get(designId);
         if (!d) return null;
         const role = d.owner === user.email ? 'owner' : d.members?.[user.email];
-        return role ? { role, name: d.name } : null;
+        // d.locked: people without a plan (web/base44/shared/billing.js).
+        return role ? { role, name: d.name, locked: Boolean(d.locked?.includes(user.email)) } : null;
       },
       motors: async () => (typeof motors === 'function' ? motors(designId, sessions.get(designId)?.helloFrom) : motors),
       touch: async () => {},

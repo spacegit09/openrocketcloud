@@ -8,7 +8,9 @@
 //   connections()      -> the open connections
 //   user(conn)         -> { id, email, name } of the signed-in person, or null
 //   access(user, { fresh })
-//                      -> { role: 'owner' | 'editor' | 'viewer', name } for this design, or null
+//                      -> { role: 'owner' | 'editor' | 'viewer', name, locked } for this design,
+//                      or null; `locked` for someone without a plan (web/base44/shared/billing.js),
+//                      who may only download the design and its saved copies, or delete it
 //                      (the host may answer from a lookup a moment old; with fresh, it looks
 //                      again before refusing); throws if it could not look
 //   motors()           -> [{ name, content }] custom motors of everyone the design is shared with
@@ -33,6 +35,9 @@ const HISTORY_ROWS = 300;
 const MAX_MODEL_BYTES = 50 * 1024 * 1024;
 const MAX_OBJECTS = 200_000;
 const ROLE_TTL_MS = 10_000;
+/** What someone without a plan may still ask of a design: to download it or its saved copies, its drawing, its history, and (its owner) to delete it. */
+const LOCKED_REQUESTS = new Set(['export', 'snapshots', 'snapshot', 'preview', 'history', 'destroy']);
+const PLAN_MESSAGE = 'Your free week has ended. Choose a plan to open designs; you can still download them from your dashboard.';
 
 const PALETTE = ['#e8590c', '#1c7ed6', '#2f9e44', '#ae3ec9', '#f08c00', '#0c8599', '#d6336c', '#5f3dc4', '#66a80f', '#c92a2a'];
 
@@ -206,12 +211,13 @@ export class Room {
     if (!looked?.access?.role) return null;
     let c = this.clients.get(conn.id);
     if (!c) {
-      c = { user: looked.user, role: null, roleAt: 0, name: null, selection: [], frags: new Map() };
+      c = { user: looked.user, role: null, roleAt: 0, name: null, locked: false, selection: [], frags: new Map() };
       this.clients.set(conn.id, c);
     }
     c.user = looked.user;
     c.role = looked.access.role;
     c.name = looked.access.name ?? null;
+    c.locked = Boolean(looked.access.locked);
     c.roleAt = Date.now();
     return c;
   }
@@ -253,6 +259,7 @@ export class Room {
         for (const c of list) {
           c.role = access?.role ?? null;
           c.name = access?.name ?? null;
+          c.locked = Boolean(access?.locked);
           c.roleAt = Date.now();
         }
       }
@@ -274,6 +281,7 @@ export class Room {
       type: 'hi',
       role: c.role,
       name: c.name,
+      locked: c.locked,
       version: this.meta?.version ?? 0,
       empty: !this.model,
       you: { id: c.user.id, name: c.user.name, email: c.user.email, color: colorFor(c.user.id) },
@@ -307,7 +315,8 @@ export class Room {
     const byUser = new Map();
     for (const conn of this.connections()) {
       const c = this.clients.get(conn.id);
-      if (!c?.role) continue;
+      // Someone downloading without a plan is not shown as here.
+      if (!c?.role || c.locked) continue;
       const entry = byUser.get(c.user.id) ?? { id: c.user.id, name: c.user.name, email: c.user.email, color: colorFor(c.user.id), role: c.role, selection: [] };
       for (const id of c.selection) entry.selection.push({ id, name: (this.model && componentName(this.model, id)) ?? 'component' });
       byUser.set(c.user.id, entry);
@@ -343,6 +352,17 @@ export class Room {
         return;
       }
       return this.message(conn, whole);
+    }
+    if (c.locked && msg.rid === undefined && (msg.type === 'hello' || msg.type === 'ops')) {
+      // Before turning them away, their plan looked up again: they may just have bought one.
+      const again = await this.lookUp(conn, { fresh: true }).catch(() => null);
+      if (again?.access?.role) this.admit(conn, again);
+    }
+    if (c.locked) {
+      if (msg.rid !== undefined && LOCKED_REQUESTS.has(msg.type)) return this.request(conn, c, msg);
+      if (msg.rid !== undefined) return this.send(conn, { type: 'reply', rid: msg.rid, ok: false, error: PLAN_MESSAGE, code: 'plan_required' });
+      if (msg.type === 'hello' || msg.type === 'ops') this.send(conn, { type: 'kick', message: PLAN_MESSAGE, code: 'plan_required' });
+      return undefined;
     }
     if (msg.rid !== undefined) return this.request(conn, c, msg);
     switch (msg.type) {

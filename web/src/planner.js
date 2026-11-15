@@ -4,6 +4,7 @@
 // shows the flight and where it is likely to land.
 import './style.css';
 import { api, currentUser } from './base44.js';
+import { requirePlan } from './plan.js';
 import { $, h, avatar, icon, toast, confirmDialog, promptDialog, timeAgo } from './common.js';
 import { fetchDesign, openInOpenRocket } from './flight/openrocket.js';
 import { environment, fly } from './flight/engine.js';
@@ -560,6 +561,7 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
+  await requirePlan(); // without a plan: the plans notice (src/plan.js)
   // The planner's home lists your launch plans; a plan, a new plan or a design's plan opens the planner.
   if (!params.has('id') && !params.has('flight') && !params.has('new')) return showPlans();
   $('#planner').hidden = false;

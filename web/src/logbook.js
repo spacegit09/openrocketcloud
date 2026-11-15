@@ -6,6 +6,7 @@
 import './style.css';
 import './logbook/logbook.css';
 import { api, base44, currentUser } from './base44.js';
+import { requirePlan } from './plan.js';
 import {
   $, h, icon, avatar, timeAgo, toast, modal, confirmDialog, promptDialog, shareDialog, SHARE_LOGBOOK,
 } from './common.js';
@@ -1026,6 +1027,7 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
+  await requirePlan(); // without a plan: the plans notice (src/plan.js)
   if (params.get('id')) await showBook(params.get('id'));
   else await showBooks();
 }

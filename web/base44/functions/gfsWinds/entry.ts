@@ -1,13 +1,18 @@
 // The forecast winds and air for a launch (the launch planner), from NOAA's GFS, and with
 // `ensemble` its 31-run ensemble (GEFS) too: see gfs.js.
-// Signed-in people only, so the site does not pass on requests for anyone.
+// Signed-in people with a plan only (shared/billing.js), so the site does not pass on requests
+// for anyone.
 import { createClientFromRequest } from "npm:@base44/sdk";
+import { lookAccess, PLAN_MESSAGE, PLAN_REQUIRED } from "../../shared/billing.js";
 import { gefsProfiles, gfsProfile } from "./gfs.js";
 
 export default async function (req: Request): Promise<Response> {
   const base44 = createClientFromRequest(req);
   const me = await base44.auth.me().catch(() => null);
   if (!me?.email) return Response.json({ error: "Please sign in." }, { status: 401 });
+  const plan = await lookAccess(base44.asServiceRole.entities, { id: String(me.id), created: me.created_date, role: me.role })
+    .catch(() => ({ ok: true })); // not known: let them in
+  if (!plan.ok) return Response.json({ error: PLAN_MESSAGE, code: PLAN_REQUIRED }, { status: 402 });
   const { lat, lon, time, ensemble } = await req.json().catch(() => ({}));
   const when = new Date(String(time ?? ""));
   if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon)) || Number.isNaN(when.getTime())) {

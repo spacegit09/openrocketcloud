@@ -12,7 +12,7 @@ import { markUndone } from '../../server/src/history.js';
 
 const PORT = 8799;
 const designs = new Map([
-  ['d1', { name: 'Test rocket', owner: 'a@test.local', members: { 'b@test.local': 'editor', 'v@test.local': 'viewer' } }],
+  ['d1', { name: 'Test rocket', owner: 'a@test.local', members: { 'b@test.local': 'editor', 'v@test.local': 'viewer', 'l@test.local': 'editor' }, locked: ['l@test.local'] }],
 ]);
 let hub;
 let model;
@@ -199,6 +199,44 @@ test('saved copies, export and large messages in fragments', async () => {
   const ex = await a.request('export');
   assert.equal(ex.model.objs['att:big.png'].v.data.length, big.length);
   a.close();
+});
+
+test('someone without a plan can download the design and its saved copies, not open or change it', async () => {
+  const a = client('a@test.local');
+  await a.next((m) => m.type === 'hi');
+  const l = client('l@test.local');
+  const hi = await l.next((m) => m.type === 'hi');
+  assert.equal(hi.role, 'editor');
+  assert.equal(hi.locked, true);
+  // Not shown to the others as here.
+  const shown = await a.next((m) => m.type === 'presence' && m.members.length >= 1);
+  assert.ok(!shown.members.some((p) => p.email === 'l@test.local'));
+  const { model: exported } = await l.request('export');
+  assert.ok(Object.keys(exported.objs).length > 0);
+  const copies = await l.request('snapshots');
+  assert.ok(copies.length >= 1);
+  assert.ok((await l.request('snapshot', { version: copies[0].version })).model);
+  await assert.rejects(l.request('revert', { mode: 'undo', from: 1, userId: 'x' }), /free week has ended/);
+  l.send({ type: 'hello' });
+  const kick = await l.next((m) => m.type === 'kick');
+  assert.equal(kick.code, 'plan_required');
+  await assert.rejects(l.next((m) => m.type === 'welcome', 600));
+  // Their edits go nowhere.
+  l.send({ type: 'ops', seq: 1, ops: [{ op: 'set', id: stage(), v: named('No plan') }] });
+  await l.next((m) => m.type === 'kick');
+  await assert.rejects(a.next((m) => m.type === 'ops' && m.ops[0].v.name === '<name>No plan</name>', 600));
+  for (const c of [a, l]) c.close();
+});
+
+test('someone who has just bought a plan is let in on their hello', async () => {
+  designs.get('d1').members['p@test.local'] = 'editor';
+  designs.get('d1').locked.push('p@test.local');
+  const p = client('p@test.local');
+  assert.equal((await p.next((m) => m.type === 'hi')).locked, true);
+  designs.get('d1').locked = designs.get('d1').locked.filter((e) => e !== 'p@test.local'); // paid
+  p.send({ type: 'hello' });
+  assert.equal((await p.next((m) => m.type === 'welcome')).role, 'editor');
+  p.close();
 });
 
 test('people the design is not shared with are turned away', async () => {

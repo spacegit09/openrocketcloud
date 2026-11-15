@@ -1,0 +1,32 @@
+// A person's plan account (web/base44/shared/billing.js): when their free week started, and their
+// customer id at Paddle, which takes the payments. Made the first time they open the site signed
+// in; reached only through the billing function.
+{
+  "name": "Account",
+  "type": "object",
+  "description": "When a person's free week started, and their Paddle customer id",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "The person's Base44 user id"
+    },
+    "trial_started": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When their free week started"
+    },
+    "customer": {
+      "type": "string",
+      "description": "Their Paddle customer id (ctm_…), once they have started a purchase"
+    }
+  },
+  "required": [
+    "user_id"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}

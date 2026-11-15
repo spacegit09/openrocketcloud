@@ -10,7 +10,8 @@ export const base44 = createClient({
 });
 
 /**
- * Calls one of the app's backend functions ('designs', 'motors', 'flights') and returns its result.
+ * Calls one of the app's backend functions ('designs', 'motors', 'flights', 'logbooks', 'billing')
+ * and returns its result; a refusal throws an Error with the function's message (and its `code`).
  * Designs, motors and saved launch plans are stored sealed, so these functions are the only way to
  * read or change them.
  */
@@ -18,7 +19,11 @@ export async function api(name, body) {
   try {
     return (await base44.functions.invoke(name, body)).data;
   } catch (e) {
-    throw new Error(e.response?.data?.error ?? e.message);
+    const err = new Error(e.response?.data?.error ?? e.message);
+    err.code = e.response?.data?.code ?? null;
+    // Their free week has ended (base44/shared/billing.js): src/plan.js shows the plans.
+    if (err.code === 'plan_required') window.dispatchEvent(new CustomEvent('plan-required', { detail: err.message }));
+    throw err;
   }
 }
 

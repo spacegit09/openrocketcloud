@@ -18,7 +18,7 @@ export function markSignedIn() {
   for (const b of document.querySelectorAll('[data-signin]')) {
     const open = document.createElement('a');
     open.className = b.className;
-    open.href = '/';
+    open.href = b.dataset.signedInHref ?? '/';
     open.textContent = b.dataset.signedIn ?? 'Open your designs';
     b.replaceWith(open);
   }

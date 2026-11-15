@@ -2,6 +2,7 @@
 // room, with who's here, recent changes, sharing, edit history and .ork download.
 import './style.css';
 import { api, currentUser, signIn } from './base44.js';
+import { requirePlan, showPlanWall } from './plan.js';
 import { $, h, icon, avatar, timeAgo, toast, shareDialog, editHistoryDialog } from './common.js';
 import { RoomClient, testHub } from './room-client.js';
 import { closeOpenRocket, editsSaved, onJavaDownload, prefetchOpenRocket, previewSaved, prepareJava, startOpenRocket } from './java.js';
@@ -214,7 +215,9 @@ async function main() {
   if (!me) return signIn();
   // The design is looked up before its room connects (OpenRocket starts meanwhile): that also
   // tells the room who you are, if it was shared with you by email and this is your first visit.
+  // Their plan too (src/plan.js): without one, the plans notice, and the design stays closed.
   const found = hub ? null : api('designs', { action: 'get', id: designId }).catch(() => null);
+  await requirePlan();
   if (found) await found;
 
   room = new RoomClient(designId, { connectionId: connectionId() }).connect();
@@ -242,7 +245,7 @@ async function main() {
   });
   room.on('activity', showActivity);
   room.on('notice', (m) => toast(m.message));
-  room.on('kick', (m) => ended('The design was closed', m.message));
+  room.on('kick', (m) => (m.code === 'plan_required' ? showPlanWall() : ended('The design was closed', m.message)));
 
   // OpenRocket starts now rather than when the room answers: its Java start-up is the longer
   // wait, and its bridge waits for the room by itself.

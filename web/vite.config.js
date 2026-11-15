@@ -13,6 +13,7 @@ export default defineConfig({
         design: resolve(import.meta.dirname, 'design.html'),
         planner: resolve(import.meta.dirname, 'planner.html'),
         logbook: resolve(import.meta.dirname, 'logbook.html'),
+        account: resolve(import.meta.dirname, 'account.html'),
         privacy: resolve(import.meta.dirname, 'privacy.html'),
         terms: resolve(import.meta.dirname, 'terms.html'),
         tourOpenrocket: resolve(import.meta.dirname, 'features/openrocket.html'),

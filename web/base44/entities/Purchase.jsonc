@@ -1,0 +1,57 @@
+// A plan bought through Paddle (web/base44/shared/billing.js): a monthly plan (one record per
+// Paddle subscription, kept up to date by the paddleWebhook function) or a one-time plan (one
+// record per Paddle transaction). No card or payment details: Paddle keeps those.
+{
+  "name": "Purchase",
+  "type": "object",
+  "description": "A plan bought through Paddle (no payment details)",
+  "properties": {
+    "paddle_id": {
+      "type": "string",
+      "description": "The Paddle subscription (sub_…) or transaction (txn_…)"
+    },
+    "kind": {
+      "type": "string",
+      "description": "monthly, lifetime, group, or seat (extra places in a group)"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "The buyer's Base44 user id"
+    },
+    "customer": {
+      "type": "string",
+      "description": "The buyer's Paddle customer id"
+    },
+    "status": {
+      "type": "string",
+      "description": "Monthly: Paddle's subscription status (active, past_due, paused, canceled…). One-time: completed or refunded"
+    },
+    "seats": {
+      "type": "integer",
+      "description": "Places in a group this purchase gives (group and seat purchases)"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Monthly: end of the month paid for"
+    },
+    "cancel_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Monthly: when it stops, if it was cancelled"
+    },
+    "event_at": {
+      "type": "string",
+      "description": "Paddle's time (to the nanosecond, as Paddle gives it) of the latest news applied; older news arriving late is ignored"
+    }
+  },
+  "required": [
+    "paddle_id"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
