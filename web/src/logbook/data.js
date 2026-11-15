@@ -242,11 +242,53 @@ export function datasetFromPlan(plan, study) {
     details: {
       date: when ? `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}` : '',
       time: when ? `${pad(when.getHours())}:${pad(when.getMinutes())}` : '',
-      location: study.site ? `${study.site.lat.toFixed(5)}, ${study.site.lon.toFixed(5)}` : '',
+      location: study.site ? formatSite(study.site.lat, study.site.lon) : '',
       rocket: study.design?.name ?? plan.design_name ?? '',
     },
     note: plan.summary ? `Launch Planner (${plan.name}): ${plan.summary}` : '',
   };
+}
+
+// ------------------------------------------------------------------ the launch site
+
+const MAX_LOCATION = 200; // the Location field's length
+// A decimal "latitude, longitude" pair, as the Location field and the Launch Planner write it.
+const PAIR = /(?<![\d.])([+-]?\d{1,2}(?:\.\d+)?)\s*,\s*([+-]?\d{1,3}(?:\.\d+)?)(?![\d.])/g;
+
+/** A launch site as the Location field shows it: "37.56654, 126.97797". */
+export function formatSite(lat, lon) {
+  return `${(+lat).toFixed(5)}, ${(+lon).toFixed(5)}`;
+}
+
+/** The last "latitude, longitude" pair in a Location field's text: { lat, lon, index, length }, or null. */
+export function siteIn(text) {
+  let found = null;
+  for (const m of String(text ?? '').matchAll(PAIR)) {
+    const lat = Number(m[1]);
+    const lon = Number(m[2]);
+    // "Pad 3, 120" is not a place: one of the two needs decimals.
+    const decimals = m[1].includes('.') || m[2].includes('.');
+    if (decimals && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) found = { lat, lon, index: m.index, length: m[0].length };
+  }
+  return found;
+}
+
+/**
+ * The Location field's text with a site picked on the map: its coordinates in place of the ones
+ * there, or after the place's name ("Black Rock (40.88123, -119.12345)"), or on their own.
+ */
+export function withSite(text, lat, lon) {
+  const site = formatSite(lat, lon);
+  const t = String(text ?? '').trim();
+  const old = siteIn(t);
+  let name = t;
+  if (old) {
+    const out = `${t.slice(0, old.index)}${site}${t.slice(old.index + old.length)}`;
+    if (out.length <= MAX_LOCATION) return out;
+    name = t.slice(0, old.index).replace(/[\s(,;:-]+$/, '');
+  }
+  if (!name) return site;
+  return `${name.slice(0, MAX_LOCATION - site.length - 3).trimEnd()} (${site})`;
 }
 
 // ------------------------------------------------------------------ graphs

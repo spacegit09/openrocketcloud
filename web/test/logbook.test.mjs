@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  datasetFromPlan, datasetFromSimulation, formatInstructions, graphGroups, OR_DEFAULTS, parseRows, simulationsFromXml,
-  sparkline, summarize, templateCsv, thin, ticks,
+  datasetFromPlan, datasetFromSimulation, formatInstructions, formatSite, graphGroups, OR_DEFAULTS, parseRows, simulationsFromXml,
+  siteIn, sparkline, summarize, templateCsv, thin, ticks, withSite,
 } from '../src/logbook/data.js';
 import { importOrk } from '../src/lib/ork.js';
 import { readZip } from '../src/lib/zip.js';
@@ -132,4 +132,24 @@ test('Launch Planner: a plan\'s nominal flight, and where and when it flies', ()
   assert.equal(details.rocket, 'Alpha');
   assert.match(note, /Lands 420 m NE/);
   assert.throws(() => datasetFromPlan({ name: 'x' }, { nominal: { path: [] } }), /no flight path/);
+});
+
+test('the launch site picked on the map goes into the Location field, keeping the place name', () => {
+  assert.equal(formatSite(37.566543, 126.977966), '37.56654, 126.97797');
+  assert.equal(withSite('', 40.881234, -119.123456), '40.88123, -119.12346');
+  assert.equal(withSite('Black Rock', 40.88123, -119.12346), 'Black Rock (40.88123, -119.12346)');
+  assert.equal(withSite('Black Rock (40.1, -119.2)', 41, -120), 'Black Rock (41.00000, -120.00000)');
+  assert.equal(withSite('37.56654, 126.97797', -33.9, 18.4), '-33.90000, 18.40000');
+  assert.equal(withSite('Field 12, gate 3', 1, 2), 'Field 12, gate 3 (1.00000, 2.00000)', 'not coordinates: "12, gate"');
+  const long = 'x'.repeat(250);
+  assert.ok(withSite(long, 1, 2).length <= 200 && withSite(long, 1, 2).endsWith('(1.00000, 2.00000)'));
+
+  assert.deepEqual(siteIn('Han river field (37.56654, 126.97797)'), { lat: 37.56654, lon: 126.97797, index: 17, length: 19 });
+  assert.equal(siteIn('-33.9,18.4')?.lon, 18.4);
+  assert.equal(siteIn('Black Rock'), null);
+  assert.equal(siteIn('95.1, 10'), null, 'no latitude over 90');
+  assert.equal(siteIn('10, 190'), null, 'no longitude over 180');
+  assert.equal(siteIn('123.4, 5'), null, 'not part of a longer number');
+  assert.equal(siteIn('Pad 3, 120'), null, 'whole numbers alone are not a place');
+  assert.equal(siteIn('40.9, -119')?.lon, -119);
 });

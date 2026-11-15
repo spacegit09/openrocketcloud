@@ -397,7 +397,9 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
 - **Logbook** (browser version; *Logbook* on the dashboard and the planner): a record of each flight,
   kept as logbooks shown as cards (a photo or the flight's altitude curve). A logbook has the flight's
   details (date, time, location, rocket, motor, weather, outcome), a description and notes, saved as
-  you type. **Flight data**: choose what your data has (time first, then altitude, velocity,
+  you type. **Pick on map** sets the location on the Launch Planner's satellite map: search for a
+  place (Esri's geocoding) or use your location, then click where you launched; the coordinates go
+  into the field, after the place's name if one is there. **Flight data**: choose what your data has (time first, then altitude, velocity,
   acceleration and custom columns of your own, each in its unit), and the logbook shows the exact
   column order, an example and a CSV template; paste the text or open a CSV file, and every
   mistake is listed by line (a wrong number of values, a decimal comma, a value that is not a

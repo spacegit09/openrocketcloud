@@ -26,7 +26,8 @@ function loadCesium() {
 }
 
 /**
- * A map in `el`: { setSite(lat, lon), onPick(fn(lat, lon)), setLaunch(rail), showStudy(study), replay(), clear() }.
+ * A map in `el`: { setSite(lat, lon), onPick(fn(lat, lon)), setLaunch(rail), showStudy(study), replay(), clear(),
+ * flyToArea(area) }. The logbook uses it to pick a launch site (logbook/site-map.js).
  * `arcgisKey` is the site's ArcGIS API key (Cesium's evaluation key is used without one).
  */
 export async function createMap(el, { arcgisKey } = {}) {
@@ -214,6 +215,10 @@ export async function createMap(el, { arcgisKey } = {}) {
       viewer.trackedEntity = undefined;
     },
     clear,
+    /** Shows an area (degrees), e.g. a place found by a search. */
+    flyToArea({ west, south, east, north }) {
+      viewer.camera.flyTo({ destination: Cesium.Rectangle.fromDegrees(west, south, east, north), duration: 1.2 });
+    },
     /**
      * The launch marker: the rail tilted `angle` toward `direction` (rad, clockwise from north),
      * with `label`; `pending` when the direction is not known yet (into the wind, before a forecast).

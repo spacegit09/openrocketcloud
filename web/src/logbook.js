@@ -11,7 +11,7 @@ import {
 } from './common.js';
 import {
   QUANTITIES, TIME_UNITS, OR_DEFAULTS, columnLabel, datasetFromPlan, datasetFromSimulation, formatInstructions,
-  formatNumber, graphGroups, parseRows, simulationsFromXml, summarize, templateCsv,
+  formatNumber, graphGroups, parseRows, simulationsFromXml, siteIn, summarize, templateCsv, withSite,
 } from './logbook/data.js';
 import { lineChart, sparkSvg } from './logbook/chart.js';
 
@@ -311,6 +311,19 @@ function detailsCard() {
     } else {
       input = h('input', { type, value: d[k] ?? '', placeholder: placeholder ?? '', readonly: !edit, maxlength: 200 });
       input.oninput = () => change(`details.${k}`, input.value);
+    }
+    if (k === 'location' && edit) {
+      // The launch site on a map, instead of typing its coordinates (logbook/site-map.js).
+      const pick = h('button', { type: 'button', title: 'Choose the launch site on a map' }, icon('pin'), 'Pick on map');
+      pick.onclick = async (e) => {
+        e.preventDefault();
+        const { pickSite } = await import('./logbook/site-map.js');
+        const site = await pickSite(siteIn(input.value));
+        if (!site) return;
+        input.value = withSite(input.value, site.lat, site.lon);
+        change('details.location', input.value);
+      };
+      return h('label', { class: `lb-field lb-${k}` }, h('span', {}, label), h('div', { class: 'lb-site' }, input, pick));
     }
     return h('label', { class: `lb-field lb-${k}` }, h('span', {}, label), input);
   });

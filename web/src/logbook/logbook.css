@@ -23,6 +23,23 @@ svg.lb-spark .fill { fill: var(--accent); opacity: 0.12; }
 .lb-field { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); min-width: 0; }
 .lb-field > input, .lb-field > select, .lb-field > textarea { width: 100%; }
 .lb-fields .lb-location, .lb-fields .lb-weather { grid-column: span 2; }
+.lb-site { display: flex; gap: 8px; }
+.lb-site > input { flex: 1; min-width: 0; }
+.lb-site > button { flex: none; }
+
+/* The launch site on a map (logbook/site-map.js). */
+dialog.site-pick-dialog { width: min(960px, calc(100vw - 32px)); }
+dialog.site-pick-dialog .content { max-height: none; }
+.site-pick-search { display: flex; gap: 8px; }
+.site-pick-search > input { flex: 1; min-width: 0; }
+.site-pick-results { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.site-pick-results:empty { display: none; }
+.site-pick-results .site-pick-credit { margin-left: auto; font-size: 11px; }
+.site-pick-map { position: relative; height: min(58vh, 540px); border-radius: var(--radius-sm); overflow: hidden; background: #0b1220; }
+.site-pick-map .cesium-viewer { position: absolute; inset: 0; }
+.site-pick-note { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: #cbd5e1; font-size: 13px; }
+.site-pick-foot { display: flex; align-items: center; gap: 8px; }
+.site-pick-foot > .hint { flex: 1; min-width: 0; }
 textarea {
   font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 8px 10px; resize: vertical; min-height: 64px;
