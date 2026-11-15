@@ -16,10 +16,12 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import java.util.ArrayList;
@@ -42,7 +44,9 @@ import info.openrocket.core.file.GeneralRocketLoader;
 import info.openrocket.core.file.openrocket.OpenRocketSaver;
 import info.openrocket.core.logging.ErrorSet;
 import info.openrocket.core.logging.WarningSet;
+import info.openrocket.core.motor.Motor;
 import info.openrocket.core.motor.MotorConfiguration;
+import info.openrocket.core.rocketcomponent.FlightConfigurationId;
 import info.openrocket.core.rocketcomponent.FreeformFinSet;
 import info.openrocket.core.rocketcomponent.InsideColorComponent;
 import info.openrocket.core.rocketcomponent.MotorMount;
@@ -51,6 +55,7 @@ import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.util.Coordinate;
 import info.openrocket.core.simulation.FlightData;
 import info.openrocket.core.simulation.customexpression.CustomExpression;
+import info.openrocket.core.startup.Application;
 import info.openrocket.core.startup.jij.ClasspathUrlStreamHandler;
 import info.openrocket.core.startup.jij.ConfigurableStreamHandlerFactory;
 import info.openrocket.core.util.BuildProperties;
@@ -77,9 +82,116 @@ final class OrDoc {
 		URL.setURLStreamHandlerFactory(factory);
 	}
 
-	/** Folder for the design's custom motor files (written fresh each session, see Bridge). */
-	static Path motorDir() {
-		return Path.of(System.getProperty("java.io.tmpdir"), "orcloud-motors");
+	/**
+	 * A custom motor file tidied before OpenRocket reads it, as uploads are (server/src/motors.js
+	 * tidyMotorText): formatting OpenRocket's reader trips on but that changes no motor, so the file
+	 * loads instead of failing with a warning (its motors missing). For .eng: lines of only spaces
+	 * become empty, a comment's leading spaces go, and so does a comment after the values on a line;
+	 * for both kinds, a byte order mark.
+	 */
+	public static String tidyMotorFile(String name, String content) {
+		String s = content.startsWith("\uFEFF") ? content.substring(1) : content;
+		if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".eng")) {
+			return s;
+		}
+		String[] lines = s.split("\r\n|\r|\n", -1);
+		StringBuilder out = new StringBuilder(s.length());
+		for (int i = 0; i < lines.length; i++) {
+			if (i > 0) {
+				out.append('\n');
+			}
+			out.append(tidyMotorLine(lines[i]));
+		}
+		return out.toString();
+	}
+
+	private static boolean motorSpace(char c) {
+		return c == ' ' || c == '\t' || c == '\u000B' || c == '\f';
+	}
+
+	private static String tidyMotorLine(String line) {
+		int a = 0;
+		while (a < line.length() && motorSpace(line.charAt(a))) {
+			a++;
+		}
+		if (a == line.length()) {
+			return "";
+		}
+		if (line.charAt(a) == ';') {
+			return line.substring(a);
+		}
+		int c = line.indexOf(';');
+		if (c < 0) {
+			return line;
+		}
+		while (c > 0 && motorSpace(line.charAt(c - 1))) {
+			c--;
+		}
+		return line.substring(0, c);
+	}
+
+	private static final String MOTOR_FOLDERS = "orcloud-session-motors";
+	private static final String SHARED_MOTOR_FOLDER = "orcloud-motors"; // before: one for all sessions
+	private static Path motorDir;
+
+	/**
+	 * This session's folder for its custom motor files (written as it starts, see Bridge and
+	 * FlightLab), a new one each session. In a browser the temporary folder is in the site's storage,
+	 * which all the site's tabs share: two designs, or a design and the launch planner, starting at
+	 * once in one folder deleted and read each other's files, and a design's motors went missing.
+	 * Folders of sessions started over an hour ago are removed (a session reads its motors as it
+	 * starts).
+	 */
+	static synchronized Path motorDir() {
+		if (motorDir == null) {
+			Path tmp = Path.of(System.getProperty("java.io.tmpdir"));
+			Path root = tmp.resolve(MOTOR_FOLDERS);
+			long now = System.currentTimeMillis();
+			motorDir = root.resolve(now + "-" + UUID.randomUUID().toString().substring(0, 8));
+			try (Stream<Path> old = Files.list(root)) {
+				for (Path p : (Iterable<Path>) old::iterator) {
+					String n = p.getFileName().toString();
+					long made = 0;
+					try {
+						made = Long.parseLong(n.substring(0, n.indexOf('-')));
+					} catch (RuntimeException e) {
+						// not a session's folder
+					}
+					if (made < now - 3_600_000L) {
+						deleteTree(p);
+					}
+				}
+			} catch (Exception e) {
+				// no folders yet
+			}
+			deleteTree(tmp.resolve(SHARED_MOTOR_FOLDER));
+		}
+		return motorDir;
+	}
+
+	private static void deleteTree(Path p) {
+		try (Stream<Path> all = Files.walk(p)) {
+			for (Path x : (Iterable<Path>) all.sorted(Comparator.reverseOrder())::iterator) {
+				try {
+					Files.deleteIfExists(x);
+				} catch (Exception e) {
+					// in use: left for later
+				}
+			}
+		} catch (Exception e) {
+			// not there
+		}
+	}
+
+	/** Motor folders of other (and earlier) sessions, as listed in OpenRocket's preferences. */
+	private static boolean otherSessionsMotors(String dir) {
+		try {
+			Path tmp = Path.of(System.getProperty("java.io.tmpdir"));
+			Path p = Path.of(dir);
+			return p.startsWith(tmp.resolve(MOTOR_FOLDERS)) || p.startsWith(tmp.resolve(SHARED_MOTOR_FOLDER));
+		} catch (RuntimeException e) {
+			return false;
+		}
 	}
 
 	/**
@@ -101,13 +213,15 @@ final class OrDoc {
 			dirs.add(def.getAbsolutePath());
 		} else {
 			for (String d : current.split("\\|")) {
-				if (!d.isBlank()) {
+				// Preferences are in the site's storage too, shared by its tabs: name this session's
+				// motor folder only.
+				if (!d.isBlank() && !otherSessionsMotors(d.trim())) {
 					dirs.add(d.trim());
 				}
 			}
 		}
-		if (!dirs.contains(motorDir().toString())) {
-			dirs.add(motorDir().toString());
+		dirs.add(motorDir().toString());
+		if (!String.join("|", dirs).equals(current)) {
 			node.put("UserThrustCurves", String.join("|", dirs));
 		}
 		try {
@@ -298,6 +412,127 @@ final class OrDoc {
 				}
 			}
 		}
+	}
+
+	/**
+	 * Motors of the shared design that OpenRocket here cannot load, put back into a snapshot.
+	 *
+	 * When a design names a motor that is not in this session's motor database (a custom motor file
+	 * removed from the design, or not received), OpenRocket opens the design without it and leaves it
+	 * out, with its ignition settings, when it saves the motor mount. Any edit to that mount (or on
+	 * the Motors &amp; Configuration tab) would then remove the motor from the shared design, for
+	 * everyone, though this user never removed it and cannot see it. So for each motor mount, the
+	 * motor of each flight configuration the snapshot leaves out is taken from {@code shared} when
+	 * OpenRocket here has no motor in that configuration and cannot find the shared one. Choosing a
+	 * motor replaces it; removing the configuration removes it.
+	 *
+	 * @return the flight configurations (their ids) with a motor kept: OpenRocket here simulates
+	 *         them without it
+	 */
+	static Set<String> keepUnavailableMotors(OpenRocketDocument doc, Model shared, Model snap) {
+		Set<String> missing = new TreeSet<>();
+		if (shared == null) {
+			return missing;
+		}
+		Rocket rocket = doc.getRocket();
+		for (RocketComponent c : rocket) {
+			if (!(c instanceof MotorMount) || !((MotorMount) c).isMotorMount()) {
+				continue;
+			}
+			String id = c.getID().toString();
+			Model.Obj so = snap.get(id);
+			Model.Obj eo = shared.get(id);
+			String sx = so == null ? null : so.v.get("motormount");
+			String ex = eo == null ? null : eo.v.get("motormount");
+			if (sx == null || ex == null || sx.equals(ex)) {
+				continue;
+			}
+			try {
+				Xml.El mine = Xml.parse(sx);
+				Xml.El theirs = Xml.parse(ex);
+				Map<String, Xml.El> motors = byConfig(mine, "motor");
+				Map<String, Xml.El> ignitions = byConfig(mine, "ignitionconfiguration");
+				Map<String, Xml.El> sharedMotors = byConfig(theirs, "motor");
+				Map<String, Xml.El> sharedIgnitions = byConfig(theirs, "ignitionconfiguration");
+				boolean kept = false;
+				for (FlightConfigurationId fcid : rocket.getIds()) {
+					String key = fcid.key.toString();
+					Xml.El motor = sharedMotors.get(key);
+					if (motor == null || motors.containsKey(key) || !((MotorMount) c).getMotorConfig(fcid).isEmpty()
+							|| availableHere(motor)) {
+						continue;
+					}
+					motors.put(key, motor);
+					if (!ignitions.containsKey(key) && sharedIgnitions.containsKey(key)) {
+						ignitions.put(key, sharedIgnitions.get(key));
+					}
+					missing.add(key);
+					kept = true;
+				}
+				if (!kept) {
+					continue;
+				}
+				// In OpenRocket's order (RocketComponentSaver.motorMountParams): the mount's own
+				// settings, then each configuration's motor and ignition, in the rocket's order.
+				Xml.El out = new Xml.El("motormount");
+				out.attrs.putAll(mine.attrs);
+				for (Object child : mine.children) {
+					if (!(child instanceof Xml.El) || configId((Xml.El) child) == null) {
+						out.children.add(child);
+					}
+				}
+				for (FlightConfigurationId fcid : rocket.getIds()) {
+					String key = fcid.key.toString();
+					for (Map<String, Xml.El> els : List.of(motors, ignitions)) {
+						Xml.El el = els.remove(key);
+						if (el != null) {
+							out.children.add(el);
+						}
+					}
+				}
+				so.v.put("motormount", Xml.canonical(out));
+			} catch (Exception e) {
+				Log.warn("Could not keep the motors of " + c.getName() + ": " + e);
+			}
+		}
+		return missing;
+	}
+
+	private static String configId(Xml.El el) {
+		return el.tag.equals("motor") || el.tag.equals("ignitionconfiguration") ? el.attrs.get("configid") : null;
+	}
+
+	private static Map<String, Xml.El> byConfig(Xml.El mount, String tag) {
+		Map<String, Xml.El> out = new java.util.LinkedHashMap<>();
+		for (Xml.El el : mount.elements()) {
+			if (el.tag.equals(tag) && el.attrs.get("configid") != null) {
+				out.put(el.attrs.get("configid"), el);
+			}
+		}
+		return out;
+	}
+
+	/** Whether OpenRocket here finds a design's motor, as it does when it opens the design (MotorHandler). */
+	private static boolean availableHere(Xml.El motor) {
+		String designation = text(motor, "designation");
+		if (designation == null) {
+			return true; // OpenRocket ignores such a motor: nothing to keep
+		}
+		Motor.Type type = null;
+		String t = text(motor, "type");
+		for (Motor.Type x : Motor.Type.values()) {
+			if (t != null && x.name().toLowerCase(java.util.Locale.ENGLISH).equals(t)) {
+				type = x;
+			}
+		}
+		return !Application.getMotorSetDatabase()
+				.findMotors(text(motor, "digest"), type, text(motor, "manufacturer"), designation, Double.NaN, Double.NaN)
+				.isEmpty();
+	}
+
+	private static String text(Xml.El parent, String tag) {
+		Xml.El el = parent.first(tag);
+		return el == null ? null : el.text().trim();
 	}
 
 	// ------------------------------------------------------------------ in-place property updates

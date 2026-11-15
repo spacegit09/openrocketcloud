@@ -5,6 +5,9 @@
 import { WebSocketServer } from 'ws';
 import { Room } from '../base44/actors/DesignRoom/room.js';
 
+// motors: the custom motor files ([{ name, content }]) every session of every design gets, or
+// (designId, email) => such a list, for one person's session to have motors another's lacks
+// (email: whoever said hello last; the room asks for a welcome's motors right after the hello).
 export function startHub({ port = 8788, designs = new Map(), motors = [] } = {}) {
   const sessions = new Map(); // design id -> { room, conns }
 
@@ -28,7 +31,7 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
         const role = d.owner === user.email ? 'owner' : d.members?.[user.email];
         return role ? { role, name: d.name } : null;
       },
-      motors: async () => motors,
+      motors: async () => (typeof motors === 'function' ? motors(designId, sessions.get(designId)?.helloFrom) : motors),
       touch: async () => {},
       preview: async (preview, { onlyIfMissing = false } = {}) => {
         const d = designs.get(designId);
@@ -68,6 +71,7 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
       }
       if (msg?.type === '__ping') return void ws.send('{"type":"__pong"}');
       if (!ready) return void pending.push(msg);
+      if (msg?.type === 'hello') s.helloFrom = conn.user?.email;
       await s.room.handleMessage(conn, msg);
     });
     ws.on('close', () => {
@@ -81,7 +85,10 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
       return ws.close(4003, refused);
     }
     ready = true;
-    for (const m of pending) await s.room.handleMessage(conn, m);
+    for (const m of pending) {
+      if (m?.type === 'hello') s.helloFrom = conn.user?.email;
+      await s.room.handleMessage(conn, m);
+    }
   });
   return {
     port,

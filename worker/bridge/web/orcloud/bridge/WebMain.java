@@ -29,6 +29,7 @@ import orcloud.web.ModelTab;
 import orcloud.web.Preview;
 import orcloud.web.RecoveryHelpers;
 import orcloud.web.SettingsMenu;
+import orcloud.web.StartupDialogs;
 import orcloud.web.StlImport;
 import orcloud.web.Warmup;
 
@@ -59,6 +60,8 @@ public final class WebMain {
 		browserPreferences();
 		// On a Mac, ⌘-click adds to a selection (the component tree, lists, tables).
 		CommandClick.install();
+		// Windows OpenRocket waits on while it starts (warnings about the design) are shown.
+		StartupDialogs.install();
 
 		Bridge bridge = new Bridge(BrowserLink::new, "", workDir);
 		bridge.start();
@@ -149,6 +152,7 @@ public final class WebMain {
 		}
 		// The page shows the window, and its header may have changed since the menus were placed.
 		MenuRow.placeNow(BrowserLink.ready());
+		StartupDialogs.done();
 		// Once the menu bar is redrawn: the header shows the menus, and the component preset database,
 		// which waited for the window (see our copy of its loader), loads. Loading holds up redrawing
 		// for several seconds.

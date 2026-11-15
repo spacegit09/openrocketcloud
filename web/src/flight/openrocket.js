@@ -2,8 +2,7 @@
 // without its windows (orcloud.bridge.FlightMain and FlightLab in worker/bridge/web), run as a
 // program the way the design page runs OpenRocket. It reads a design and computes the flight
 // tables the engine (engine.js) flies with. The dashboard uses it to draw designs' previews.
-import { prepareJava } from '../java.js';
-import { api } from '../base44.js';
+import { designMotors, prepareJava } from '../java.js';
 import { testHub, withRoom } from '../room-client.js';
 import { exportOrk } from '../lib/ork.js';
 import { fromJson } from '../../../server/src/model.js';
@@ -18,7 +17,7 @@ let files = 0;
  * its own).
  */
 export async function fetchDesign(designId) {
-  const motors = testHub() ? Promise.resolve(null) : api('designs', { action: 'motors', id: designId }).catch(() => null);
+  const motors = testHub() ? Promise.resolve(null) : designMotors(designId);
   const design = await withRoom(designId, (room) => new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error('The design did not answer. Try again.')), 60_000);
     room.on('welcome', (m) => {

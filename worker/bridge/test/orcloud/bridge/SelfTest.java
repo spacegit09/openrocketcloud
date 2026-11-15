@@ -99,6 +99,13 @@ public final class SelfTest {
 				System.out.println("ERROR 3D view: " + t);
 				t.printStackTrace(System.out);
 			}
+			try {
+				missingMotorChecks(examples);
+			} catch (Throwable t) {
+				failures++;
+				System.out.println("ERROR missing motors: " + t);
+				t.printStackTrace(System.out);
+			}
 		});
 		System.out.println((failures == 0 ? "SELFTEST PASS" : "SELFTEST FAIL") + " checks=" + checks + " failures=" + failures);
 		System.exit(failures == 0 ? 0 : 1);
@@ -240,6 +247,135 @@ public final class SelfTest {
 
 	private static void check(String what, boolean ok) {
 		check(what, ok ? List.of() : List.of("false"));
+	}
+
+	/**
+	 * A shared design naming a motor this session cannot load (a custom motor file removed from the
+	 * design, or not received): OpenRocket opens it without the motor and saves the mount without
+	 * it. Edits must not remove it from the shared design (OrDoc.keepUnavailableMotors), unless the
+	 * user picks another motor or removes the configuration; a motor OpenRocket finds, removed by
+	 * the user, is removed.
+	 */
+	private static void missingMotorChecks(List<Path> examples) throws Exception {
+		Path p = examples.stream().filter(x -> x.getFileName().toString().startsWith("A simple model rocket")).findFirst()
+				.orElse(examples.get(0));
+		System.out.println("Missing motor (" + p.getFileName() + ")");
+		OpenRocketDocument d0 = new GeneralRocketLoader(p.toFile()).load();
+		MotorMount mount0 = null;
+		FlightConfigurationId fcid = null;
+		find: for (RocketComponent c : d0.getRocket()) {
+			if (c instanceof MotorMount && ((MotorMount) c).isMotorMount()) {
+				for (FlightConfigurationId id : d0.getRocket().getIds()) {
+					if (!((MotorMount) c).getMotorConfig(id).isEmpty()) {
+						mount0 = (MotorMount) c;
+						fcid = id;
+						break find;
+					}
+				}
+			}
+		}
+		check("missing motor: the example has a motor", mount0 != null);
+		if (mount0 == null) {
+			return;
+		}
+		String mountId = ((RocketComponent) mount0).getID().toString();
+		String key = fcid.key.toString();
+		Motor available = mount0.getMotorConfig(fcid).getMotor();
+
+		// The shared design: that configuration's motor is a custom motor no motor database here has,
+		// lit at launch 1.5 s late (its ignition settings must be kept with it).
+		Model shared = model(d0, false);
+		Xml.El mm = Xml.parse(shared.get(mountId).v.get("motormount"));
+		Xml.El custom = Xml.parse("<motor configid=\"" + key + "\"><type>single</type><manufacturer>RocketClub</manufacturer>"
+				+ "<digest>0123456789abcdef0123456789abcdef</digest><designation>KN38-I310</designation><diameter>0.038</diameter>"
+				+ "<length>0.33</length><delay>6.0</delay></motor>");
+		Xml.El ignition = Xml.parse("<ignitionconfiguration configid=\"" + key + "\"><ignitionevent>launch</ignitionevent>"
+				+ "<ignitiondelay>1.5</ignitiondelay></ignitionconfiguration>");
+		for (int i = 0; i < mm.children.size(); i++) {
+			Object el = mm.children.get(i);
+			if (el instanceof Xml.El && ((Xml.El) el).tag.equals("ignitionconfiguration") && key.equals(((Xml.El) el).attrs.get("configid"))) {
+				mm.children.remove(i--);
+			}
+		}
+		for (int i = 0; i < mm.children.size(); i++) {
+			Object el = mm.children.get(i);
+			if (el instanceof Xml.El && ((Xml.El) el).tag.equals("motor") && key.equals(((Xml.El) el).attrs.get("configid"))) {
+				mm.children.set(i, custom);
+				mm.children.add(i + 1, ignition);
+			}
+		}
+		shared.get(mountId).v.put("motormount", Xml.canonical(mm));
+		String sharedMount = shared.get(mountId).v.get("motormount");
+		check("missing motor: the shared design names it", sharedMount.contains("KN38-I310") && sharedMount.contains("<ignitiondelay>1.5</ignitiondelay>"));
+
+		OpenRocketDocument d1 = OrDoc.load(shared);
+		MotorMount mount1 = (MotorMount) d1.getRocket().findComponent(((RocketComponent) mount0).getID());
+		check("missing motor: OpenRocket opens the design without it", mount1.getMotorConfig(fcid).isEmpty());
+		Model snap = model(d1, false);
+		check("missing motor: OpenRocket saves the mount without it (what the guard is for)",
+				!snap.get(mountId).v.get("motormount").contains("KN38-I310"));
+		OrDoc.keepUnavailableMotors(d1, shared, snap);
+		check("missing motor: kept, with its ignition settings, in OpenRocket's order",
+				sharedMount.equals(snap.get(mountId).v.get("motormount")));
+		List<Map<String, Object>> untouched = Model.diff(shared, snap, Set.of(mountId));
+		check("missing motor: an edit elsewhere on the mount sends nothing for it", !touchesMount(untouched, mountId));
+		List<String> others = new ArrayList<>();
+		for (Map<String, Object> op : Model.diff(shared, snap, Set.of())) {
+			others.add(op.get("op") + " " + op.get("id") + (op.get("v") instanceof Map ? " " + ((Map<?, ?>) op.get("v")).keySet() : ""));
+		}
+		if (!others.isEmpty()) {
+			System.out.println("  note opening the design without the motor changes (outside the rocket): " + others);
+		}
+
+		// An edit to the mount: sent, with the motor still in it.
+		mount1.setMotorOverhang(mount1.getMotorOverhang() + 0.005);
+		Model edited = model(d1, false);
+		OrDoc.keepUnavailableMotors(d1, shared, edited);
+		List<Map<String, Object>> ops = Model.diff(shared, edited, Set.of(mountId));
+		Model next = shared.copy();
+		next.applyAll(ops);
+		String nextMount = next.get(mountId).v.get("motormount");
+		check("missing motor: an edit of the mount is sent and keeps it", touchesMount(ops, mountId)
+				&& nextMount.contains("KN38-I310") && nextMount.contains("<ignitiondelay>1.5</ignitiondelay>")
+				&& !nextMount.equals(sharedMount));
+		OpenRocketDocument d2 = OrDoc.load(next);
+		check("missing motor: the result opens in OpenRocket",
+				((MotorMount) d2.getRocket().findComponent(((RocketComponent) mount0).getID())).getMotorConfig(fcid).isEmpty());
+
+		// The user picks a motor for that configuration: it replaces the missing one.
+		MotorConfiguration picked = new MotorConfiguration(mount1, fcid, mount1.getDefaultMotorConfig());
+		picked.setMotor(available);
+		mount1.setMotorConfig(picked, fcid);
+		Model chosen = model(d1, false);
+		OrDoc.keepUnavailableMotors(d1, shared, chosen);
+		String chosenMount = chosen.get(mountId).v.get("motormount");
+		check("missing motor: a motor picked instead replaces it",
+				!chosenMount.contains("KN38-I310") && chosenMount.contains(">" + available.getDesignation() + "<"));
+
+		// The user removes the configuration: the motor goes with it.
+		OpenRocketDocument d3 = OrDoc.load(shared);
+		d3.getRocket().removeFlightConfiguration(fcid);
+		Model removed = model(d3, false);
+		OrDoc.keepUnavailableMotors(d3, shared, removed);
+		check("missing motor: removing the configuration removes it",
+				!removed.get(mountId).v.get("motormount").contains("KN38-I310"));
+
+		// A motor OpenRocket finds, removed by the user: removed.
+		Model plain = model(d0, false);
+		mount0.setMotorConfig(new MotorConfiguration(mount0, fcid), fcid);
+		Model cleared = model(d0, false);
+		OrDoc.keepUnavailableMotors(d0, plain, cleared);
+		check("missing motor: a motor found here and removed by the user is removed",
+				!cleared.get(mountId).v.get("motormount").contains("configid=\"" + key + "\""));
+	}
+
+	private static boolean touchesMount(List<Map<String, Object>> ops, String mountId) {
+		for (Map<String, Object> op : ops) {
+			if (mountId.equals(op.get("id")) && op.get("v") instanceof Map && ((Map<?, ?>) op.get("v")).containsKey("motormount")) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static void run(Path p) throws Exception {

@@ -71,7 +71,7 @@ let modelFiles = 0;
 
 // The bridge's side of the page: events for BrowserLink.jsReceive ("o" connected, "c" + reason
 // disconnected, "m" + JSON a message from the room) and the room and callbacks of startOpenRocket.
-const link = { events: [], waiting: null, room: null, onReady: null, designId: null, motors: null };
+const link = { events: [], waiting: null, room: null, onReady: null, onDialogs: null, designId: null, motors: null };
 
 // Edits OpenRocket sent (their "seq") that the room has not confirmed yet: it confirms each batch
 // with an "ack", or by passing it on to everyone, the sender included.
@@ -132,6 +132,21 @@ function skipEmptyDownloads() {
     if (this.hasAttribute('download') && empty.delete(this.href)) return undefined;
     return click.call(this);
   };
+}
+
+/**
+ * The custom motor files of everyone `designId` is shared with ([{ name, content }]), or null. Tried
+ * three times: without them, a design using one opens with that motor missing.
+ */
+export async function designMotors(designId) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await api('designs', { action: 'motors', id: designId });
+    } catch {
+      await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+  return null;
 }
 
 /**
@@ -218,6 +233,10 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
             previewSaving = api('designs', { action: 'preview', id: link.designId, preview: json }).catch(() => {});
           }
         },
+        async Java_orcloud_web_StartupDialogs_jsDialogs(lib, open) {
+          // OpenRocket waits on a window it opened while starting (orcloud.web.StartupDialogs).
+          link.onDialogs?.(open > 0);
+        },
         async Java_orcloud_web_FileWindows_jsFileWindow(lib, x, y, w, h) {
           markFileWindow(x, y, w, h);
         },
@@ -234,14 +253,15 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
  * Starts OpenRocket for `designId` in the `screen` element. `room` is the design's RoomClient;
  * OpenRocket's bridge talks to it through the BrowserLink natives above.
  */
-export async function startOpenRocket({ designId, screen, room, onReady, onExit }) {
+export async function startOpenRocket({ designId, screen, room, onReady, onDialogs, onExit }) {
   link.room = room;
   link.onReady = onReady;
+  link.onDialogs = onDialogs;
   link.designId = designId;
   // The custom motor files of everyone the design is shared with, for the room's welcome: the
   // room cannot read them (they are sealed), the designs function can. The local test hub sends
   // its own.
-  link.motors = testHub() ? Promise.resolve(null) : api('designs', { action: 'motors', id: designId }).catch(() => null);
+  link.motors = testHub() ? Promise.resolve(null) : designMotors(designId);
   await prepareJava(designId);
   // What the room says reaches OpenRocket in order, a welcome with the motor files in it.
   let order = Promise.resolve();

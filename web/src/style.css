@@ -172,6 +172,7 @@ dialog footer { padding: 12px 20px 16px; display: flex; justify-content: flex-en
 .list .item .sub { color: var(--muted); font-size: 12.5px; }
 .error { color: var(--danger); min-height: 1em; }
 .hint { color: var(--muted); font-size: 12.5px; }
+.list .item .sub.motor-problem { color: var(--danger); margin-top: 2px; }
 
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);

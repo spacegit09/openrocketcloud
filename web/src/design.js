@@ -250,6 +250,17 @@ async function main() {
     designId,
     screen,
     room,
+    // OpenRocket waits on a window it opened while starting (a warning about the design, say):
+    // shown over the loading screen until it is answered.
+    onDialogs: (open) => {
+      if (state === 'ready' || state === 'ended' || closing) return;
+      if (open) {
+        $('#overlay').hidden = true;
+        setStatus('Waiting for you', 'wait');
+      } else {
+        renderState();
+      }
+    },
     onReady: () => {
       if (state === 'ended') return;
       state = 'ready';

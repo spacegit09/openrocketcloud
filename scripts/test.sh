@@ -5,7 +5,10 @@
 #  2. the launch planner's flight engine against OpenRocket, its weather decoding and its shared
 #     forecasts, fins built with their cross sections and root fillets for 3D export, the fins'
 #     flutter speed, and 3D export of every example with the "3D printing" settings;
-#  3. the server tests, including Java/Node parity on those fixtures.
+#  3. custom motor files (worker/bridge/test/motors) read by OpenRocket's own motor readers, as a
+#     session reads uploads;
+#  4. the server tests, including Java/Node parity on those fixtures and the upload check of motor
+#     files accepting exactly what OpenRocket reads.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export ORC_IMAGES="${ORC_IMAGES:-orcloud}" # test the locally built images
@@ -66,5 +69,11 @@ docker run --rm -v "$PWD/worker:/w" -w /w eclipse-temurin:17-jdk \
 docker run --rm -v "$PWD/$cache/test-out:/opt/test" -v "$PWD/$cache/test-web:/opt/test-web" --entrypoint bash orcloud-worker -c '
   set -o pipefail
   java -Djava.awt.headless=true -cp /opt/test-web:/opt/openrocket/OpenRocket.jar:/opt/test orcloud.obj.ObjExportCheck 2>&1 | grep -E "^(OBJCHECK|  FAIL)"'
+
+# Custom motor files: OpenRocket's verdict on each, after the session's tidying (worker/.cache/motors),
+# for server/test/motors.test.js to hold the upload check to.
+docker run --rm -v "$PWD/worker/bridge/test/motors:/in:ro" -v "$PWD/$cache:/c" -v "$PWD/$cache/test-out:/opt/test" --entrypoint bash orcloud-worker -c '
+  rm -rf /c/motors
+  java -Djava.awt.headless=true -cp /opt/openrocket/OpenRocket.jar:/opt/test orcloud.bridge.MotorFileCheck /in /c/motors 2>&1 | grep -E "^MOTORFILECHECK"'
 
 (cd server && npm ci --no-audit --no-fund >/dev/null && npm test)

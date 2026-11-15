@@ -15,11 +15,16 @@
 //   PERF_NOPREFETCH=1        the page does not ask the service worker to prefetch the jar
 //   PERF_RESOURCES=<file>    save CheerpJ's list of the runtime files used (public/or/preload.json)
 //   PERF_QS=<&a=b...>        extra query string for the design page
+//   PERF_ORK=<file>          open this .ork file
+//   PERF_MOTORS=<file>,...   custom motor files, given to OpenRocket as the room gives a design's
+//   PERF_TIMEOUT=<ms>        how long to wait for the design to open (default 180000)
+//   PERF_FAIL_SHOT=<file>    if it never opens: a screenshot of what OpenRocket shows, under the
+//                            page's loading screen
 // PERF_RANGES and the download summary include requests from workers, the service worker and
 // CheerpJ's own frame on its CDN (where it reads the Java runtime).
 import { createReadStream, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
 import WebSocket from 'ws';
@@ -31,7 +36,10 @@ const HUB = 8789;
 const WEB = 5184;
 const slow = process.argv.includes('--slow');
 const designs = new Map([['perf', { name: 'Perf rocket', owner: 'a@test.local', members: {} }]]);
-const hub = startHub({ port: HUB, designs });
+// PERF_MOTORS=<file>,<file>...: custom motor files, given to OpenRocket as the room gives a design's.
+const motors = (process.env.PERF_MOTORS ?? '').split(',').filter(Boolean)
+  .map((f, i) => ({ name: `m${i}-${basename(f).replace(/[^A-Za-z0-9._-]/g, '_')}`, content: readFileSync(f, 'utf8') }));
+const hub = startHub({ port: HUB, designs, motors });
 // Serves the jars like the live site does: Vite answers "bytes=0-0" (CheerpJ's first request)
 // with the whole 42 MB file, which would swamp the timings on an emulated connection.
 const jarRanges = {
@@ -76,6 +84,8 @@ const request = (type, data) => new Promise((resolve) => {
 });
 // PERF_EXAMPLE=<name>: open one of OpenRocket's example designs instead of a new rocket.
 let designBytes = new Uint8Array(readFileSync(join(import.meta.dirname, '..', '..', 'server', 'templates', 'new-rocket.ork')));
+// PERF_ORK=<file>: open this .ork file instead.
+if (process.env.PERF_ORK) designBytes = new Uint8Array(readFileSync(process.env.PERF_ORK));
 if (process.env.PERF_EXAMPLE) {
   const { readZip } = await import('../src/lib/zip.js');
   const jar = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'public', 'or', 'OpenRocket-web.jar')));
@@ -166,7 +176,17 @@ try {
   const t0 = Date.now();
   navAt = t0;
   await page.goto(`http://localhost:${WEB}/design.html?id=perf&hub=ws://localhost:${HUB}&user=a@test.local${process.env.PERF_QS ?? ''}`);
-  await page.waitForFunction(() => ['Live', 'Viewing'].includes(document.querySelector('#status')?.textContent), { timeout: 180_000, polling: 50 });
+  try {
+    await page.waitForFunction(() => ['Live', 'Viewing'].includes(document.querySelector('#status')?.textContent), { timeout: Number(process.env.PERF_TIMEOUT ?? 180_000), polling: 50 });
+  } catch (e) {
+    // PERF_FAIL_SHOT=<file.png>: what the page showed when it never became ready.
+    if (process.env.PERF_FAIL_SHOT) {
+      await page.evaluate(() => { const o = document.querySelector('#overlay'); if (o) o.style.display = 'none'; }).catch(() => {});
+      await page.screenshot({ path: process.env.PERF_FAIL_SHOT }).catch(() => {});
+    }
+    console.log(`NOT READY: ${await page.evaluate(() => document.querySelector('#overlay-box')?.innerText.replace(/\s+/g, ' ')).catch(() => '?')}`);
+    throw e;
+  }
   const ready = await page.evaluate(() => Math.round(performance.now()));
   if (process.env.PERF_PROFILE) writeFileSync(process.env.PERF_PROFILE, JSON.stringify((await cdp.send('Profiler.stop')).profile));
   // PERF_RESOURCES=<file>: save CheerpJ's list of the runtime files used (for public/or/preload.json).

@@ -186,7 +186,9 @@ stops). Changes to the page's JavaScript and CSS show at once. After changing Ja
 Tests: `npm test` (the room, `.ork` handling, the planner's weather decoding, Monte Carlo and
 flight engine; the engine's comparison with OpenRocket needs the fixtures `scripts/test.sh`
 writes) and `node test/e2e.mjs` (two headless Chrome
-windows running the real OpenRocket against a local stand-in for the actor). `node test/perf.mjs`
+windows running the real OpenRocket against a local stand-in for the actor). `node test/motors-e2e.mjs`
+opens designs with custom motors that are missing, changed, unreadable or messily written, and two
+people of whom only one has the motor's file. `node test/perf.mjs`
 times how long a design takes to open, what it downloads, and how long an edit takes to arrive.
 
 ## Installing the self-hosted version
@@ -314,7 +316,15 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
 - **Motors** (dashboard): upload custom motor files (`.eng` RASP or `.rse` RockSim). They appear in
   OpenRocket's motor selector next to the built-in motors. Everyone a design is shared with gets
   the custom motors of all its members, so collaborators always see the same motors. Reopen
-  OpenRocket to load motors added while it's open.
+  OpenRocket to load motors added while it's open. Files are checked as OpenRocket reads them, so
+  a file it would refuse (say, a manufacturer name with a space, or a curve with two thrusts at one
+  time) is refused with the line and the reason; harmless formatting OpenRocket trips on (a byte
+  order mark, comments after the values, indented comments, lines of spaces) is tidied. Files kept
+  from before this check that OpenRocket can't read are marked in the list. When a design's motor
+  can't be found (its file was removed, or its owner left the design) or its file changed,
+  OpenRocket's *Warnings while opening file* shows as the design opens, and *OK* opens it. A
+  session without one of the design's motors leaves that motor, and the simulations using it, as
+  they are for everyone else.
 - **Settings** (browser version): the *Settings* menu, left of *File*, opens OpenRocket's
   preferences (General, UI, Design, Simulation, Launch, Units, Materials), as does *Edit →
   Preferences*. Left out are the options that conflict with the browser version (thrust-curve

@@ -68,9 +68,11 @@ public final class FlightLab {
 				if (!safe.matches("(?i).*\\.(eng|rse)")) {
 					continue;
 				}
-				// CheerpJ's /str/ files sit at the top level (no folders there); bytes as they came.
+				// CheerpJ's /str/ files sit at the top level (no folders there); tidied as a design
+				// session tidies them (OrDoc.tidyMotorFile).
 				try {
-					Files.write(dir.resolve(safe), Files.readAllBytes(Path.of("/str/planner-motor-" + safe)));
+					String text = new String(Files.readAllBytes(Path.of("/str/planner-motor-" + safe)), java.nio.charset.StandardCharsets.UTF_8);
+					Files.writeString(dir.resolve(safe), OrDoc.tidyMotorFile(safe, text), java.nio.charset.StandardCharsets.UTF_8);
 				} catch (Exception e) {
 					Log.warn("Skipping custom motor " + safe + ": " + e);
 				}

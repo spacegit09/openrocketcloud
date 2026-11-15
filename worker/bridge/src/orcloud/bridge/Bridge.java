@@ -213,7 +213,7 @@ final class Bridge implements Link.Handler {
 				Map<String, Object> m = (Map<String, Object>) o;
 				String name = String.valueOf(m.get("name")).replaceAll("[^A-Za-z0-9._-]", "_");
 				if (name.matches("(?i).*\\.(eng|rse)") && m.get("content") instanceof String) {
-					Files.writeString(dir.resolve(name), (String) m.get("content"), StandardCharsets.UTF_8);
+					Files.writeString(dir.resolve(name), OrDoc.tidyMotorFile(name, (String) m.get("content")), StandardCharsets.UTF_8);
 					n++;
 				}
 			}
@@ -500,6 +500,7 @@ final class Bridge implements Link.Handler {
 			warmedUp = doc.getRocket().getModID();
 		}
 		Model m = OrDoc.toModel(doc, ids, decals);
+		Set<String> missingMotors = OrDoc.keepUnavailableMotors(doc, expected, m);
 
 		// Full flight data is serialised only when a simulation produced new results.
 		Set<FlightData> current = Collections.newSetFromMap(new IdentityHashMap<>());
@@ -550,13 +551,29 @@ final class Bridge implements Link.Handler {
 				continue;
 			}
 			Simulation sim = sims.get(i);
+			Model.Obj shared = expected == null ? null : expected.get(ids.get(i));
+			if (shared != null && sim.getFlightConfigurationId() != null
+					&& missingMotors.contains(sim.getFlightConfigurationId().key.toString())) {
+				// A motor of this simulation's configuration is not available here (see
+				// keepUnavailableMotors): OpenRocket here says it cannot run, or runs it without that
+				// motor. Neither is the design's: keep the shared status and results.
+				if (shared.v.containsKey(Model.ATTRS)) {
+					o.v.put(Model.ATTRS, shared.v.get(Model.ATTRS));
+				}
+				if (shared.v.containsKey("flightdata")) {
+					o.v.put("flightdata", shared.v.get("flightdata"));
+					if (shared.v.containsKey("#basis")) {
+						putKey(o, "#basis", shared.v.get("#basis"));
+					}
+				}
+				continue;
+			}
 			String status = OrDoc.statusAttr(sim);
 			o.v.put(Model.ATTRS, Xml.attrsCanonical(Collections.singletonMap("status", status)));
 			FlightData data = sim.getSimulatedData();
 			if (data == null) {
 				continue;
 			}
-			Model.Obj shared = expected == null ? null : expected.get(ids.get(i));
 			String basis = Model.basis(rocket, o);
 			boolean sharedCurrent = shared != null && shared.v.containsKey("flightdata")
 					&& "uptodate".equals(statusOf(shared)) && basis.equals(shared.v.get("#basis"));

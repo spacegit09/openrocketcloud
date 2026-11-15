@@ -356,8 +356,16 @@ async function motorsDialog() {
       const m = motors[0] ?? {};
       const details = [m.manufacturer, m.diameterMm ? `${m.diameterMm} mm` : '', m.impulseNs ? `${m.impulseNs.toFixed(1)} N·s (${m.impulseClass})` : '']
         .filter(Boolean).join(' · ');
+      // Files added before uploads were checked as OpenRocket reads them may not load there.
+      let problem = null;
+      try {
+        const bytes = new TextEncoder().encode(f.content ?? '');
+        readMotorFile(f.filename, Object.assign(bytes, { toString: () => f.content ?? '' }));
+      } catch (err) {
+        problem = h('div', { class: 'sub motor-problem' }, `OpenRocket cannot read this file, so its motors are missing there: ${err.message} Remove it and add a corrected file.`);
+      }
       return h('div', { class: 'item' }, icon('flame'),
-        h('div', { class: 'grow' }, h('div', {}, motors.map((x) => x.designation).join(', ') || f.filename), h('div', { class: 'sub' }, `${details} — ${f.filename}`)), dl, rm);
+        h('div', { class: 'grow' }, h('div', {}, motors.map((x) => x.designation).join(', ') || f.filename), h('div', { class: 'sub' }, `${details} — ${f.filename}`), problem), dl, rm);
     }) : [h('div', { class: 'item sub' }, 'No custom motors yet.')]));
   };
   const upload = async (fileList) => {
@@ -366,8 +374,9 @@ async function motorsDialog() {
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
         const text = new TextDecoder().decode(bytes);
-        const { motors } = readMotorFile(file.name, Object.assign(bytes, { toString: () => text }));
-        await api('motors', { action: 'add', filename: file.name, content: text, summary: JSON.stringify(motors) });
+        // Checked as OpenRocket reads motor files, and kept tidied (server/src/motors.js).
+        const { motors, text: tidied } = readMotorFile(file.name, Object.assign(bytes, { toString: () => text }));
+        await api('motors', { action: 'add', filename: file.name, content: tidied, summary: JSON.stringify(motors) });
       } catch (err) {
         error.textContent = `${file.name}: ${err.message}`;
       }
