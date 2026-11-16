@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Launch Planner: know where your rocket lands — Rocket in Cloud</title>
-  <meta name="description" content="Fly your OpenRocket design hundreds of times in NOAA’s forecast for your launch site and time, and see on a satellite map where it is likely to land.">
+  <title>Launch Planner: landing predictions from weather forecasts — Rocket in Cloud</title>
+  <meta name="description" content="Simulate your OpenRocket design hundreds of times in NOAA’s wind forecast for your launch site and time, and see on a satellite map where it is likely to land.">
   <meta name="theme-color" content="#060a14">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Rocket in Cloud">
-  <meta property="og:title" content="Launch Planner: know where your rocket lands — Rocket in Cloud">
-  <meta property="og:description" content="Fly your OpenRocket design hundreds of times in NOAA’s forecast for your launch site and time, and see on a satellite map where it is likely to land.">
+  <meta property="og:title" content="Launch Planner: landing predictions from weather forecasts — Rocket in Cloud">
+  <meta property="og:description" content="Simulate your OpenRocket design hundreds of times in NOAA’s wind forecast for your launch site and time, and see on a satellite map where it is likely to land.">
   <meta property="og:url" content="https://rocketincloud.com/features/launch-planner.html">
   <meta property="og:image" content="https://rocketincloud.com/tour/og.jpg">
   <meta name="twitter:card" content="summary_large_image">
@@ -30,9 +30,9 @@
   <main>
   <section class="t-hero">
     <div class="t-wrap">
-      <span class="t-eyebrow"><b>Launch Planner</b> · real weather, real ground</span>
-      <h1>Know where it lands — <span class="t-grad-soft">before you launch.</span></h1>
-      <p class="t-lead">The Launch Planner flies your OpenRocket design hundreds of times in NOAA’s forecast for your field and launch time, and shows on a satellite map where it is likely to come down.</p>
+      <span class="t-eyebrow"><b>Launch Planner</b> · NOAA forecasts · terrain elevation</span>
+      <h1>Predict where your rocket <span class="t-grad-soft">will land</span></h1>
+      <p class="t-lead">The Launch Planner simulates your OpenRocket design hundreds of times in NOAA’s wind forecast for your launch site and time, and shows on a satellite map where it is likely to land.</p>
       <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button><a class="t-btn" href="#how">How it works <svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg></a></div>
       <div class="t-stage t-reveal">
         <figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — Launch Planner</span></div><img class="" src="/tour/pl-map.webp" alt="A launch plan: 500 simulated landings with 50, 95 and 99% ellipses on a satellite map of a Kansas field, and the forecast winds by height" width="1800" height="1125" decoding="async"></figure>
@@ -44,12 +44,12 @@
     <div class="t-wrap">
       <div class="t-head t-reveal">
         <span class="t-kicker">How it works</span>
-        <h2>Three steps. About a minute.</h2>
+        <h2>Three steps to a launch plan</h2>
       </div>
       <div class="t-steps3">
-        <div class="t-card t-reveal"><h3>Pick your rocket</h3><p>Choose a design and one of its simulations. OpenRocket works out the rocket’s aerodynamics, motors, mass and recovery, right in the page.</p></div>
-        <div class="t-card t-reveal"><h3>Set the field and time</h3><p>Click the map to place the pad, pick a launch time up to 16 days ahead, and set the rail’s length and angle.</p></div>
-        <div class="t-card t-reveal"><h3>Fly it 500 times</h3><p>Each flight varies what you can’t control. In seconds you see where 50, 95 and 99% of them land.</p></div>
+        <div class="t-card t-reveal"><h3>Choose a design</h3><p>Choose a design and one of its simulations. OpenRocket works out the rocket’s aerodynamics, motors, mass and recovery in the browser.</p></div>
+        <div class="t-card t-reveal"><h3>Set the site and time</h3><p>Click the map to place the pad, pick a launch time up to 16 days ahead, and set the rail’s length and angle.</p></div>
+        <div class="t-card t-reveal"><h3>Run 500 simulations</h3><p>Each flight varies the factors you can’t control. The results show where 50, 95 and 99% of the flights land.</p></div>
       </div>
     </div>
   </section>
@@ -58,19 +58,19 @@
     <div class="t-wrap">
       <div class="t-feature t-reveal">
         <div class="text">
-          <span class="t-kicker">Real weather</span>
-          <h2>The forecast for your field — not a guess.</h2>
-          <p>Winds and air come from NOAA’s GFS forecast for the exact spot and hour of your launch, at every height your rocket flies through.</p>
-          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The <b>ensemble forecast</b>: each flight flies in one of NOAA’s 31 forecasts, so the landing area is as wide as the weather is uncertain that day</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Or a <b>fixed spread</b> on the main forecast, the same margin every day</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Wind speed, direction and the ensemble’s range at every height</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The rail can tilt into the wind, as a range would set it</span></li></ul>
+          <span class="t-kicker">Weather data</span>
+          <h2>NOAA forecasts for your launch site</h2>
+          <p>Wind and air conditions come from NOAA’s forecasts (the GEFS ensemble, or GFS) for the exact location and hour of your launch, at every altitude the rocket flies through.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The <b>ensemble forecast</b>: each flight flies in one of NOAA’s 31 forecasts, so the landing area reflects how uncertain that day’s forecast is</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Or a <b>fixed spread</b> on the main GFS forecast, with the same margin every day</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Wind speed, direction and the ensemble’s range at every height</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The rail can tilt into the wind, as a range would set it</span></li></ul>
         </div>
         <div class="media"><figure class="t-shot"><div class="t-shot-bar"><i></i><i></i><i></i><span>rocketincloud.com — New launch plan</span></div><img class="" src="/tour/pl-setup.webp" alt="Setting up a launch plan: design, simulation, launch site and time, rail, and the ensemble forecast option" width="1800" height="1125" loading="lazy" decoding="async"></figure><img class="t-float" src="/tour/pl-winds.webp" alt="The forecast winds by height, with the ensemble range" width="700" height="826" loading="lazy" decoding="async"></div>
       </div>
       <div class="t-feature rev t-reveal">
         <div class="text">
-          <span class="t-kicker">Monte Carlo</span>
-          <h2>Every uncertainty, flown.</h2>
-          <p>Real flights never go exactly as simulated. The planner varies the motor’s thrust, drag, mass, the parachutes, the rail’s aim and the ejection delay — then flies the rocket hundreds of times.</p>
-          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Where 50%, 95% and 99% of flights land, as ellipses on the map</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Apogee with its range, flight time, top speed and landing speed</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The farthest landing, and the flight in the forecast as it is</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>A replay of the flight in 3D over the satellite map</span></li></ul>
+          <span class="t-kicker">Monte Carlo simulation</span>
+          <h2>Variation in every flight</h2>
+          <p>Real flights differ from the simulation. For each flight, the planner varies the motor’s thrust, the drag, the mass, the parachutes, the rail’s aim and the ejection delay.</p>
+          <ul><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Where 50%, 95% and 99% of flights land, as ellipses on the map</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>Apogee with its range, flight time, top speed and landing speed</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>The farthest landing, and the flight in the unvaried forecast</span></li><li><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg><span>A replay of the flight in 3D over the satellite map</span></li></ul>
         </div>
         <div class="media"><figure class="t-shot flat"><img class="" src="/tour/pl-results.webp" alt="Results: apogee 590 m, landing 260 m WNW, farthest landing 446 m, flight time 65 s" width="776" height="644" loading="lazy" decoding="async"></figure></div>
       </div>
@@ -80,20 +80,20 @@
   <section class="t-section">
     <div class="t-wrap">
       <div class="t-head t-reveal">
-        <span class="t-kicker">Accurate where it counts</span>
-        <h2>OpenRocket’s physics, a thousand times faster.</h2>
-        <p>OpenRocket computes your rocket’s aerodynamic tables in the page; a six-degree-of-freedom flight simulation then flies them in the browser’s background threads.</p>
+        <span class="t-kicker">Accuracy</span>
+        <h2>Checked against OpenRocket</h2>
+        <p>OpenRocket computes your rocket’s aerodynamic tables in the browser. A six-degree-of-freedom flight simulation then uses them in background threads.</p>
       </div>
       <div class="t-stats">
-        <div class="t-stat t-reveal"><b>0.5<small>%</small></b><span>apogee agreement with OpenRocket on its single-stage examples</span></div>
-        <div class="t-stat t-reveal"><b>10<small> m</small></b><span>landing point agreement with OpenRocket’s own simulation</span></div>
-        <div class="t-stat t-reveal"><b>~1,000<small>×</small></b><span>faster than running OpenRocket’s simulation itself</span></div>
-        <div class="t-stat t-reveal"><b>31</b><span>NOAA ensemble forecasts flown, each by its share of the flights</span></div>
+        <div class="t-stat t-reveal"><b>0.5<small>%</small></b><span>largest apogee difference from OpenRocket on its single-stage example designs</span></div>
+        <div class="t-stat t-reveal"><b>10<small> m</small></b><span>largest landing point difference from OpenRocket’s simulation</span></div>
+        <div class="t-stat t-reveal"><b>~1,000<small>×</small></b><span>faster than OpenRocket’s own simulation</span></div>
+        <div class="t-stat t-reveal"><b>31</b><span>members in NOAA’s GEFS ensemble, each used for part of the flights</span></div>
       </div>
       <div class="t-grid" style="margin-top:56px">
-        <div class="t-card t-reveal"><h3>On real ground</h3><p>Landings meet the real terrain, from open elevation data, not a flat plane at the pad’s height.</p></div>
-        <div class="t-card t-reveal"><h3>Save your plans</h3><p>Keep a plan — settings, forecast and results — and open it again later, as a card with a picture of where it landed.</p></div>
-        <div class="t-card t-reveal"><h3>Straight into the logbook</h3><p>Bring a plan’s predicted flight into your logbook and see how close the real flight came.</p></div>
+        <div class="t-card t-reveal"><h3>Terrain elevation</h3><p>Landing points use terrain elevation from open elevation data, not a flat plane at the pad’s height.</p></div>
+        <div class="t-card t-reveal"><h3>Saved plans</h3><p>Save a plan’s settings, forecast and results, and open it again later. Each saved plan shows a map of its landing area.</p></div>
+        <div class="t-card t-reveal"><h3>Logbook integration</h3><p>Add a plan’s predicted flight to a logbook and compare it with the real flight.</p></div>
       </div>
       <div class="t-note t-reveal"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg><span>Predictions, not a substitute for your range safety officer or your club’s safety code. Single-stage rockets for now.</span></div>
       <div style="margin-top:72px">
@@ -105,8 +105,8 @@
   <section class="t-final">
     <div class="t-wrap">
       <div class="box t-reveal">
-        <h2>See your landing area before launch day.</h2>
-        <p>Sign in with Google, open the Launch Planner, and fly any of your designs in tomorrow’s forecast.</p>
+        <h2>Try the Launch Planner</h2>
+        <p>Sign in with Google, open the Launch Planner, and simulate any of your designs in the forecast for your next launch.</p>
         <div class="t-ctas"><button type="button" class="t-btn primary" data-signin data-signed-in="Open your designs"><svg class="g" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button></div>
         <p class="t-fine">Free for a week · Sign in with a Google account · Nothing to install · <a href="/#pricing">Pricing</a></p>
       </div>
