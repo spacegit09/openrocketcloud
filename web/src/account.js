@@ -182,7 +182,7 @@ function renderPlans() {
   const cards = [];
   if (!forGood()) {
     cards.push(card('monthly', st.monthly ? { state: st.monthly.cancelAt ? `Yours until ${dateText(st.monthly.cancelAt)}` : 'Your plan' } : {}));
-    cards.push(card('lifetime', st.monthly && !st.monthly.cancelAt ? { note: 'Your monthly plan then stops at the end of the month you paid for.', label: 'Switch for US$4' } : {}));
+    cards.push(card('lifetime', st.monthly && !st.monthly.cancelAt ? { note: 'Your monthly plan then stops at the end of the month you paid for.', label: `Switch for ${PLANS.lifetime.price}` } : {}));
   }
   cards.push(card('group', ownsGroup() ? { state: 'You have this' } : {}));
   const title = forGood() ? 'For your team' : ['open', 'trial', 'none'].includes(st.access.kind) ? 'Choose a plan' : 'Other plans';

@@ -4,7 +4,7 @@
 // before plans began (FREE_BEFORE) and the app's admins keep using it free. After the week,
 // someone needs one of these plans (prices in US dollars, set in Paddle by scripts/paddle-setup.mjs):
 //   monthly    US$1 a month, a Paddle subscription they can cancel at any time
-//   lifetime   US$4 once, for one person, for good
+//   lifetime   US$5 once, for one person, for good
 //   group      US$10 once, for the buyer and 9 people they name by their Google address
 //   seat       US$3 once each: one more person in the buyer's group
 // Paddle (paddle.com) sells the plans as merchant of record: its checkout takes the payment and
@@ -39,7 +39,7 @@ export const GROUP_SIZE = 10;
 export const MAX_PLACES = 1000;
 export const MAX_EXTRA_AT_ONCE = 100;
 /** Prices as the site shows them (Paddle charges what scripts/paddle-setup.mjs set there). */
-export const PRICES = { monthly: 1, lifetime: 4, group: 10, seat: 3 };
+export const PRICES = { monthly: 1, lifetime: 5, group: 10, seat: 3 };
 export const PLAN_REQUIRED = 'plan_required';
 /**
  * What each function still does for someone without a plan: see their work, download their

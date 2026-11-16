@@ -202,7 +202,7 @@ try {
     const page = await open('/');
     await page.waitForSelector('#pricing', { visible: true });
     const t = await text(page, '#pricing');
-    for (const p of [/Monthly/i, /US\$1/, /a month/, /Individual/i, /US\$4/, /Group/i, /US\$10/, /9 people you choose/, /US\$3 for each extra person/, /free week/i, /Paddle/]) assert.match(t, p);
+    for (const p of [/Monthly/i, /US\$1/, /a month/, /Individual/i, /US\$5/, /Group/i, /US\$10/, /you and 9 others/, /US\$3 for each extra person/, /free week/i, /Paddle/]) assert.match(t, p);
     assert.ok(await page.$('.t-links a[href="#pricing"]'));
     await page.evaluate(() => document.querySelector('#pricing').scrollIntoView());
     await sleep(900);

@@ -61,11 +61,15 @@ export async function setUpPaddle({ apiKey, site, webhook = null, taxMode = 'ext
     const cents = String(Math.round(PRICES[plan] * 100));
     const found = existing.find((x) => x.custom_data?.plan === plan);
     if (found) {
-      const note = found.unit_price?.amount !== cents || found.unit_price?.currency_code !== 'USD'
-        ? ` — WARNING: it costs ${found.unit_price?.amount} ${found.unit_price?.currency_code} (in cents), not ${cents} USD`
-        : '';
-      log(`Price ${plan}: ${found.id} (already there)${note}`);
-      prices[plan] = found;
+      if (found.unit_price?.amount === cents && found.unit_price?.currency_code === 'USD') {
+        log(`Price ${plan}: ${found.id} (already there)`);
+        prices[plan] = found;
+      } else {
+        // The price changed in billing.js: new checkouts charge the new one. A subscription keeps
+        // the price it began with unless it is changed in Paddle.
+        prices[plan] = await paddle.patch(`/prices/${found.id}`, { unit_price: { amount: cents, currency_code: 'USD' } });
+        log(`Price ${plan}: ${found.id} (changed from ${found.unit_price?.amount} ${found.unit_price?.currency_code} cents to US$${PRICES[plan]})`);
+      }
       continue;
     }
     prices[plan] = await paddle.post('/prices', {

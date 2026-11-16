@@ -567,7 +567,7 @@ test('scripts/paddle-setup.mjs makes the product, prices, payment link, webhook 
   assert.equal(first.sandbox, true);
   assert.deepEqual(Object.fromEntries(Object.entries(first.prices).map(([k, p]) => [k, [p.unit_price.amount, p.unit_price.currency_code, p.billing_cycle?.interval ?? null, p.quantity.maximum, p.tax_mode]])), {
     monthly: ['100', 'USD', 'month', 1, 'external'],
-    lifetime: ['400', 'USD', null, 1, 'external'],
+    lifetime: ['500', 'USD', null, 1, 'external'],
     group: ['1000', 'USD', null, 1, 'external'],
     seat: ['300', 'USD', null, 100, 'external'],
   });
@@ -583,6 +583,12 @@ test('scripts/paddle-setup.mjs makes the product, prices, payment link, webhook 
   assert.equal(again.secret, null, 'the webhook is not made twice');
   assert.equal(fp.notifications.size, 1);
   assert.ok(lines.some((l) => /already there/.test(l)));
+  // A price changed in billing.js is changed in Paddle, keeping its id.
+  fp.prices.get(first.prices.lifetime.id).unit_price = { amount: '400', currency_code: 'USD' };
+  const changed = await run();
+  assert.equal(changed.prices.lifetime.id, first.prices.lifetime.id);
+  assert.equal(fp.prices.get(first.prices.lifetime.id).unit_price.amount, '500');
+  assert.ok(lines.some((l) => /Price lifetime: .*changed from 400 USD cents to US\$5/.test(l)));
   // Live keys go to Paddle's live API.
   await assert.rejects(setUpPaddle({ apiKey: 'nonsense', site: 'https://x.test', fetch: fp.fetch, log: () => {} }), /PADDLE_API_KEY/);
 });

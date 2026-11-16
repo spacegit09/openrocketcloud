@@ -65,6 +65,12 @@ export function fakePaddle({ now = () => Date.now() } = {}) {
       prices.set(p.id, p);
       return { status: 201, data: p };
     }
+    if (method === 'PATCH' && (m = path.match(/^\/prices\/(pri_\w+)$/))) {
+      const p = prices.get(m[1]);
+      if (!p) return error(404, 'entity_not_found', 'not found');
+      Object.assign(p, body, { updated_at: at() });
+      return { data: p };
+    }
     if (method === 'GET' && path === '/customers') {
       const emails = (query.get('email') ?? '').split(',').filter(Boolean);
       return { data: [...customers.values()].filter((c) => !emails.length || emails.includes(c.email)) };

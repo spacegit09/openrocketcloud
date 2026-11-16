@@ -188,7 +188,7 @@ if (!explore && !process.argv.includes('noexplore')) {
       await sleep(500);
       await page.screenshot({ path: join(out, 'sandbox-declined.png') });
       await f.click('[data-testid=wideOverlayCloseIcon]');
-      await waitText(page, '.plan-card[data-plan=lifetime] button', /Buy for US\$4/);
+      await waitText(page, '.plan-card[data-plan=lifetime] button', /Buy for US\$5/);
       assert.equal((await purchases(u)).length, 0);
       await page.close();
     });

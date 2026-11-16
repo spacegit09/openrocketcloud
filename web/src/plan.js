@@ -9,8 +9,8 @@ const PADDLE_JS = 'https://cdn.paddle.com/paddle/v2/paddle.js';
 
 /** The plans as the site describes them (Paddle charges what scripts/paddle-setup.mjs set there). */
 export const PLANS = {
-  monthly: { name: 'Monthly', price: 'US$1', per: 'a month', points: ['Everything in Rocket in Cloud', 'Cancel at any time'] },
-  lifetime: { name: 'Individual', price: 'US$4', per: 'once', points: ['Pay once, use it for good', 'For you'] },
+  monthly: { name: 'Monthly', price: 'US$1', per: 'a month', points: ['Everything in Rocket in Cloud, for one person', 'Cancel at any time'] },
+  lifetime: { name: 'Individual', price: 'US$5', per: 'once', points: ['Everything in Rocket in Cloud, for one person', 'Pay once, no subscription'] },
   group: { name: 'Group', price: 'US$10', per: 'once', points: ['You and 9 people you choose, for good', 'Change the people at any time', 'More people: US$3 each, once'] },
 };
 export const SEAT_PRICE = 3;
