@@ -80,7 +80,9 @@ function showPlan(st) {
 }
 
 function showLanding() {
-  // The tour (src/tour.css, src/tour.js): always dark, with its own header and footer.
+  // The tour (src/tour.css, src/tour.js): always dark, with its own header and footer. A saved
+  // sign-in that has expired took tour-first away in index.html; it comes back here.
+  document.documentElement.classList.add('tour-first');
   document.body.classList.add('tour-page');
   $('#landing').hidden = false;
   const err = new URLSearchParams(location.search).get('error');
