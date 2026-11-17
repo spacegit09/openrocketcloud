@@ -218,6 +218,7 @@ export function fakePaddle({ now = () => Date.now() } = {}) {
         lifetime: addPrice({ plan: 'lifetime', amount: 4 }),
         group: addPrice({ plan: 'group', amount: 10 }),
         seat: addPrice({ plan: 'seat', amount: 3 }),
+        openrocket: addPrice({ plan: 'openrocket', amount: 1 }),
       };
     },
     /** Events from API calls since last asked. */

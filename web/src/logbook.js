@@ -1027,7 +1027,7 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
-  await requirePlan(); // without a plan: the plans notice (src/plan.js)
+  await requirePlan({ full: true }); // without a plan (or with OpenRocket only): the plans notice (src/plan.js)
   if (params.get('id')) await showBook(params.get('id'));
   else await showBooks();
 }

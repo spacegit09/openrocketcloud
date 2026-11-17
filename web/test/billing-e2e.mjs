@@ -54,7 +54,8 @@ async function call(name, user, body) {
   const me = { id: user.id, email: user.email, name: user.full_name, created: user.created_date, role: user.role };
   const ctx = { db, s, me, paddle: payments ? paddle : null, paddleToken: payments ? 'test_e2e000000000000000000000' : null, files: { sign: async () => null } };
   try {
-    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name]);
+    // As the functions do (base44/functions/*/entry.ts): the planner's and the logbook's need a plan with everything.
+    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name], { full: name === 'flights' || name === 'logbooks' });
     return { status: 200, json: await APIS[name](ctx, body) };
   } catch (e) {
     if (e.status) return { status: e.status, json: { error: e.message, ...(e.code ? { code: e.code } : {}) } };
@@ -224,7 +225,7 @@ try {
     await page.goto(`http://localhost:${WEB}/account.html`, { waitUntil: 'domcontentloaded' });
     await waitText(page, '#now', /Free week: 7 days left/);
     const cards = await page.$$eval('.plan-card', (els) => els.map((e) => e.dataset.plan));
-    assert.deepEqual(cards, ['monthly', 'lifetime', 'group']);
+    assert.deepEqual(cards, ['openrocket', 'monthly', 'lifetime', 'group']);
     await shot(page, 'account-trial', true);
     await page.close();
   });
@@ -257,6 +258,31 @@ try {
     await clickText(page, '#now button', /Keep my plan/);
     await waitText(page, '#now', /Renews on/);
     await page.close();
+  });
+
+  await check('OpenRocket plan: designs work; the planner and the logbook say they are not included', async () => {
+    const ora = await person('ora@gmail.com', { name: 'Ora Orbit' });
+    await call('billing', ora, { action: 'status' });
+    await endTrial('ora@gmail.com');
+    await db.Purchase.create({ paddle_id: 'txn_01openrocketplan0000000000', kind: 'openrocket', user_id: ora.id, status: 'completed', seats: 0 });
+    forgetAccess();
+    assert.equal((await call('designs', ora, { action: 'create', name: 'Orbit I' })).status, 200);
+    const refusedFlight = await call('flights', ora, { action: 'create', name: 'x' });
+    assert.equal(refusedFlight.status, 402);
+    assert.equal(refusedFlight.json.code, 'plan_upgrade');
+    assert.equal((await call('flights', ora, { action: 'list' })).status, 200, 'their launch plans stay theirs to see');
+    const account = await open('/account.html', 'ora@gmail.com');
+    await waitText(account, '#now', /OpenRocket plan/);
+    await waitText(account, '.plan-card[data-plan=openrocket]', /Your plan/);
+    await shot(account, 'account-openrocket', true);
+    await account.close();
+    for (const path of ['/planner.html', '/logbook.html']) {
+      const page = await open(path, 'ora@gmail.com');
+      await page.waitForSelector('dialog.plan-wall-dialog[open]');
+      await waitText(page, 'dialog.plan-wall-dialog', /Not part of your plan/);
+      if (path === '/planner.html') await shot(page, 'planner-openrocket-only');
+      await page.close();
+    }
   });
 
   await check('free week over: the dashboard says so, keeps downloads, and the plans notice stops the rest', async () => {

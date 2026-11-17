@@ -178,6 +178,7 @@ before plans began (15 November 2026, `FREE_BEFORE`) and the app's admins keep u
 | Plan | Price | |
 |---|---|---|
 | Monthly | US$1 a month | a subscription, cancelled at any time on the plan page |
+| OpenRocket | US$1 once | for one person, for good: OpenRocket only (not the Launch Planner or the Logbook) |
 | Individual | US$5 once | for one person, for good |
 | Group | US$10 once | the buyer and 9 people they add by Google address on the plan page |
 | Extra place | US$3 once each | one more person in a group |

@@ -4,4 +4,4 @@ import { flightsApi } from "../../shared/api.js";
 import { OPEN_ACTIONS } from "../../shared/billing.js";
 import { endpoint } from "../../shared/endpoint.ts";
 
-export default endpoint("flights", flightsApi, { open: OPEN_ACTIONS.flights });
+export default endpoint("flights", flightsApi, { open: OPEN_ACTIONS.flights, full: true });

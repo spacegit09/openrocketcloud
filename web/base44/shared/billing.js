@@ -5,6 +5,8 @@
 // someone needs one of these plans (prices in US dollars, set in Paddle by scripts/paddle-setup.mjs):
 //   monthly    US$1 a month, a Paddle subscription they can cancel at any time
 //   lifetime   US$5 once, for one person, for good
+//   openrocket US$1 once, for one person, for good: OpenRocket only (the design page, its sharing
+//              and live co-editing), not the Launch Planner or the Logbook
 //   group      US$10 once, for the buyer and 9 people they name by their Google address
 //   seat       US$3 once each: one more person in the buyer's group
 // Paddle (paddle.com) sells the plans as merchant of record: its checkout takes the payment and
@@ -39,7 +41,7 @@ export const GROUP_SIZE = 10;
 export const MAX_PLACES = 1000;
 export const MAX_EXTRA_AT_ONCE = 100;
 /** Prices as the site shows them (Paddle charges what scripts/paddle-setup.mjs set there). */
-export const PRICES = { monthly: 1, lifetime: 5, group: 10, seat: 3 };
+export const PRICES = { monthly: 1, lifetime: 5, group: 10, seat: 3, openrocket: 1 };
 export const PLAN_REQUIRED = 'plan_required';
 /**
  * What each function still does for someone without a plan: see their work, download their
@@ -52,9 +54,12 @@ export const OPEN_ACTIONS = {
   logbooks: ['list', 'leave', 'delete'],
 };
 export const PLAN_MESSAGE = 'Your free week has ended. Choose a plan to keep using Rocket in Cloud.';
+/** For someone whose plan is OpenRocket only, asking for the Launch Planner or the Logbook. */
+export const PLAN_UPGRADE = 'plan_upgrade';
+export const UPGRADE_MESSAGE = 'Your OpenRocket plan covers designing in OpenRocket. The Launch Planner and the Logbook come with the Monthly, Individual and Group plans.';
 
-const PLANS = new Set(['monthly', 'lifetime', 'group', 'seat']);
-const ONE_TIME = new Set(['lifetime', 'group', 'seat']);
+const PLANS = new Set(['monthly', 'lifetime', 'group', 'seat', 'openrocket']);
+const ONE_TIME = new Set(['lifetime', 'group', 'seat', 'openrocket']);
 /** Subscription states that keep a monthly plan going (past_due: Paddle is retrying the payment). */
 const LIVE = new Set(['active', 'trialing', 'past_due']);
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -106,9 +111,10 @@ export function freeKind(user) {
 }
 
 /**
- * What someone may do, from their records: { ok, kind, until, trialEnds, groupId }, kind being
- * 'admin' | 'early' | 'lifetime' | 'group' | 'monthly' | 'open' (plans have not begun) | 'trial' |
- * 'none' (the best they have).
+ * What someone may do, from their records: { ok, full, kind, until, trialEnds, groupId, openrocket },
+ * kind being 'admin' | 'early' | 'lifetime' | 'group' | 'monthly' | 'open' (plans have not begun) |
+ * 'trial' | 'openrocket' (OpenRocket only, after their free week) | 'none' (the best they have).
+ * `ok`: they may use the site; `full`: the Launch Planner and the Logbook too.
  * `groups` are the Group records they are in, as owner or as a member let in.
  */
 export function accessOf({ user, account = null, purchases = [], groups = [], now = Date.now() }) {
@@ -125,9 +131,13 @@ export function accessOf({ user, account = null, purchases = [], groups = [], no
     && (g.owner_id === user.id || (g.access ?? []).includes(user.id))) ?? null;
   const monthly = purchases.filter((p) => p.kind === 'monthly' && LIVE.has(p.status))
     .sort((a, b) => (when(b.ends_at) || 0) - (when(a.ends_at) || 0))[0] ?? null;
-  const kind = free ?? (lifetime ? 'lifetime' : group ? 'group' : monthly ? 'monthly' : !begun ? 'open' : now < trialEnds ? 'trial' : 'none');
+  const openrocket = purchases.some((p) => p.kind === 'openrocket' && p.status === 'completed');
+  // The OpenRocket plan counts once their free week (everything) is over.
+  const kind = free ?? (lifetime ? 'lifetime' : group ? 'group' : monthly ? 'monthly' : !begun ? 'open' : now < trialEnds ? 'trial' : openrocket ? 'openrocket' : 'none');
   return {
     ok: kind !== 'none',
+    full: kind !== 'none' && kind !== 'openrocket',
+    openrocket,
     kind,
     until: kind === 'monthly' ? (when(monthly.ends_at) || null) : kind === 'trial' ? trialEnds : null,
     trialEnds: free ? null : trialEnds,
@@ -596,6 +606,8 @@ export async function billingApi(ctx, body) {
       if (plan === 'monthly' && forGood) fail(409, 'You already have Rocket in Cloud for good.');
       if (plan === 'monthly' && monthly) fail(409, 'You already have the monthly plan.');
       if (plan === 'lifetime' && forGood) fail(409, 'You already have Rocket in Cloud for good.');
+      if (plan === 'openrocket' && (forGood || monthly || access.kind === 'group')) fail(409, 'Your plan already includes OpenRocket.');
+      if (plan === 'openrocket' && access.openrocket) fail(409, 'You already have the OpenRocket plan.');
       if (plan === 'group' && (Number(group?.seats) || 0) > 0) fail(409, 'You already have a group. Add places to it instead.');
       if (plan === 'seat' && !((Number(group?.seats) || 0) > 0)) fail(409, 'Buy the group plan first.');
       if (plan === 'seat' && group.seats + quantity > MAX_PLACES) fail(400, `A group can have up to ${MAX_PLACES} people.`);
@@ -697,6 +709,7 @@ async function statusOf(ctx, user, { refresh = true } = {}) {
     access: { ...access, until: iso(access.until), trialEnds: iso(access.trialEnds) },
     monthly: monthly ? { status: monthly.status, endsAt: monthly.ends_at ? iso(when(monthly.ends_at)) : null, cancelAt: monthly.cancel_at ? iso(when(monthly.cancel_at)) : null } : null,
     lifetime: purchases.some((p) => p.kind === 'lifetime' && p.status === 'completed'),
+    openrocket: access.openrocket,
     group,
     memberOf,
     bought: purchases.some((p) => p.status === 'completed' || LIVE.has(p.status)),
@@ -709,22 +722,23 @@ async function statusOf(ctx, user, { refresh = true } = {}) {
 
 // ------------------------------------------------------------------ the other functions
 
-const accessCache = new Map(); // user id -> { at, ok }
+const accessCache = new Map(); // user id -> { at, full }
 
 /**
  * For the other functions: throws a 402 (code plan_required) when the signed-in person has no
  * plan, unless `action` is one of `open` (what someone may still do without one: see and
- * download their work, leave and delete). Someone found to have a plan is not looked up again for
- * a minute; someone without one is looked up every time, so a purchase counts at once. If their
- * plan cannot be looked up, they are let in.
+ * download their work, leave and delete). With `full` (the Launch Planner and the Logbook), a plan
+ * for OpenRocket only is not enough either: a 402 with code plan_upgrade. Someone found to have
+ * what is asked is not looked up again for a minute; anyone else is looked up every time, so a
+ * purchase counts at once. If their plan cannot be looked up, they are let in.
  */
-export async function requirePlan(ctx, action, open = []) {
+export async function requirePlan(ctx, action, open = [], { full = false } = {}) {
   if (open.includes(action)) return;
   const { db, s, me } = ctx;
   const user = { id: me.id, created: me.created, role: me.role };
   if (freeKind(user)) return;
   const kept = accessCache.get(me.id);
-  if (kept && Date.now() - kept.at < 60_000) return;
+  if (kept && Date.now() - kept.at < 60_000 && (!full || kept.full)) return;
   let access;
   try {
     access = await lookAccess(db, user, { key: await s.lookupKey(me.email) });
@@ -733,9 +747,10 @@ export async function requirePlan(ctx, action, open = []) {
     return;
   }
   if (access.ok) {
-    accessCache.set(me.id, { at: Date.now() });
+    accessCache.set(me.id, { at: Date.now(), full: access.full });
     if (accessCache.size > 5000) accessCache.delete(accessCache.keys().next().value);
-    return;
+    if (!full || access.full) return;
+    fail(402, UPGRADE_MESSAGE, PLAN_UPGRADE);
   }
   fail(402, PLAN_MESSAGE, PLAN_REQUIRED);
 }

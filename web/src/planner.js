@@ -561,7 +561,7 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
-  await requirePlan(); // without a plan: the plans notice (src/plan.js)
+  await requirePlan({ full: true }); // without a plan (or with OpenRocket only): the plans notice (src/plan.js)
   // The planner's home lists your launch plans; a plan, a new plan or a design's plan opens the planner.
   if (!params.has('id') && !params.has('flight') && !params.has('new')) return showPlans();
   $('#planner').hidden = false;

@@ -21,8 +21,8 @@ export async function api(name, body) {
   } catch (e) {
     const err = new Error(e.response?.data?.error ?? e.message);
     err.code = e.response?.data?.code ?? null;
-    // Their free week has ended (base44/shared/billing.js): src/plan.js shows the plans.
-    if (err.code === 'plan_required') window.dispatchEvent(new CustomEvent('plan-required', { detail: err.message }));
+    // Their free week has ended, or their plan is OpenRocket only (base44/shared/billing.js): src/plan.js shows the plans.
+    if (err.code === 'plan_required' || err.code === 'plan_upgrade') window.dispatchEvent(new CustomEvent('plan-required', { detail: { message: err.message, code: err.code } }));
     throw err;
   }
 }

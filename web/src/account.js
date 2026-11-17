@@ -97,6 +97,9 @@ function renderNow() {
     case 'lifetime':
       main = card('Individual plan', 'Rocket in Cloud is yours for good. Thank you!');
       break;
+    case 'openrocket':
+      main = card('OpenRocket plan', 'OpenRocket in your browser is yours for good. The Launch Planner and the Logbook come with the plans below.');
+      break;
     case 'group':
       main = ownsGroup()
         ? card('Group plan', `You and up to ${st.group.seats - 1} people you choose have Rocket in Cloud for good.`)
@@ -180,6 +183,8 @@ function renderPlans() {
       button);
   };
   const cards = [];
+  // OpenRocket only, for anyone without a plan that already includes it.
+  if (!forGood() && !st.monthly && st.access.kind !== 'group') cards.push(card('openrocket', st.openrocket ? { state: 'Your plan' } : {}));
   if (!forGood()) {
     cards.push(card('monthly', st.monthly ? { state: st.monthly.cancelAt ? `Yours until ${dateText(st.monthly.cancelAt)}` : 'Your plan' } : {}));
     cards.push(card('lifetime', st.monthly && !st.monthly.cancelAt ? { note: 'Your monthly plan then stops at the end of the month you paid for.', label: `Switch for ${PLANS.lifetime.price}` } : {}));

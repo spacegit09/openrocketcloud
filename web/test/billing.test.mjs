@@ -44,6 +44,8 @@ function setup({ payments = true } = {}) {
       status: () => billing({ action: 'status' }),
       /** What a gated function does before an action (designs: list, get, leave, delete, preview are open). */
       gate: (action) => requirePlan(ctxOf(me), action, OPEN),
+      /** The same for the Launch Planner's and the Logbook's functions (flights: list and delete are open). */
+      gateFull: (action) => requirePlan(ctxOf(me), action, OPEN_ACTIONS.flights, { full: true }),
       /** What the actors ask: no fingerprint, by user id. */
       actor: () => lookAccess(db, { id: u.id, created, role }),
       /** Their free week, moved back so it ended `days` ago. */
@@ -346,6 +348,53 @@ test('lifetime: bought once; a running monthly plan stops at its end; refunds an
   assert.equal((await sora.status()).access.kind, 'none');
 });
 
+test('openrocket: OpenRocket only once the free week is over, not the Launch Planner or the Logbook', async () => {
+  const { fp, person, deliver } = setup();
+  const upgrade = (e) => e instanceof BillingError && e.status === 402 && e.code === 'plan_upgrade';
+  const mina = await person('mina@example.com');
+  // Bought during the free week: everything until the week ends.
+  await deliver((await mina.buy('openrocket')).events);
+  let st = await mina.status();
+  assert.equal(st.access.kind, 'trial');
+  assert.equal(st.access.full, true);
+  assert.equal(st.openrocket, true);
+  await mina.gateFull('create');
+  await mina.endTrial();
+  st = await mina.status();
+  assert.equal(st.access.kind, 'openrocket');
+  assert.deepEqual([st.access.ok, st.access.full], [true, false]);
+  await mina.gate('create'); // designs (OpenRocket)
+  await assert.rejects(mina.gateFull('create'), upgrade);
+  await assert.rejects(mina.gateFull('create'), upgrade, 'refused again, not let through by the cache');
+  await mina.gateFull('list'); // their launch plans and logbooks stay theirs to see and delete
+  const seen = await mina.actor();
+  assert.deepEqual([seen.ok, seen.full], [true, false], 'the design room lets them in; the Forecasts actor does not');
+  await assert.rejects(mina.billing({ action: 'checkout', plan: 'openrocket' }), refused(409));
+  // A plan with everything: at once, the cache does not keep them out.
+  await deliver((await mina.buy('lifetime')).events);
+  st = await mina.status();
+  assert.equal(st.access.kind, 'lifetime');
+  assert.equal(st.access.full, true);
+  await mina.gateFull('create');
+  await assert.rejects(mina.billing({ action: 'checkout', plan: 'openrocket' }), refused(409, /already includes OpenRocket/));
+
+  // Not for someone whose plan already includes it.
+  const sora = await person('sora@example.com');
+  await sora.endTrial();
+  await deliver((await sora.buy('monthly')).events);
+  await assert.rejects(sora.billing({ action: 'checkout', plan: 'openrocket' }), refused(409, /already includes OpenRocket/));
+
+  // Refunded: gone.
+  const joon = await person('joon@example.com');
+  await joon.endTrial();
+  const bought = await joon.buy('openrocket');
+  await deliver(bought.events);
+  assert.equal((await joon.status()).access.kind, 'openrocket');
+  await deliver(fp.refund(bought.transactionId));
+  st = await joon.status();
+  assert.deepEqual([st.access.kind, st.openrocket], ['none', false]);
+});
+
 test('group: the buyer names 9 people, with or without accounts; more places; changes; refunds', async () => {
   const { db, s, fp, person, deliver } = setup();
   const teacher = await person('teacher@school.org', { name: 'Ms Park' });
@@ -570,6 +619,7 @@ test('scripts/paddle-setup.mjs makes the product, prices, payment link, webhook 
     lifetime: ['500', 'USD', null, 1, 'external'],
     group: ['1000', 'USD', null, 1, 'external'],
     seat: ['300', 'USD', null, 100, 'external'],
+    openrocket: ['100', 'USD', null, 1, 'external'],
   });
   assert.equal(fp.settings.default_url, 'https://rocketincloud.com/account.html');
   const [hook] = fp.notifications.values();

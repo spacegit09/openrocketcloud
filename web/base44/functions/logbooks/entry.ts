@@ -5,4 +5,4 @@ import { logbooksApi } from "../../shared/logbooks.js";
 import { OPEN_ACTIONS } from "../../shared/billing.js";
 import { endpoint } from "../../shared/endpoint.ts";
 
-export default endpoint("logbooks", logbooksApi, { open: OPEN_ACTIONS.logbooks });
+export default endpoint("logbooks", logbooksApi, { open: OPEN_ACTIONS.logbooks, full: true });

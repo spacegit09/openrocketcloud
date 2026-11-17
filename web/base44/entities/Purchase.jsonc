@@ -12,7 +12,7 @@
     },
     "kind": {
       "type": "string",
-      "description": "monthly, lifetime, group, or seat (extra places in a group)"
+      "description": "monthly, lifetime, group, seat (extra places in a group), or openrocket (OpenRocket only)"
     },
     "user_id": {
       "type": "string",

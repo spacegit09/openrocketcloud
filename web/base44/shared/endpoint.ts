@@ -2,7 +2,9 @@
 // entities and the sealer in; JSON out. Errors are logged without any personal data.
 //
 // With `open`, the function is for people with a plan (shared/billing.js): someone whose free week
-// has ended gets a 402 (code plan_required) for any action not in `open`.
+// has ended gets a 402 (code plan_required) for any action not in `open`. With `full` too, the
+// function is part of the Launch Planner or the Logbook, which a plan for OpenRocket only does not
+// include (code plan_upgrade).
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import { ApiError } from "./api.js";
@@ -14,7 +16,7 @@ type Me = { id: string; email: string; name: string; created: string | null; rol
 type Ctx = { db: any; s: ReturnType<typeof sealer>; me: Me; files: Files; paddle: ReturnType<typeof paddleApi> | null; paddleToken: string | null };
 type Handler = (ctx: Ctx, body: any) => Promise<unknown>;
 
-export function endpoint(name: string, handler: Handler, { open = null }: { open?: string[] | null } = {}) {
+export function endpoint(name: string, handler: Handler, { open = null, full = false }: { open?: string[] | null; full?: boolean } = {}) {
   return async (req: Request): Promise<Response> => {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me().catch(() => null);
@@ -38,7 +40,7 @@ export function endpoint(name: string, handler: Handler, { open = null }: { open
       const key = secrets.get("PADDLE_API_KEY");
       const paddle = key ? paddleApi(key, secrets.get("PADDLE_ENVIRONMENT") === "sandbox" ? { sandbox: true } : {}) : null;
       const ctx = { db: base44.asServiceRole.entities, s: sealer(secrets.get("DATA_KEY")), me, files, paddle, paddleToken: secrets.get("PADDLE_CLIENT_TOKEN") ?? null };
-      if (open) await requirePlan(ctx, String(body?.action ?? ""), open);
+      if (open) await requirePlan(ctx, String(body?.action ?? ""), open, { full });
       const out = await handler(ctx, body);
       return Response.json(out);
     } catch (e) {

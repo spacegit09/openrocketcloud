@@ -7,7 +7,7 @@
 // while it waits its turn, then { type: "reply", rid, ok, data | error } (data as gfsWinds gives).
 // Signed-in people with a plan only (lib/billing.js, copied from shared/ by scripts/prebuild.mjs).
 import { Actor } from "base44:runtime/actors";
-import { lookAccess, PLAN_MESSAGE } from "./lib/billing.js";
+import { lookAccess, PLAN_MESSAGE, UPGRADE_MESSAGE } from "./lib/billing.js";
 import { Forecaster } from "./lib/forecaster.js";
 
 const forecaster = new Forecaster();
@@ -18,11 +18,16 @@ export default class Forecasts extends Actor {
       conn.reject(4001, "Please sign in.");
       return;
     }
-    const ok = await this.client.asServiceRole.entities.User.get(String(conn.identity.userId))
+    const access = await this.client.asServiceRole.entities.User.get(String(conn.identity.userId))
       .then((u: any) => lookAccess(this.client.asServiceRole.entities, { id: String(conn.identity.userId), created: u?.created_date ?? null, role: u?.role ?? null }))
-      .then((a: any) => a.ok, () => true); // not known: let them in
-    if (!ok) {
+      .catch(() => ({ ok: true, full: true })); // not known: let them in
+    if (!access.ok) {
       conn.reject(4002, PLAN_MESSAGE);
+      return;
+    }
+    if (access.full === false) {
+      // The Launch Planner is not part of a plan for OpenRocket only.
+      conn.reject(4002, UPGRADE_MESSAGE);
       return;
     }
     conn.send({ type: "hi" });

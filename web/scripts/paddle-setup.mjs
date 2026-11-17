@@ -11,6 +11,8 @@
 //                    make no webhook (a sandbox tried from your own computer, say)
 //   --tax external   prices plus the buyer's VAT or sales tax (default); `internal`: tax included
 //   --out FILE       write the app secrets to FILE (KEY=value lines) instead of printing them
+//   --prices-only    only the product and its prices (a plan added later): no payment link,
+//                    webhook or client-side token
 //
 // The API key needs these permissions (or "all"): products, prices, customers, transactions,
 // subscriptions and customer portal sessions (read and write), adjustments (read), notification
@@ -33,10 +35,11 @@ const PLANS = {
   lifetime: { name: 'Individual', description: 'Rocket in Cloud for one person, for good', max: 1 },
   group: { name: 'Group of 10', description: 'Rocket in Cloud for you and 9 people you choose, for good', max: 1 },
   seat: { name: 'Extra person', description: 'One more person in your Rocket in Cloud group, for good', max: 100 },
+  openrocket: { name: 'OpenRocket', description: 'OpenRocket in Rocket in Cloud for one person, for good (no Launch Planner or Logbook)', max: 1 },
 };
 
 /** Sets up Paddle; returns what it found or made. `log` gets a line per step. */
-export async function setUpPaddle({ apiKey, site, webhook = null, taxMode = 'external', fetch: fetchFn = globalThis.fetch, log = console.log }) {
+export async function setUpPaddle({ apiKey, site, webhook = null, taxMode = 'external', pricesOnly = false, fetch: fetchFn = globalThis.fetch, log = console.log }) {
   if (!/^pdl_(sdbx|live)_apikey_/.test(String(apiKey ?? ''))) throw new Error('Set PADDLE_API_KEY to a Paddle API key (pdl_sdbx_apikey_… or pdl_live_apikey_…).');
   const origin = new URL(site).origin;
   const hook = webhook === 'none' ? 'none' : webhook ?? `${origin}/functions/paddleWebhook`;
@@ -86,6 +89,7 @@ export async function setUpPaddle({ apiKey, site, webhook = null, taxMode = 'ext
   }
 
   const checkoutUrl = `${origin}/account.html`;
+  if (pricesOnly) return { sandbox: paddle.sandbox, product, prices, checkoutUrl, checkoutSet: null, webhook: null, secret: null, clientToken: null };
   let checkoutSet = true;
   try {
     await paddle.patch('/settings/checkout-url', { default_url: checkoutUrl });
@@ -138,7 +142,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     process.exit(2);
   }
   try {
-    const r = await setUpPaddle({ apiKey: process.env.PADDLE_API_KEY, site, webhook: arg('webhook'), taxMode: arg('tax', 'external') });
+    const pricesOnly = process.argv.includes('--prices-only');
+    const r = await setUpPaddle({ apiKey: process.env.PADDLE_API_KEY, site, webhook: arg('webhook'), taxMode: arg('tax', 'external'), pricesOnly });
+    if (pricesOnly) process.exit(0);
     const secrets = [
       ['PADDLE_API_KEY', process.env.PADDLE_API_KEY],
       ['PADDLE_CLIENT_TOKEN', r.clientToken],
