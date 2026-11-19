@@ -59,6 +59,7 @@ import info.openrocket.core.startup.Application;
 import info.openrocket.core.startup.jij.ClasspathUrlStreamHandler;
 import info.openrocket.core.startup.jij.ConfigurableStreamHandlerFactory;
 import info.openrocket.core.util.BuildProperties;
+import info.openrocket.swing.gui.configdialog.ComponentConfigDialog;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.gui.main.componenttree.ComponentTreeModel;
 import orcloud.stl.PartMeshes;
@@ -781,5 +782,25 @@ final class OrDoc {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * The id of the component whose editor (OpenRocket's component configuration dialog) is open,
+	 * or null. The editor is not modal, and OpenRocket closes it whenever the rocket's tree changes.
+	 */
+	static String componentEditorFor() {
+		if (!ComponentConfigDialog.isDialogVisible()) {
+			return null;
+		}
+		RocketComponent c = ComponentConfigDialog.getDialog().getComponent();
+		return c == null ? null : c.getID().toString();
+	}
+
+	/** Opens the editor of the component with this id again, if the rocket still has it. */
+	static void openComponentEditor(BasicFrame frame, OpenRocketDocument doc, String id) {
+		RocketComponent c = findComponent(doc, id);
+		if (c != null && !ComponentConfigDialog.isDialogVisible()) {
+			ComponentConfigDialog.showDialog(frame, doc, c, true, false);
+		}
 	}
 }

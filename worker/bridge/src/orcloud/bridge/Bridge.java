@@ -63,6 +63,13 @@ final class Bridge implements Link.Handler {
 	 * OpenRocket's window for a moment (about 0.1 s when OpenRocket runs in a browser).
 	 */
 	private static final long QUIET_INPUT_MS = 2000;
+	/**
+	 * Someone else's added, moved or removed parts wait while a component's editor is open (they
+	 * would close it). If the editor stays open, they wait this long, and then until the user has
+	 * not typed or clicked for {@link #EDITOR_IDLE_MS}; the editor is opened again after them.
+	 */
+	private static final long EDITOR_WAIT_MS = 15_000;
+	private static final long EDITOR_IDLE_MS = 5_000;
 
 	private final Link conn;
 	private final String token;
@@ -83,6 +90,7 @@ final class Bridge implements Link.Handler {
 	private long nextSeq = 1;
 	private boolean applying;
 	private boolean deferred;
+	private long deferredSince; // System.currentTimeMillis() when remote changes began to wait
 	private int quietTicks;
 	private long lastInput; // System.currentTimeMillis() of the user's last key or mouse input
 	private String lastPresence = "";
@@ -937,9 +945,16 @@ final class Bridge implements Link.Handler {
 			return;
 		}
 		boolean onlyLeaves = !plan.reloadRocket && !plan.sims && !plan.raw;
-		if (!onlyLeaves && OrDoc.modalDialogOpen()) {
-			// Replacing components under an open modal dialog would invalidate what it edits;
-			// retried every second until the dialog closes.
+		// Replacing components under an open modal dialog would invalidate what it edits. A
+		// component's editor is not modal, but OpenRocket closes it when the rocket's tree changes,
+		// and what the user then types goes nowhere. Retried every second (see tick()).
+		String editing = OrDoc.componentEditorFor();
+		boolean waitForEditor = plan.reloadRocket && editing != null && !editorMayClose();
+		if ((!onlyLeaves && OrDoc.modalDialogOpen()) || waitForEditor) {
+			if (!deferred) {
+				deferredSince = System.currentTimeMillis();
+				Log.debug("Remote changes wait for " + (waitForEditor ? "the component's editor" : "a dialog") + " to close");
+			}
 			deferred = true;
 			return;
 		}
@@ -969,6 +984,16 @@ final class Bridge implements Link.Handler {
 			OrDoc.select(frame, doc, selection);
 		}
 		verify(target, plan, reloaded);
+		if (editing != null) {
+			// A reload closed it (when it was left open, unused, for a while): open it again.
+			OrDoc.openComponentEditor(frame, doc, editing);
+		}
+	}
+
+	/** Whether a component's editor has been left open, unused, long enough for remote changes to close it. */
+	private boolean editorMayClose() {
+		long now = System.currentTimeMillis();
+		return deferred && now - deferredSince >= EDITOR_WAIT_MS && now - lastInput >= EDITOR_IDLE_MS;
 	}
 
 	private void reloadRocket(Model target) throws Exception {

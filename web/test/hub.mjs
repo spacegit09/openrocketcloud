@@ -8,7 +8,9 @@ import { Room } from '../base44/actors/DesignRoom/room.js';
 // motors: the custom motor files ([{ name, content }]) every session of every design gets, or
 // (designId, email) => such a list, for one person's session to have motors another's lacks
 // (email: whoever said hello last; the room asks for a welcome's motors right after the hello).
-export function startHub({ port = 8788, designs = new Map(), motors = [] } = {}) {
+// delay: milliseconds the room takes to answer an edit or request, as on the live site (the actor
+// writes the edit to its storage before it shares it; 0: at once). Messages keep their order.
+export function startHub({ port = 8788, designs = new Map(), motors = [], delay = 0 } = {}) {
   const sessions = new Map(); // design id -> { room, conns }
 
   function session(designId) {
@@ -53,10 +55,18 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
     const email = (url.searchParams.get('user') ?? '').toLowerCase();
     const s = session(designId);
     await s.started;
+    let due = 0;
     const conn = {
       id: url.searchParams.get('conn') ?? crypto.randomUUID(),
       user: email ? { id: `local:${email}`, email, name: url.searchParams.get('name') ?? email.split('@')[0] } : null,
-      send: (m) => ws.readyState === 1 && ws.send(JSON.stringify(m)),
+      send: (m) => {
+        const text = JSON.stringify(m);
+        if (!delay) return ws.readyState === 1 && ws.send(text);
+        // `delay` ms later, in order.
+        due = Math.max(Date.now() + delay, due);
+        setTimeout(() => ws.readyState === 1 && ws.send(text), due - Date.now());
+        return true;
+      },
     };
     // A reconnect with the same id replaces the old socket, as in Base44.
     for (const c of s.conns) if (c.id === conn.id) s.conns.delete(c);
@@ -98,6 +108,10 @@ export function startHub({ port = 8788, designs = new Map(), motors = [] } = {})
     close: () => {
       for (const ws of wss.clients) ws.terminate();
       return new Promise((r) => wss.close(r));
+    },
+    /** Drops every connection, as a network hiccup would (the pages reconnect by themselves). */
+    drop: () => {
+      for (const ws of wss.clients) ws.terminate();
     },
   };
 }

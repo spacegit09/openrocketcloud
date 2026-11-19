@@ -22,6 +22,7 @@ import info.openrocket.core.preferences.ApplicationPreferences;
 import info.openrocket.swing.gui.main.BasicFrame;
 import info.openrocket.swing.startup.SwingStartup;
 import orcloud.web.CommandClick;
+import orcloud.web.DeleteKey;
 import orcloud.web.FileWindows;
 import orcloud.web.FinProfiles;
 import orcloud.web.MenuRow;
@@ -47,6 +48,8 @@ public final class WebMain {
 
 	public static void main(String[] args) throws Exception {
 		String design = System.getProperty("orcloud.design", "design").replaceAll("[^A-Za-z0-9_-]", "_");
+		// The page passes orcloud.debug=true (design.html?debug=1): the live share's details in the console.
+		Log.debug |= Boolean.getBoolean("orcloud.debug");
 		Path workDir = Path.of("/files/orcloud", design);
 		Files.createDirectories(workDir);
 		Files.createDirectories(DOWNLOADS);
@@ -60,6 +63,8 @@ public final class WebMain {
 		browserPreferences();
 		// On a Mac, ⌘-click adds to a selection (the component tree, lists, tables).
 		CommandClick.install();
+		// A Mac's or Chromebook's delete key deletes the selected parts, as the Delete key does.
+		DeleteKey.install();
 		// Windows OpenRocket waits on while it starts (warnings about the design) are shown.
 		StartupDialogs.install();
 
