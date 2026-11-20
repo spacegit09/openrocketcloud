@@ -203,6 +203,7 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
   display: flex; flex-direction: column; gap: 12px; padding: 28px 26px 26px; border-radius: 18px;
   background: linear-gradient(180deg, rgba(19, 29, 53, 0.9), rgba(12, 19, 36, 0.9)); border: 1px solid var(--t-line);
 }
+.t-price .t-buy { margin-top: auto; align-self: stretch; justify-content: center; }
 .t-price.featured { border-color: rgba(96, 165, 250, 0.55); box-shadow: 0 24px 60px -28px rgba(59, 130, 246, 0.55); }
 .t-price .name { color: var(--t-muted); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .t-price .amount { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }

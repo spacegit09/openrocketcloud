@@ -1,8 +1,9 @@
 // Plans and payments: who may use Rocket in Cloud, and the purchases behind it.
 //
-// Everyone gets a free week from the first time they open the site signed in. People who joined
-// before plans began (FREE_BEFORE) and the app's admins keep using it free. After the week,
-// someone needs one of these plans (prices in US dollars, set in Paddle by scripts/paddle-setup.mjs):
+// Everyone gets a free week from when they signed up (it does not wait for plans to begin), and
+// may buy a plan at any time, the week included. People who joined before plans began
+// (FREE_BEFORE) and the app's admins keep using it free. After the week, someone needs one of
+// these plans (prices in US dollars, set in Paddle by scripts/paddle-setup.mjs):
 //   monthly    US$1 a month, a Paddle subscription they can cancel at any time
 //   lifetime   US$5 once, for one person, for good
 //   openrocket US$1 once, for one person, for good: OpenRocket only (the design page, its sharing
@@ -24,11 +25,11 @@
 /** People whose account is older than this use Rocket in Cloud free, for good. */
 export const FREE_BEFORE = Date.parse('2026-11-15T11:30:00Z');
 /**
- * When plans begin (an ISO time), or null: until then nobody needs a plan, and nobody's free week
- * runs out (it counts from this time at the earliest). Set it once Paddle's live account takes
- * payments (README: Plans and payments), and deploy.
+ * When plans begin (an ISO time), or null: until then nobody needs a plan. From then on, someone
+ * whose free week (from their sign-up) is over needs one at once. Set once Paddle's live account
+ * took payments (README: Plans and payments).
  */
-export const PLANS_START = null;
+export const PLANS_START = '2026-11-20T10:30:00Z';
 let plansStart = PLANS_START ? Date.parse(PLANS_START) : null;
 
 /** For tests: plans begin at `ms` (null: not yet). */
@@ -119,11 +120,10 @@ export function freeKind(user) {
  */
 export function accessOf({ user, account = null, purchases = [], groups = [], now = Date.now() }) {
   const free = freeKind(user);
-  let start = when(account?.trial_started);
-  if (Number.isNaN(start)) start = when(user?.created);
-  if (Number.isNaN(start)) start = now;
-  // Nobody's free week counts from before plans began.
-  if (plansStart != null) start = Math.max(start, plansStart);
+  // The free week counts from their sign-up (their Account's start, if older, or now if neither
+  // is known), even when that was before plans began: then it may be over already.
+  const known = [when(user?.created), when(account?.trial_started)].filter((t) => !Number.isNaN(t));
+  const start = known.length ? Math.min(...known) : now;
   const begun = plansStart != null && now >= plansStart;
   const trialEnds = plansStart == null ? null : start + TRIAL_MS;
   const lifetime = purchases.some((p) => p.kind === 'lifetime' && p.status === 'completed');
@@ -179,7 +179,7 @@ export async function lookAccess(db, user, opts = {}) {
   return (await loadAccess(db, user, opts)).access;
 }
 
-/** Their Account record, made (starting their free week) the first time they are seen. */
+/** Their Account record, made the first time they are seen (their free week counts from their sign-up). */
 export async function ensureAccount(db, user, now = Date.now()) {
   const found = (await db.Account.filter({ user_id: user.id })).filter((a) => a.user_id === user.id);
   if (found.length) return oldest(found);

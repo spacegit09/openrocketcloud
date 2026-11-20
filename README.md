@@ -172,7 +172,8 @@ refuses big records the same way.
 
 ### Plans and payments
 
-The live site is paid: every new account gets a **free week**, then needs a plan. Accounts made
+The live site is paid (since 20 November 2026): every account gets a **free week** from its sign-up,
+then needs a plan; a plan can also be bought during the week, and starts at once. Accounts made
 before plans began (15 November 2026, `FREE_BEFORE`) and the app's admins keep using it free.
 
 | Plan | Price | |
@@ -216,8 +217,8 @@ base44 secrets set PADDLE_WEBHOOK_SECRET=…
 
 Until `PLANS_START` in `web/base44/shared/billing.js` is set, nobody needs a plan. The pricing,
 the plan page and the Terms can then go live first, for Paddle to review the site. Once the live
-account takes payments, set `PLANS_START` to the time plans begin and deploy. Everyone's free week
-counts from then at the earliest.
+account takes payments, set `PLANS_START` to the time plans begin and deploy. Free weeks count from
+each person's sign-up, so someone whose week is over by then needs a plan at once.
 
 The script makes the product and its four prices, sets the default payment link (the plan page),
 makes the webhook and a client-side token for Paddle.js, and prints the secrets to set. Running it

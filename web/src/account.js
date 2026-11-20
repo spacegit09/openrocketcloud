@@ -30,11 +30,29 @@ async function main() {
     return;
   }
   render();
+  // The homepage's "Buy now" (?buy=plan): that plan's checkout.
+  const want = new URLSearchParams(location.search).get('buy');
+  if (want) buyFromLink(want);
   // Paddle's emails link here (?_ptxn=…) to pay or to update a card: Paddle.js opens that checkout.
   if (new URLSearchParams(location.search).has('_ptxn') && st.sale) loadPaddle(st.sale).catch((e) => toast(e.message));
 }
 
 const forGood = () => ['admin', 'early', 'lifetime'].includes(st.access.kind);
+
+/** account.html?buy=plan (a "Buy now" on the homepage): opens that plan's checkout, if they can buy it. */
+function buyFromLink(plan) {
+  const url = new URL(location.href);
+  url.searchParams.delete('buy');
+  history.replaceState(null, '', url);
+  if (!Object.hasOwn(PLANS, plan)) return;
+  const card = document.querySelector(`#plans .plan-card[data-plan="${plan}"]`);
+  card?.scrollIntoView({ block: 'center' });
+  const button = card?.querySelector('button.primary');
+  if (!card) toast(forGood() ? 'Rocket in Cloud is already yours for good.' : 'Your plan already includes this.');
+  else if (!button) toast('This is already your plan.');
+  else if (!st.sale) toast('Payments are not open yet. Please try again soon.');
+  else checkout(button, plan);
+}
 const ownsGroup = () => (st.group?.seats ?? 0) > 0;
 
 function render() {
@@ -113,7 +131,12 @@ function renderNow() {
       break;
     case 'trial': {
       const n = daysLeft(a.trialEnds);
-      main = card(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left`, `Your free week ends on ${dateText(a.trialEnds)}. To keep using Rocket in Cloud after that, choose a plan below. No card needed until then.`);
+      const now = h('button', { class: 'primary' }, 'Buy a plan now');
+      now.onclick = () => $('#plans').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      main = card(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left`, [
+        `Your free week ends on ${dateText(a.trialEnds)}. To keep using Rocket in Cloud after that, choose a plan below. No card needed until then.`,
+        'Or buy a plan now: it starts at once, without waiting for your free week to end.',
+      ], now);
       break;
     }
     default:

@@ -205,6 +205,11 @@ try {
     const t = await text(page, '#pricing');
     for (const p of [/Monthly/i, /US\$1/, /a month/, /Individual/i, /US\$5/, /Group/i, /US\$10/, /you and 9 others/, /US\$3 for each extra person/, /free week/i, /Paddle/]) assert.match(t, p);
     assert.ok(await page.$('.t-links a[href="#pricing"]'));
+    // Each plan can be bought at once, skipping the free week: sign-in, then that plan's checkout.
+    assert.match(t, /skip the free week/);
+    const buyNow = await page.$$eval('#pricing .t-buy', (els) => els.map((e) => [e.textContent.trim(), e.dataset.signinTo]));
+    assert.deepEqual(buyNow, ['openrocket', 'monthly', 'lifetime', 'group'].map((p) => ['Buy now', `/account.html?buy=${p}`]));
+    assert.doesNotMatch(t, /Until payments begin/);
     await page.evaluate(() => document.querySelector('#pricing').scrollIntoView());
     await sleep(900);
     await shot(page, 'home-pricing');
@@ -221,9 +226,12 @@ try {
     const page = await open('/', 'nova@example.com');
     await waitText(page, '#plan-banner', /Free week: 7 days left/);
     assert.ok(await page.$('#me a[href="/account.html"]'), 'Plan link in the top bar');
+    assert.equal(await page.$eval('#plan-banner a', (a) => [a.textContent, a.getAttribute('href')].join(' ')), 'Buy a plan now /account.html#plans');
     await shot(page, 'dashboard-trial');
     await page.goto(`http://localhost:${WEB}/account.html`, { waitUntil: 'domcontentloaded' });
     await waitText(page, '#now', /Free week: 7 days left/);
+    await waitText(page, '#now', /Or buy a plan now: it starts at once/);
+    assert.ok(await page.$('#now button.primary'), 'Buy a plan now on the free week card');
     const cards = await page.$$eval('.plan-card', (els) => els.map((e) => e.dataset.plan));
     assert.deepEqual(cards, ['openrocket', 'monthly', 'lifetime', 'group']);
     await shot(page, 'account-trial', true);
@@ -257,6 +265,33 @@ try {
     await shot(page, 'account-cancelled', true);
     await clickText(page, '#now button', /Keep my plan/);
     await waitText(page, '#now', /Renews on/);
+    await page.close();
+  });
+
+  await check('buy now, skipping the free week: the homepage link opens that plan\'s checkout', async () => {
+    await person('rae@example.com', { name: 'Rae Lin' });
+    // Closed without paying: still in the free week, and the link is not opened again on reload.
+    let page = await open('/account.html?buy=lifetime', 'rae@example.com');
+    await page.waitForSelector('#fake-close', { timeout: 15_000 });
+    assert.match(await page.$eval('#fake-text', (e) => e.textContent), /Checkout/);
+    assert.equal(new URL(page.url()).search, '');
+    await page.click('#fake-close');
+    await waitText(page, '#now', /Free week: 7 days left/);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitText(page, '#now', /Free week/);
+    await sleep(800);
+    assert.equal(await page.$('#fake-close'), null, 'no checkout after a reload');
+    await page.close();
+    // Paid: the plan starts at once, in the middle of the free week.
+    page = await open('/account.html?buy=lifetime', 'rae@example.com');
+    await pay(page);
+    await waitText(page, '#now', /Individual plan/);
+    await page.evaluate(() => window.Paddle.Checkout.close());
+    await shot(page, 'account-buy-now', true);
+    // A plan they already have, and someone free for good: told so, no checkout.
+    await page.goto(`http://localhost:${WEB}/account.html?buy=lifetime`, { waitUntil: 'domcontentloaded' });
+    await waitText(page, '.toast', /already yours for good/);
+    assert.equal(await page.$('#fake-close'), null);
     await page.close();
   });
 

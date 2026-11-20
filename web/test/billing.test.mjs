@@ -112,37 +112,56 @@ test('a new person gets a free week; after it, they can still see, download and 
   assert.equal((await nova.actor()).ok, false);
 });
 
-test('the free week ends exactly 7 days after it starts', () => {
-  const user = { id: 'u1', created: new Date(FREE_BEFORE + DAY).toISOString() };
-  const start = FREE_BEFORE + 2 * DAY;
-  const account = { trial_started: new Date(start).toISOString() };
-  assert.equal(accessOf({ user, account, now: start + TRIAL_MS - 1 }).kind, 'trial');
-  assert.equal(accessOf({ user, account, now: start + TRIAL_MS }).kind, 'none');
-  // Before the site has seen them (the actors, someone who never opened a page): from their sign-up.
-  assert.equal(accessOf({ user, now: FREE_BEFORE + DAY + TRIAL_MS - 1 }).kind, 'trial');
-  assert.equal(accessOf({ user, now: FREE_BEFORE + DAY + TRIAL_MS }).kind, 'none');
+test('the free week ends exactly 7 days after sign-up', () => {
+  const created = FREE_BEFORE + DAY;
+  const user = { id: 'u1', created: new Date(created).toISOString() };
+  assert.equal(accessOf({ user, now: created + TRIAL_MS - 1 }).kind, 'trial');
+  assert.equal(accessOf({ user, now: created + TRIAL_MS }).kind, 'none');
+  // The site first saw them later (their Account): the week still counts from their sign-up.
+  const account = { trial_started: new Date(created + 2 * DAY).toISOString() };
+  assert.equal(accessOf({ user, account, now: created + TRIAL_MS - 1 }).kind, 'trial');
+  assert.equal(accessOf({ user, account, now: created + TRIAL_MS }).kind, 'none');
+  assert.equal(accessOf({ user, account, now: created + TRIAL_MS - 1 }).trialEnds, created + TRIAL_MS);
 });
 
-test('before plans begin, nobody needs one; free weeks count from when they begin', async () => {
-  const { db, person } = setup();
+test('before plans begin, nobody needs one; then free weeks count from sign-up, not from when plans begin', async () => {
+  // Signed up 10 days before plans begin: the week is over the moment they begin.
+  const created = FREE_BEFORE + DAY;
+  const begin = created + 10 * DAY;
+  const user = { id: 'u1', created: new Date(created).toISOString() };
+  setPlansStart(begin);
+  assert.equal(accessOf({ user, now: begin - 1 }).kind, 'open');
+  assert.equal(accessOf({ user, now: begin }).kind, 'none');
+  // Signed up 3 days before: 4 days left.
+  const late = { id: 'u2', created: new Date(begin - 3 * DAY).toISOString() };
+  assert.equal(accessOf({ user: late, now: begin }).kind, 'trial');
+  assert.equal(accessOf({ user: late, now: begin }).trialEnds, begin - 3 * DAY + TRIAL_MS);
+  assert.equal(accessOf({ user: late, now: begin + 4 * DAY }).kind, 'none');
+  setPlansStart(BEGUN);
+
+  const { person } = setup();
   setPlansStart(null);
-  const nova = await person('nova@example.com', { created: '2026-11-15T11:31:00.000000' });
+  const nova = await person('nova@example.com', { created: new Date(Date.now() - 3 * DAY).toISOString().replace('Z', '') });
   let st = await nova.status();
   assert.equal(st.access.kind, 'open');
   assert.equal(st.access.ok, true);
   assert.equal(st.access.trialEnds, null);
   await nova.gate('create');
   assert.equal((await nova.actor()).ok, true);
-  // Seen long before plans begin (their Account says so): still a whole week from the start.
-  const [a] = await db.Account.filter({ user_id: nova.id });
-  await db.Account.update(a.id, { trial_started: new Date(Date.now() - 30 * DAY).toISOString() });
-  const begin = Date.now() - 2 * DAY;
-  setPlansStart(begin);
+  // Plans begin now: Nova's week (from her sign-up, 3 days ago) has 4 days left...
+  setPlansStart(Date.now());
   forgetAccess();
   st = await nova.status();
   assert.equal(st.access.kind, 'trial');
-  assert.ok(near(st.access.trialEnds, begin + TRIAL_MS));
-  // Scheduled for later: still open, the week's end known.
+  assert.ok(near(st.access.trialEnds, Date.now() - 3 * DAY + TRIAL_MS));
+  await nova.gate('create');
+  // ...and once it is over, she needs a plan.
+  await nova.endTrial();
+  st = await nova.status();
+  assert.equal(st.access.kind, 'none');
+  await assert.rejects(nova.gate('create'), (e) => e.status === 402 && e.code === 'plan_required');
+  assert.equal((await nova.actor()).ok, false);
+  // Scheduled for later: still open.
   setPlansStart(Date.now() + DAY);
   forgetAccess();
   st = await nova.status();
@@ -151,6 +170,24 @@ test('before plans begin, nobody needs one; free weeks count from when they begi
   const { transactionId } = await nova.buy('lifetime');
   assert.equal((await nova.billing({ action: 'sync', transactionId })).access.kind, 'lifetime');
   setPlansStart(BEGUN);
+});
+
+test('a plan can be bought during the free week, at once, without waiting for the week to end', async () => {
+  const { person, deliver } = setup();
+  const rae = await person('rae@example.com');
+  assert.equal((await rae.status()).access.kind, 'trial');
+  // Monthly: charged now, the plan starts now.
+  const { transactionId, events } = await rae.buy('monthly');
+  await deliver(events);
+  let st = await rae.billing({ action: 'sync', transactionId });
+  assert.equal(st.access.kind, 'monthly');
+  assert.ok(st.monthly);
+  // And the other plans too, for someone else in their free week.
+  const sol = await person('sol@example.com');
+  const bought = await sol.buy('lifetime');
+  await deliver(bought.events);
+  st = await sol.billing({ action: 'sync', transactionId: bought.transactionId });
+  assert.equal(st.access.kind, 'lifetime');
 });
 
 test('people from before plans began, and admins, keep using it free', async () => {

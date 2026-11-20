@@ -145,8 +145,13 @@ async function payByCard(page, { card = '4242 4242 4242 4242' } = {}) {
   const f = await checkoutFrame(page);
   const go = '[data-testid=combinedAuthenticationLocationFormSubmitButton]';
   const number = '[data-testid=cardNumberInput]';
-  await f.waitForSelector(`${go}, ${number}`, { visible: true, timeout: 40_000 });
-  if (await f.$(go)) await f.click(go);
+  // First Paddle's "Your details" step (email and country, filled in): its Continue button, which
+  // Paddle has named in more than one way; or straight to the card form.
+  const step = () => document.querySelector('[data-testid=cardNumberInput]')
+    ?? document.querySelector('[data-testid=combinedAuthenticationLocationFormSubmitButton]')
+    ?? [...document.querySelectorAll('button')].find((b) => /^\s*continue\s*$/i.test(b.innerText) && b.offsetParent);
+  await f.waitForFunction(step, { timeout: 40_000, polling: 250 });
+  if (!(await f.$(number))) await f.evaluate((src) => new Function(`return (${src})()`)().click(), step.toString());
   await f.waitForSelector(number, { visible: true, timeout: 40_000 });
   await f.type(number, card, { delay: 15 });
   await f.type('[data-testid=cardholderNameInput]', 'Test Buyer', { delay: 10 });

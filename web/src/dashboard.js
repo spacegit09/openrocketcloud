@@ -64,15 +64,15 @@ function showPlan(st) {
   locked = !a.ok;
   if (locked) allowClosingWall();
   const banner = $('#plan-banner');
-  const show = (text, label, ended = false) => {
-    banner.replaceChildren(h('span', {}, text), h('a', { class: `btn${ended ? ' primary' : ''}`, href: '/account.html' }, label));
+  const show = (text, label, ended = false, href = '/account.html') => {
+    banner.replaceChildren(h('span', {}, text), h('a', { class: `btn${ended ? ' primary' : ''}`, href }, label));
     banner.classList.toggle('ended', ended);
     banner.hidden = false;
   };
   if (!a.ok) show('Your free week has ended. Choose a plan to open designs, plan launches and keep logbooks. You can still download your designs.', 'See plans', true);
   else if (a.kind === 'trial') {
     const n = daysLeft(a.trialEnds);
-    show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month.`, 'See plans');
+    show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month, or buy one now.`, 'Buy a plan now', false, '/account.html#plans');
   } else if (a.kind === 'monthly' && st.monthly?.status === 'past_due') show('Your last monthly payment did not go through. Update your card to keep your plan.', 'Plan & billing', true);
   else if (a.kind === 'monthly' && st.monthly?.cancelAt) show(`Your monthly plan ends on ${dateText(st.monthly.cancelAt)}.`, 'Plan & billing');
   else banner.hidden = true;

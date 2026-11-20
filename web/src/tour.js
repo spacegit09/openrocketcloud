@@ -7,8 +7,9 @@ import { signIn } from './base44.js';
 /** Sets up the tour's page: sign-in buttons, and sections that appear as they scroll into view. */
 export function setupTour() {
   for (const b of document.querySelectorAll('[data-signin]')) {
-    // Back to the home page after signing in: the dashboard.
-    b.addEventListener('click', () => signIn(new URL('/', location.href).toString()));
+    // Back to the home page after signing in (the dashboard), or to the button's data-signin-to
+    // (a plan's "Buy now": the plan page, with that plan's checkout open).
+    b.addEventListener('click', () => signIn(new URL(b.dataset.signinTo ?? '/', location.href).toString()));
   }
   reveal();
 }
@@ -18,7 +19,7 @@ export function markSignedIn() {
   for (const b of document.querySelectorAll('[data-signin]')) {
     const open = document.createElement('a');
     open.className = b.className;
-    open.href = b.dataset.signedInHref ?? '/';
+    open.href = b.dataset.signedInHref ?? b.dataset.signinTo ?? '/';
     open.textContent = b.dataset.signedIn ?? 'Open your designs';
     b.replaceWith(open);
   }
