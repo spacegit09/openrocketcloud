@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
 import { designsApi } from '../base44/shared/api.js';
-import { billingApi, forgetAccess, handleEvent, OPEN_ACTIONS, paddleApi, requirePlan, setPlansStart, TRIAL_MS } from '../base44/shared/billing.js';
+import { billingApi, forgetAccess, handleEvent, OPEN_ACTIONS, paddleApi, requirePlan, setCheckoutOpen, setPlansStart, TRIAL_MS } from '../base44/shared/billing.js';
 import { sealer } from '../base44/shared/sealed.js';
 import { fakeDb } from './fake-base44.mjs';
 
@@ -30,6 +30,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const explore = process.argv.includes('explore');
 
 setPlansStart(Date.parse('2026-01-01T00:00:00Z'));
+setCheckoutOpen(true); // the sandbox takes payments
 const db = fakeDb(['Design', 'Motor', 'SavedFlight', 'Logbook', 'SealedPart', 'User', 'Account', 'Purchase', 'Group']);
 const s = sealer(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'));
 const paddle = paddleApi(KEY);

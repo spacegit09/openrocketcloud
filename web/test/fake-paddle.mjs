@@ -103,6 +103,8 @@ export function fakePaddle({ now = () => Date.now() } = {}) {
     }
     if (method === 'POST' && path === '/transactions') {
       if (!settings.default_url && settings.requireDefaultUrl) return error(400, 'transaction_default_checkout_url_not_set', 'no default payment link');
+      // A live account whose onboarding Paddle has not finished: no checkouts yet.
+      if (settings.checkoutNotEnabled) return error(400, 'transaction_checkout_not_enabled', "Checkouts aren't enabled for this account.");
       const items = [];
       for (const it of body.items ?? []) {
         const price = prices.get(it.price_id);

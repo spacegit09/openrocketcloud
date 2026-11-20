@@ -50,7 +50,7 @@ function buyFromLink(plan) {
   const button = card?.querySelector('button.primary');
   if (!card) toast(forGood() ? 'Rocket in Cloud is already yours for good.' : 'Your plan already includes this.');
   else if (!button) toast('This is already your plan.');
-  else if (!st.sale) toast('Payments are not open yet. Please try again soon.');
+  else if (!st.sale) toast('Payments open in a day or two. Please try again then.');
   else checkout(button, plan);
 }
 const ownsGroup = () => (st.group?.seats ?? 0) > 0;
@@ -126,17 +126,20 @@ function renderNow() {
     case 'monthly':
       main = monthlyCard(`acct-card acct-${a.kind}`);
       break;
+    case 'waiting':
+      main = card('Your free week has ended', 'Payments open in a day or two. Until then, you can keep using Rocket in Cloud; after that, you will need a plan to continue.');
+      break;
     case 'open':
       main = card('Free for now', 'Plans have not begun yet, so Rocket in Cloud is free for everyone. When they begin, you get a free week, and then you choose a plan below.');
       break;
     case 'trial': {
       const n = daysLeft(a.trialEnds);
-      const now = h('button', { class: 'primary' }, 'Buy a plan now');
-      now.onclick = () => $('#plans').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      main = card(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left`, [
-        `Your free week ends on ${dateText(a.trialEnds)}. To keep using Rocket in Cloud after that, choose a plan below. No card needed until then.`,
-        'Or buy a plan now: it starts at once, without waiting for your free week to end.',
-      ], now);
+      const text = `Your free week ends on ${dateText(a.trialEnds)}. To keep using Rocket in Cloud after that, choose a plan below. No card needed until then.`;
+      if (st.sale) {
+        const now = h('button', { class: 'primary' }, 'Buy a plan now');
+        now.onclick = () => $('#plans').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        main = card(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left`, [text, 'Or buy a plan now: it starts at once, without waiting for your free week to end.'], now);
+      } else main = card(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left`, text);
       break;
     }
     default:
@@ -213,10 +216,10 @@ function renderPlans() {
     cards.push(card('lifetime', st.monthly && !st.monthly.cancelAt ? { note: 'Your monthly plan then stops at the end of the month you paid for.', label: `Switch for ${PLANS.lifetime.price}` } : {}));
   }
   cards.push(card('group', ownsGroup() ? { state: 'You have this' } : {}));
-  const title = forGood() ? 'For your team' : ['open', 'trial', 'none'].includes(st.access.kind) ? 'Choose a plan' : 'Other plans';
+  const title = forGood() ? 'For your team' : ['open', 'trial', 'waiting', 'none'].includes(st.access.kind) ? 'Choose a plan' : 'Other plans';
   $('#plans').replaceChildren(...[
     h('h3', { class: 'acct-title' }, title),
-    sale ? null : h('p', { class: 'notice' }, 'Payments open soon. Until then, your free week keeps going.'),
+    sale ? null : h('p', { class: 'notice' }, 'Payments open in a day or two. Until then, you can keep using Rocket in Cloud.'),
     h('div', { class: 'plan-cards' }, cards),
   ].filter(Boolean));
 }

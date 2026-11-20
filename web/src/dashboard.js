@@ -70,9 +70,11 @@ function showPlan(st) {
     banner.hidden = false;
   };
   if (!a.ok) show('Your free week has ended. Choose a plan to open designs, plan launches and keep logbooks. You can still download your designs.', 'See plans', true);
+  else if (a.kind === 'waiting') show('Your free week has ended. Payments open in a day or two; until then, you can keep using Rocket in Cloud.', 'See plans');
   else if (a.kind === 'trial') {
     const n = daysLeft(a.trialEnds);
-    show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month, or buy one now.`, 'Buy a plan now', false, '/account.html#plans');
+    if (st.sale) show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month, or buy one now.`, 'Buy a plan now', false, '/account.html#plans');
+    else show(`Free week: ${n} ${n === 1 ? 'day' : 'days'} left. Then choose a plan to keep using Rocket in Cloud, from US$1 a month.`, 'See plans');
   } else if (a.kind === 'monthly' && st.monthly?.status === 'past_due') show('Your last monthly payment did not go through. Update your card to keep your plan.', 'Plan & billing', true);
   else if (a.kind === 'monthly' && st.monthly?.cancelAt) show(`Your monthly plan ends on ${dateText(st.monthly.cancelAt)}.`, 'Plan & billing');
   else banner.hidden = true;

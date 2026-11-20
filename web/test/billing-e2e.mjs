@@ -14,7 +14,7 @@ import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
 import { designsApi, flightsApi, motorsApi } from '../base44/shared/api.js';
 import {
-  billingApi, forgetAccess, OPEN_ACTIONS, paddleApi, receiveWebhook, requirePlan, setPlansStart, signBody, TRIAL_MS,
+  billingApi, forgetAccess, OPEN_ACTIONS, paddleApi, receiveWebhook, requirePlan, setCheckoutOpen, setPlansStart, signBody, TRIAL_MS,
 } from '../base44/shared/billing.js';
 import { logbooksApi } from '../base44/shared/logbooks.js';
 import { sealer } from '../base44/shared/sealed.js';
@@ -32,6 +32,7 @@ const SECRET = 'pdl_ntfset_e2e';
 // ------------------------------------------------------------------ Base44 and Paddle, here
 
 setPlansStart(Date.parse('2026-01-01T00:00:00Z')); // plans began a while ago (free weeks can be made to have ended)
+setCheckoutOpen(true); // Paddle takes payments (until it does, see the check below)
 const db = fakeDb(['Design', 'Motor', 'SavedFlight', 'Logbook', 'SealedPart', 'User', 'Account', 'Purchase', 'Group']);
 const s = sealer(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'));
 const fp = fakePaddle();
@@ -443,10 +444,36 @@ try {
     payments = false;
     await person('waiting@example.com');
     const page = await open('/account.html', 'waiting@example.com');
-    await waitText(page, '#plans', /Payments open soon/);
+    await waitText(page, '#plans', /Payments open in a day or two/);
     assert.ok(await page.$eval('.plan-card[data-plan=monthly] button', (b) => b.disabled));
     await page.close();
     payments = true;
+  });
+
+  await check('Paddle not taking payments yet: a week that is over locks nobody out, and buying waits', async () => {
+    setCheckoutOpen(false);
+    forgetAccess();
+    await person('late@example.com');
+    await call('billing', users.get('late@example.com'), { action: 'status' }); // seen: their Account
+    await endTrial('late@example.com');
+    const page = await open('/', 'late@example.com');
+    await waitText(page, '#plan-banner', /Payments open in a day or two/);
+    await page.waitForSelector('#dashboard:not([hidden])');
+    assert.equal(await page.$('dialog.plan-wall-dialog[open]'), null, 'no plans notice');
+    await shot(page, 'dashboard-waiting');
+    await page.goto(`http://localhost:${WEB}/logbook.html`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('#books:not([hidden])', { timeout: 15_000 });
+    assert.equal(await page.$('dialog.plan-wall-dialog[open]'), null);
+    await page.goto(`http://localhost:${WEB}/account.html?buy=monthly`, { waitUntil: 'domcontentloaded' });
+    await waitText(page, '#now', /Payments open in a day or two/);
+    await waitText(page, '#plans', /Payments open in a day or two/);
+    await waitText(page, '.toast', /Payments open in a day or two/);
+    assert.ok(await page.$eval('.plan-card[data-plan=monthly] button', (b) => b.disabled));
+    assert.equal(await page.$('#fake-close'), null, 'no checkout');
+    await shot(page, 'account-waiting', true);
+    await page.close();
+    setCheckoutOpen(true);
+    forgetAccess();
   });
 
   await check('before plans begin: free for everyone, nothing in the way', async () => {

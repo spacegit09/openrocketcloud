@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   accessOf, billingApi, BillingError, FREE_BEFORE, forgetAccess, forgetPrices, GROUP_SIZE, lookAccess, OPEN_ACTIONS, paddleApi,
-  receiveWebhook, requirePlan, setPlansStart, signBody, TRIAL_MS, verifySignature, when,
+  receiveWebhook, requirePlan, setCheckoutOpen, setPlansStart, signBody, TRIAL_MS, verifySignature, when,
 } from '../base44/shared/billing.js';
 import { sealer } from '../base44/shared/sealed.js';
 import { fakeDb } from './fake-base44.mjs';
@@ -24,6 +24,7 @@ function setup({ payments = true } = {}) {
   forgetPrices();
   forgetAccess();
   setPlansStart(BEGUN);
+  setCheckoutOpen(true);
   const db = fakeDb(['Design', 'Motor', 'SavedFlight', 'Logbook', 'SealedPart', 'User', 'Account', 'Purchase', 'Group']);
   const s = sealer(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'));
   const fp = fakePaddle();
@@ -170,6 +171,41 @@ test('before plans begin, nobody needs one; then free weeks count from sign-up, 
   const { transactionId } = await nova.buy('lifetime');
   assert.equal((await nova.billing({ action: 'sync', transactionId })).access.kind, 'lifetime');
   setPlansStart(BEGUN);
+});
+
+test('until Paddle takes payments, nobody is locked out; then someone past their week needs a plan at once', async () => {
+  const { person, fp } = setup();
+  setCheckoutOpen(false);
+  const nova = await person('nova@example.com');
+  const vega = await person('vega@example.com');
+  await nova.endTrial(2);
+  let st = await nova.status();
+  assert.equal(st.access.kind, 'waiting');
+  assert.equal(st.access.ok, true);
+  assert.equal(st.access.full, true);
+  assert.equal(st.sale, null, 'no checkout offered');
+  await nova.gate('create');
+  await nova.gateFull('create');
+  assert.equal((await nova.actor()).ok, true);
+  await assert.rejects(nova.billing({ action: 'checkout', plan: 'lifetime' }), refused(503, /Payments open in a day or two/));
+  // Someone still in their week: as before, without a checkout.
+  st = await vega.status();
+  assert.equal(st.access.kind, 'trial');
+  assert.equal(st.sale, null);
+  // Paddle takes payments: the week is over, so a plan is needed at once.
+  setCheckoutOpen(true);
+  forgetAccess();
+  st = await nova.status();
+  assert.equal(st.access.kind, 'none');
+  assert.ok(st.sale);
+  await assert.rejects(nova.gate('create'), (e) => e.status === 402 && e.code === 'plan_required');
+  assert.equal((await nova.actor()).ok, false);
+  // Paddle itself saying its checkout is not enabled yet: the same message, not an error.
+  fp.settings.checkoutNotEnabled = true;
+  await assert.rejects(nova.billing({ action: 'checkout', plan: 'lifetime' }), refused(503, /Payments open in a day or two/));
+  fp.settings.checkoutNotEnabled = false;
+  const { transactionId } = await nova.buy('lifetime');
+  assert.equal((await nova.billing({ action: 'sync', transactionId })).access.kind, 'lifetime');
 });
 
 test('a plan can be bought during the free week, at once, without waiting for the week to end', async () => {

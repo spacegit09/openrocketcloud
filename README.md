@@ -219,6 +219,10 @@ Until `PLANS_START` in `web/base44/shared/billing.js` is set, nobody needs a pla
 the plan page and the Terms can then go live first, for Paddle to review the site. Once the live
 account takes payments, set `PLANS_START` to the time plans begin and deploy. Free weeks count from
 each person's sign-up, so someone whose week is over by then needs a plan at once.
+`CHECKOUT_OPEN` in the same file says whether Paddle's live account takes payments yet (Paddle
+enables its checkout once the account's onboarding is complete). While it is false, nobody whose
+week is over is locked out, and the plan page says payments open soon; set it true and deploy once
+Paddle takes payments.
 
 The script makes the product and its four prices, sets the default payment link (the plan page),
 makes the webhook and a client-side token for Paddle.js, and prints the secrets to set. Running it

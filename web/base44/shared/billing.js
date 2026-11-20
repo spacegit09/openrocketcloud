@@ -31,10 +31,24 @@ export const FREE_BEFORE = Date.parse('2026-11-15T11:30:00Z');
  */
 export const PLANS_START = '2026-11-20T10:30:00Z';
 let plansStart = PLANS_START ? Date.parse(PLANS_START) : null;
+/**
+ * Whether Paddle's live account takes payments (Paddle enables its checkout once the account's
+ * onboarding is complete). Until then nobody whose free week is over is locked out ('waiting':
+ * they keep using everything), and the plan page says payments open soon instead of offering a
+ * checkout. Set true once Paddle takes payments, and deploy: from then, someone whose week is over
+ * needs a plan at once.
+ */
+export const CHECKOUT_OPEN = false;
+let checkoutOpen = CHECKOUT_OPEN;
 
 /** For tests: plans begin at `ms` (null: not yet). */
 export function setPlansStart(ms) {
   plansStart = ms;
+}
+
+/** For tests: whether Paddle takes payments yet (CHECKOUT_OPEN). */
+export function setCheckoutOpen(open) {
+  checkoutOpen = open;
 }
 export const TRIAL_MS = 7 * 24 * 3600_000;
 /** People in a group plan, the buyer included; more places are bought one at a time. */
@@ -44,6 +58,7 @@ export const MAX_EXTRA_AT_ONCE = 100;
 /** Prices as the site shows them (Paddle charges what scripts/paddle-setup.mjs set there). */
 export const PRICES = { monthly: 1, lifetime: 5, group: 10, seat: 3, openrocket: 1 };
 export const PLAN_REQUIRED = 'plan_required';
+const PAYMENTS_SOON = 'Payments open in a day or two. Please try again then.';
 /**
  * What each function still does for someone without a plan: see their work, download their
  * designs (their listing, then the room), leave what was shared with them, and delete their work.
@@ -114,7 +129,8 @@ export function freeKind(user) {
 /**
  * What someone may do, from their records: { ok, full, kind, until, trialEnds, groupId, openrocket },
  * kind being 'admin' | 'early' | 'lifetime' | 'group' | 'monthly' | 'open' (plans have not begun) |
- * 'trial' | 'openrocket' (OpenRocket only, after their free week) | 'none' (the best they have).
+ * 'trial' | 'openrocket' (OpenRocket only, after their free week) | 'waiting' (their week is over,
+ * but Paddle does not take payments yet: CHECKOUT_OPEN) | 'none' (the best they have).
  * `ok`: they may use the site; `full`: the Launch Planner and the Logbook too.
  * `groups` are the Group records they are in, as owner or as a member let in.
  */
@@ -133,7 +149,7 @@ export function accessOf({ user, account = null, purchases = [], groups = [], no
     .sort((a, b) => (when(b.ends_at) || 0) - (when(a.ends_at) || 0))[0] ?? null;
   const openrocket = purchases.some((p) => p.kind === 'openrocket' && p.status === 'completed');
   // The OpenRocket plan counts once their free week (everything) is over.
-  const kind = free ?? (lifetime ? 'lifetime' : group ? 'group' : monthly ? 'monthly' : !begun ? 'open' : now < trialEnds ? 'trial' : openrocket ? 'openrocket' : 'none');
+  const kind = free ?? (lifetime ? 'lifetime' : group ? 'group' : monthly ? 'monthly' : !begun ? 'open' : now < trialEnds ? 'trial' : openrocket ? 'openrocket' : checkoutOpen ? 'none' : 'waiting');
   return {
     ok: kind !== 'none',
     full: kind !== 'none' && kind !== 'openrocket',
@@ -587,6 +603,8 @@ export async function billingApi(ctx, body) {
     } catch (e) {
       if (!(e instanceof PaddleError)) throw e;
       console.error('Paddle refused', e.status, e.code ?? '');
+      // The live account's checkout not enabled yet (CHECKOUT_OPEN should still be false).
+      if (e.code === 'transaction_checkout_not_enabled') fail(503, PAYMENTS_SOON);
       fail(502, 'The payment service did not answer as expected. Please try again in a minute.');
     }
   };
@@ -611,6 +629,7 @@ export async function billingApi(ctx, body) {
       if (plan === 'group' && (Number(group?.seats) || 0) > 0) fail(409, 'You already have a group. Add places to it instead.');
       if (plan === 'seat' && !((Number(group?.seats) || 0) > 0)) fail(409, 'Buy the group plan first.');
       if (plan === 'seat' && group.seats + quantity > MAX_PLACES) fail(400, `A group can have up to ${MAX_PLACES} people.`);
+      if (!checkoutOpen) fail(503, PAYMENTS_SOON);
       const p = paddle();
       return viaPaddle(async () => {
         const price = (await pricesOf(p))[plan] ?? fail(503, 'This plan is not on sale right now. Please try again later.');
@@ -714,7 +733,7 @@ async function statusOf(ctx, user, { refresh = true } = {}) {
     memberOf,
     bought: purchases.some((p) => p.status === 'completed' || LIVE.has(p.status)),
     // Paddle.js's client-side token is public (it can only open checkouts).
-    sale: ctx.paddle && ctx.paddleToken ? { sandbox: ctx.paddle.sandbox, token: ctx.paddleToken } : null,
+    sale: ctx.paddle && ctx.paddleToken && checkoutOpen ? { sandbox: ctx.paddle.sandbox, token: ctx.paddleToken } : null,
     prices: PRICES,
     groupSize: GROUP_SIZE,
   };
