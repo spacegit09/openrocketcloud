@@ -22,6 +22,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      # The web tests in scripts/test.sh need the web packages (ws), the shared code that
+      # web/scripts/prebuild.mjs copies into place, and the browser version's OpenRocket jar:
+      # scripts/build-web-jars.sh builds the jars, then runs the prebuild script.
+      - run: npm ci --no-audit --no-fund
+        working-directory: web
+      - run: scripts/build-web-jars.sh
       - run: scripts/test.sh
 
   images:
