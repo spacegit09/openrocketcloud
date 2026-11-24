@@ -3,8 +3,8 @@
 //
 // With `open`, the function is for people with a plan (shared/billing.js): someone whose free week
 // has ended gets a 402 (code plan_required) for any action not in `open`. With `full` too, the
-// function is part of the Launch Planner or the Logbook, which a plan for OpenRocket only does not
-// include (code plan_upgrade).
+// function is part of the Launch Planner, the Logbook or the Motor Designer, which a plan for
+// OpenRocket only does not include (code plan_upgrade).
 import { createClientFromRequest } from "npm:@base44/sdk";
 import { secrets } from "base44:runtime";
 import { ApiError } from "./api.js";

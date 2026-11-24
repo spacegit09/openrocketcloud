@@ -116,7 +116,7 @@ function renderNow() {
       main = card('Individual plan', 'Rocket in Cloud is yours for good. Thank you!');
       break;
     case 'openrocket':
-      main = card('OpenRocket plan', 'OpenRocket in your browser is yours for good. The Launch Planner and the Logbook come with the plans below.');
+      main = card('OpenRocket plan', 'OpenRocket in your browser is yours for good. The Launch Planner, the Logbook and the Motor Designer come with the plans below.');
       break;
     case 'group':
       main = ownsGroup()

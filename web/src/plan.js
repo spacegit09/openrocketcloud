@@ -12,7 +12,7 @@ export const PLANS = {
   monthly: { name: 'Monthly', price: 'US$1', per: 'a month', points: ['Everything in Rocket in Cloud, for one person', 'Cancel at any time'] },
   lifetime: { name: 'Individual', price: 'US$5', per: 'once', points: ['Everything in Rocket in Cloud, for one person', 'Pay once, no subscription'] },
   group: { name: 'Group', price: 'US$10', per: 'once', points: ['You and 9 people you choose, for good', 'Change the people at any time', 'More people: US$3 each, once'] },
-  openrocket: { name: 'OpenRocket', price: 'US$1', per: 'once', points: ['OpenRocket in your browser, for one person, for good', 'Without the Launch Planner and the Logbook'] },
+  openrocket: { name: 'OpenRocket', price: 'US$1', per: 'once', points: ['OpenRocket in your browser, for one person, for good', 'Without the Launch Planner, the Logbook and the Motor Designer'] },
 };
 export const SEAT_PRICE = 3;
 
@@ -44,7 +44,7 @@ export function allowClosingWall() {
 
 /**
  * Tells them they need a plan, with the way to the plans. `upgrade`: they have the OpenRocket plan,
- * which does not include what they asked for (the Launch Planner or the Logbook).
+ * which does not include what they asked for (the Launch Planner, the Logbook or the Motor Designer).
  */
 export function showPlanWall({ upgrade = false } = {}) {
   if (wall?.isConnected) return;
@@ -54,8 +54,8 @@ export function showPlanWall({ upgrade = false } = {}) {
     : [h('a', { class: 'btn', href: '/' }, 'Your designs'), plans];
   ({ dialog: wall } = upgrade
     ? modal('Not part of your plan', h('div', { class: 'plan-wall' },
-      h('p', {}, 'Your OpenRocket plan covers designing in OpenRocket. The Launch Planner and the Logbook come with the Monthly (US$1 a month), Individual (US$5 once) and Group plans.'),
-      h('p', { class: 'hint' }, 'Your designs, launch plans and logbooks are kept.')), actions)
+      h('p', {}, 'Your OpenRocket plan covers designing in OpenRocket. The Launch Planner, the Logbook and the Motor Designer come with the Monthly (US$1 a month), Individual (US$5 once) and Group plans.'),
+      h('p', { class: 'hint' }, 'Your designs, launch plans, logbooks and motors are kept.')), actions)
     : modal('Choose a plan to continue', h('div', { class: 'plan-wall' },
       h('p', {}, 'Your free week has ended. To keep designing, planning launches and keeping logbooks, choose a plan: US$1 a month, or pay once.'),
       h('p', { class: 'hint' }, 'Your work is kept, and you can still download your designs from your dashboard.')), actions));
@@ -67,8 +67,9 @@ export function showPlanWall({ upgrade = false } = {}) {
 window.addEventListener('plan-required', (e) => showPlanWall({ upgrade: e.detail?.code === 'plan_upgrade' }));
 
 /**
- * For the design, planner and logbook pages: resolves with their status if they may use the site
- * (with `full`, the Launch Planner and the Logbook, which the OpenRocket plan does not include);
+ * For the design, planner, logbook and motor pages: resolves with their status if they may use the site
+ * (with `full`, the Launch Planner, the Logbook and the Motor Designer, which the OpenRocket plan
+ * does not include);
  * otherwise shows the plans notice and never resolves. If their plan cannot be looked up, they are
  * let in (the site's functions check it too).
  */

@@ -7,7 +7,7 @@
 //   monthly    US$1 a month, a Paddle subscription they can cancel at any time
 //   lifetime   US$5 once, for one person, for good
 //   openrocket US$1 once, for one person, for good: OpenRocket only (the design page, its sharing
-//              and live co-editing), not the Launch Planner or the Logbook
+//              and live co-editing), not the Launch Planner, the Logbook or the Motor Designer
 //   group      US$10 once, for the buyer and 9 people they name by their Google address
 //   seat       US$3 once each: one more person in the buyer's group
 // Paddle (paddle.com) sells the plans as merchant of record: its checkout takes the payment and
@@ -71,9 +71,9 @@ export const OPEN_ACTIONS = {
   logbooks: ['list', 'leave', 'delete'],
 };
 export const PLAN_MESSAGE = 'Your free week has ended. Choose a plan to keep using Rocket in Cloud.';
-/** For someone whose plan is OpenRocket only, asking for the Launch Planner or the Logbook. */
+/** For someone whose plan is OpenRocket only, asking for the Launch Planner, the Logbook or the Motor Designer. */
 export const PLAN_UPGRADE = 'plan_upgrade';
-export const UPGRADE_MESSAGE = 'Your OpenRocket plan covers designing in OpenRocket. The Launch Planner and the Logbook come with the Monthly, Individual and Group plans.';
+export const UPGRADE_MESSAGE = 'Your OpenRocket plan covers designing in OpenRocket. The Launch Planner, the Logbook and the Motor Designer come with the Monthly, Individual and Group plans.';
 
 const PLANS = new Set(['monthly', 'lifetime', 'group', 'seat', 'openrocket']);
 const ONE_TIME = new Set(['lifetime', 'group', 'seat', 'openrocket']);
@@ -132,7 +132,7 @@ export function freeKind(user) {
  * kind being 'admin' | 'early' | 'lifetime' | 'group' | 'monthly' | 'open' (plans have not begun) |
  * 'trial' | 'openrocket' (OpenRocket only, after their free week) | 'waiting' (their week is over,
  * but Paddle does not take payments yet: CHECKOUT_OPEN) | 'none' (the best they have).
- * `ok`: they may use the site; `full`: the Launch Planner and the Logbook too.
+ * `ok`: they may use the site; `full`: the Launch Planner, the Logbook and the Motor Designer too.
  * `groups` are the Group records they are in, as owner or as a member let in.
  */
 export function accessOf({ user, account = null, purchases = [], groups = [], now = Date.now() }) {
@@ -747,7 +747,8 @@ const accessCache = new Map(); // user id -> { at, full }
 /**
  * For the other functions: throws a 402 (code plan_required) when the signed-in person has no
  * plan, unless `action` is one of `open` (what someone may still do without one: see and
- * download their work, leave and delete). With `full` (the Launch Planner and the Logbook), a plan
+ * download their work, leave and delete). With `full` (the Launch Planner, the Logbook and the
+ * Motor Designer), a plan
  * for OpenRocket only is not enough either: a 402 with code plan_upgrade. Someone found to have
  * what is asked is not looked up again for a minute; anyone else is looked up every time, so a
  * purchase counts at once. If their plan cannot be looked up, they are let in.

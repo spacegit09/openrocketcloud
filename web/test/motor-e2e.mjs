@@ -40,7 +40,8 @@ async function call(name, body) {
   const me = { id: user.id, email: user.email, name: user.full_name, created: user.created_date, role: user.role };
   const ctx = { db, s, me, paddle: null, paddleToken: null, files: { sign: async () => null } };
   try {
-    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name], { full: false });
+    // As the functions do (base44/functions/*/entry.ts): the motor designer's needs a plan with everything.
+    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name], { full: name === 'motorDesigns' });
     return { status: 200, json: await APIS[name](ctx, body) };
   } catch (e) {
     if (e.status) return { status: e.status, json: { error: e.message } };

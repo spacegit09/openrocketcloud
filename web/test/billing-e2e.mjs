@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
-import { designsApi, flightsApi, motorsApi } from '../base44/shared/api.js';
+import { designsApi, flightsApi, motorDesignsApi, motorsApi } from '../base44/shared/api.js';
 import {
   billingApi, forgetAccess, OPEN_ACTIONS, paddleApi, receiveWebhook, requirePlan, setCheckoutOpen, setPlansStart, signBody, TRIAL_MS,
 } from '../base44/shared/billing.js';
@@ -33,13 +33,13 @@ const SECRET = 'pdl_ntfset_e2e';
 
 setPlansStart(Date.parse('2026-01-01T00:00:00Z')); // plans began a while ago (free weeks can be made to have ended)
 setCheckoutOpen(true); // Paddle takes payments (until it does, see the check below)
-const db = fakeDb(['Design', 'Motor', 'SavedFlight', 'Logbook', 'SealedPart', 'User', 'Account', 'Purchase', 'Group']);
+const db = fakeDb(['Design', 'Motor', 'SavedFlight', 'MotorDesign', 'Logbook', 'SealedPart', 'User', 'Account', 'Purchase', 'Group']);
 const s = sealer(Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'));
 const fp = fakePaddle();
 fp.setUp();
 const paddle = paddleApi(KEY, { fetch: fp.fetch });
 let payments = true;
-const APIS = { designs: designsApi, motors: motorsApi, flights: flightsApi, logbooks: logbooksApi, billing: billingApi };
+const APIS = { designs: designsApi, motors: motorsApi, flights: flightsApi, logbooks: logbooksApi, motorDesigns: motorDesignsApi, billing: billingApi };
 const users = new Map(); // email -> Base44 user record
 
 async function person(email, { created = new Date().toISOString().replace('Z', ''), name, role = 'user' } = {}) {
@@ -55,8 +55,9 @@ async function call(name, user, body) {
   const me = { id: user.id, email: user.email, name: user.full_name, created: user.created_date, role: user.role };
   const ctx = { db, s, me, paddle: payments ? paddle : null, paddleToken: payments ? 'test_e2e000000000000000000000' : null, files: { sign: async () => null } };
   try {
-    // As the functions do (base44/functions/*/entry.ts): the planner's and the logbook's need a plan with everything.
-    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name], { full: name === 'flights' || name === 'logbooks' });
+    // As the functions do (base44/functions/*/entry.ts): the planner's, the logbook's and the motor
+    // designer's need a plan with everything.
+    if (OPEN_ACTIONS[name]) await requirePlan(ctx, String(body?.action ?? ''), OPEN_ACTIONS[name], { full: ['flights', 'logbooks', 'motorDesigns'].includes(name) });
     return { status: 200, json: await APIS[name](ctx, body) };
   } catch (e) {
     if (e.status) return { status: e.status, json: { error: e.message, ...(e.code ? { code: e.code } : {}) } };
@@ -296,7 +297,7 @@ try {
     await page.close();
   });
 
-  await check('OpenRocket plan: designs work; the planner and the logbook say they are not included', async () => {
+  await check('OpenRocket plan: designs and custom motors work; the planner, the logbook and the motor designer say they are not included', async () => {
     const ora = await person('ora@gmail.com', { name: 'Ora Orbit' });
     await call('billing', ora, { action: 'status' });
     await endTrial('ora@gmail.com');
@@ -307,16 +308,22 @@ try {
     assert.equal(refusedFlight.status, 402);
     assert.equal(refusedFlight.json.code, 'plan_upgrade');
     assert.equal((await call('flights', ora, { action: 'list' })).status, 200, 'their launch plans stay theirs to see');
+    const refusedMotor = await call('motorDesigns', ora, { action: 'create', name: 'L1729', summary: 'L1729', data: '{}' });
+    assert.equal(refusedMotor.status, 402);
+    assert.equal(refusedMotor.json.code, 'plan_upgrade');
+    assert.equal((await call('motorDesigns', ora, { action: 'list' })).status, 200, 'their motors stay theirs to see');
+    assert.equal((await call('motors', ora, { action: 'list' })).status, 200, 'custom motors are part of OpenRocket');
     const account = await open('/account.html', 'ora@gmail.com');
     await waitText(account, '#now', /OpenRocket plan/);
     await waitText(account, '.plan-card[data-plan=openrocket]', /Your plan/);
     await shot(account, 'account-openrocket', true);
     await account.close();
-    for (const path of ['/planner.html', '/logbook.html']) {
+    for (const path of ['/planner.html', '/logbook.html', '/motor.html']) {
       const page = await open(path, 'ora@gmail.com');
       await page.waitForSelector('dialog.plan-wall-dialog[open]');
       await waitText(page, 'dialog.plan-wall-dialog', /Not part of your plan/);
       if (path === '/planner.html') await shot(page, 'planner-openrocket-only');
+      if (path === '/motor.html') await shot(page, 'motor-openrocket-only');
       await page.close();
     }
   });
@@ -340,7 +347,7 @@ try {
     await page.waitForSelector('dialog.plan-wall-dialog[open]');
     await clickText(page, 'dialog.plan-wall-dialog button', /Not now/);
     // The planner and logbook links, Share and Motors.
-    for (const sel of ['.page-head a[href="/planner.html"]', '.page-head a[href="/logbook.html"]', '#motors-btn']) {
+    for (const sel of ['.page-head a[href="/planner.html"]', '.page-head a[href="/logbook.html"]', '.page-head a[href="/motor.html"]', '#motors-btn']) {
       await page.click(sel);
       await page.waitForSelector('dialog.plan-wall-dialog[open]');
       assert.match(page.url(), /localhost:\d+\/$/);
@@ -353,7 +360,7 @@ try {
     assert.equal(r.status, 402);
     assert.equal(r.json.code, 'plan_required');
     await page.close();
-    for (const path of [`/design.html?id=${d.id}`, '/planner.html', '/logbook.html']) {
+    for (const path of [`/design.html?id=${d.id}`, '/planner.html', '/logbook.html', '/motor.html']) {
       const p = await open(path, 'lapsed@gmail.com');
       await p.waitForSelector('dialog.plan-wall-dialog[open]', { timeout: 20_000 });
       assert.match(await text(p, 'dialog.plan-wall-dialog'), /free week has ended/);
