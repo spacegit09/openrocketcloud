@@ -178,7 +178,10 @@ and Kn, Pressure, Performance, Nozzle Design, Output and Propellant data workshe
 [JSRM](https://github.com/jbgust/jsrm) 3.3 (GPL-3.0), the Java version of SRM that METEOR
 (<https://meteor.open-sky.fr>) runs, with SRM_2023's propellants; it runs in the browser through
 CheerpJ (`orcloud.bridge.MotorMain` and `MotorLab`, in `worker/bridge/web`), built from JSRM's source
-at a pinned commit by `scripts/build-web-jars.sh`. The worksheets' own cells (the Kn table, the
+at a pinned commit by `scripts/build-web-jars.sh`. One change is applied first,
+`scripts/jsrm-reuse-cross-section.patch`: shaped grains draw each burned-back cross-section twice
+per calculation line instead of three times (a star grain a quarter quicker), and every result
+stays byte-for-byte the same as unpatched JSRM's. The worksheets' own cells (the Kn table, the
 throat that gives the target pressure, the nozzle's lengths, the thrust-time table) are worked out
 as the spreadsheet does, in `web/src/motor/srm.js`; `web/test/srm.test.mjs` checks them against the
 values saved in SRM_2023.xls, and `web/test/motor-e2e.mjs` checks that JSRM in the browser answers as

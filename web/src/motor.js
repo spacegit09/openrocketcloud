@@ -197,7 +197,7 @@ async function recalc() {
 async function calculate() {
   const mine = ++generation;
   const m = structuredClone(model);
-  const slow = ['finocyl', 'star', 'cSlot'].includes(m.grain.type) ? ' (this grain shape takes 10 to 20 seconds)' : '';
+  const slow = ['finocyl', 'star'].includes(m.grain.type) ? ' (this grain shape can take 10 seconds or more)' : '';
   status(started ? `Calculating…${slow}` : 'Starting the calculator (the first time takes a few seconds)…', 'busy');
   try {
     check(m);
@@ -648,7 +648,7 @@ function propellantSheet() {
       h('tbody', {}, ...p.burn.map(([from, a, n], i) => h('tr', {}, h('td', {}, `${fmt(from, 3)} to ${fmt(p.burn[i + 1]?.[0] ?? p.burnUpTo, 3)}`),
         h('td', { class: 'num' }, fmt(a, 3)), h('td', { class: 'num' }, fmt(n, 4)))))),
     h('p', { class: 'wb-note' }, 'Conditions for these burn rates (SRM_2023, Burnrate worksheet): KNSB fine, KNDX, KNFR and KNSU with the oxidizer finely milled (mostly 60 to 125 µm); KNSB, KNMN and KNER coarse with it granular or lightly milled (mostly 150 to 250 µm); grain temperature 20 °C. Coarse burn rates courtesy Magnus Gudnason; KNPSB’s from static tests.'),
-    h('p', { class: 'wb-note' }, 'Calculation: JSRM 3.3 (github.com/jbgust/jsrm), the Java version of Richard Nakka’s SRM_2023 spreadsheet that METEOR runs. Hollow-cylinder (BATES) grains are SRM’s own model; the other grain shapes are METEOR’s (JSRM’s geometry), which SRM does not cover. Predictions, not guarantees: test a motor statically before flying it.'),
+    h('p', { class: 'wb-note' }, 'Calculation: JSRM 3.3 (github.com/jbgust/jsrm), the Java version of Richard Nakka’s SRM_2023 spreadsheet that METEOR runs, with one change of ours that makes shaped grains quicker and leaves every result the same. Hollow-cylinder (BATES) grains are SRM’s own model; the other grain shapes are METEOR’s (JSRM’s geometry), which SRM does not cover. Predictions, not guarantees: test a motor statically before flying it.'),
   ];
 }
 

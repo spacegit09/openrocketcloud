@@ -1,0 +1,57 @@
+Rocket in Cloud's one change to JSRM v3.3 (github.com/jbgust/jsrm, GPL-3.0), 24 November 2026.
+Applied by scripts/build-web-jars.sh before JSRM is built; jsrm-web.jar carries this file in META-INF.
+
+Why: for a shaped grain (C-slot, finocyl, moon burner, star), JSRM redraws the grain's burned-back
+cross-section with java.awt.geom at every calculation line. A simulation first asks for every
+cross-section area (for the grain volume) and later for every burning area, so each cross-section
+was drawn three times: once for its area, then again with the one 0.001 mm further on for the
+burning area. Now the burning area is worked out the first time, measuring the same cross-section
+on the way, and both numbers are kept: two drawings per line instead of three.
+
+Results: none change. Every number JSRM gives, for the eight test motors of
+web/test/fixtures/jsrm-native.json (every grain shape and propellant), simulations and Kn-table
+areas alike, is byte-for-byte the same as unpatched JSRM's (in Java 17). In the browser (CheerpJ, Chrome, median of three): star 17.5 s -> 13.1 s,
+finocyl 11.2 s -> 9.3 s, C-slot and moon burner 2.6 s -> 2.4 s.
+
+diff --git a/src/main/java/com/github/jbgust/jsrm/application/motor/grain/core/ExtrudedShapeGrain.java b/src/main/java/com/github/jbgust/jsrm/application/motor/grain/core/ExtrudedShapeGrain.java
+index 6b26258..434e307 100644
+--- a/src/main/java/com/github/jbgust/jsrm/application/motor/grain/core/ExtrudedShapeGrain.java
++++ b/src/main/java/com/github/jbgust/jsrm/application/motor/grain/core/ExtrudedShapeGrain.java
+@@ -29,7 +29,7 @@ public abstract class ExtrudedShapeGrain extends ExtrudedGrain implements GrainC
+ 
+ 	@Override
+ 	public double getBurningArea(double burnProgression) {
+-		return getNumberOfSegments() * surfaceArea(burnProgression*webThickness());
++		return getNumberOfSegments() * getCachedSurfaceArea(burnProgression*webThickness());
+ 	}
+ 
+ 	@Override
+@@ -58,6 +58,9 @@ public abstract class ExtrudedShapeGrain extends ExtrudedGrain implements GrainC
+ 		if (burn.isEmpty())
+ 			return zero;
+ 
++		// Rocket in Cloud: measure this cross-section now, before the subtraction changes it (see getCachedArea).
++		areaCache.computeIfAbsent(regression, currentRegression -> ShapeUtil.area(burn));
++
+ 		burn.subtract(getCrossSection(regression + .001));
+ 
+ 		double sides = ShapeUtil.perimeter(burn) / 2 * rLen;
+@@ -71,8 +74,18 @@ public abstract class ExtrudedShapeGrain extends ExtrudedGrain implements GrainC
+ 	}
+ 
+ 	private Map<Double, Double> areaCache = new HashMap<>();
++	private Map<Double, Double> surfaceAreaCache = new HashMap<>();
++
++	private double getCachedSurfaceArea(double regression) {
++		return surfaceAreaCache.computeIfAbsent(regression, this::surfaceArea);
++	}
+ 
+ 	private double getCachedArea(double regression) {
++		// Rocket in Cloud: a simulation asks for every cross-section area (for the grain volume) before any
++		// burning area, so each cross-section was built once for its area and again for its burning area.
++		// Working out the burning area first measures the same cross-section on the way, and keeps both.
++		if (!areaCache.containsKey(regression))
++			getCachedSurfaceArea(regression);
+ 		return areaCache.computeIfAbsent(regression, currentRegression -> ShapeUtil.area(getCrossSection(regression)));
+ 	}
+ 
