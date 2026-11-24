@@ -67,6 +67,7 @@ export const OPEN_ACTIONS = {
   designs: ['list', 'get', 'leave', 'delete', 'preview'],
   motors: ['list', 'delete'],
   flights: ['list', 'delete'],
+  motorDesigns: ['list', 'delete'],
   logbooks: ['list', 'leave', 'delete'],
 };
 export const PLAN_MESSAGE = 'Your free week has ended. Choose a plan to keep using Rocket in Cloud.';

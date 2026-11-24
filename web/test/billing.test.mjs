@@ -237,7 +237,8 @@ test('people from before plans began, and admins, keep using it free', async () 
   assert.equal((await early.actor()).kind, 'early');
   // The last moment before plans, and the first moment after.
   assert.equal((await (await person('last@example.com', { created: '2026-11-15T11:29:59.999000' })).status()).access.kind, 'early');
-  assert.equal((await (await person('first@example.com', { created: '2026-11-15T11:30:00.000000' })).status()).access.kind, 'trial');
+  // (Not early: its free week counts from then, whatever it is now.)
+  assert.notEqual((await (await person('first@example.com', { created: '2026-11-15T11:30:00.000000' })).status()).access.kind, 'early');
   const admin = await person('admin@example.com', { role: 'admin' });
   assert.equal((await admin.status()).access.kind, 'admin');
   await admin.gate('create');

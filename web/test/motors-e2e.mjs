@@ -20,6 +20,7 @@ import { startHub } from './hub.mjs';
 import { importOrk } from '../src/lib/ork.js';
 import { readZip } from '../src/lib/zip.js';
 import { toJson } from '../../server/src/model.js';
+import { engFile } from '../src/motor/srm.js';
 
 const HUB = 8790;
 const WEB = 5186;
@@ -34,15 +35,15 @@ const motorFile = (name) => ({ name, content: readFileSync(join(corpus, name), '
 // KN38-I310 by RocketClub (worker/bridge/test/motors/valid.eng), named as OpenRocket names it.
 const jar = new Uint8Array(readFileSync(join(import.meta.dirname, '..', 'public', 'or', 'OpenRocket-web.jar')));
 const example = (await readZip(jar)).find((e) => e.name === 'datafiles/examples/A simple model rocket.ork').data;
-async function design({ custom = true, digest = null } = {}) {
+async function design({ custom = true, digest = null, motor = ['RocketClub', 'KN38-I310', '0.038', '0.33', '6.0'] } = {}) {
   const m = await importOrk(example);
   if (!custom) return { model: m };
   const [mountId, mount] = [...m.objs].find(([, o]) => o.v.get('motormount')?.includes('<motor '));
   const xml = mount.v.get('motormount');
   const configId = /<motor configid="([^"]+)">/.exec(xml)[1];
   mount.v.set('motormount', xml.replace(/<motor configid="[^"]+">.*?<\/motor>/, `<motor configid="${configId}">`
-    + `<manufacturer>RocketClub</manufacturer>${digest ? `<digest>${digest}</digest>` : ''}<designation>KN38-I310</designation>`
-    + '<diameter>0.038</diameter><length>0.33</length><delay>6.0</delay></motor>'));
+    + `<manufacturer>${motor[0]}</manufacturer>${digest ? `<digest>${digest}</digest>` : ''}<designation>${motor[1]}</designation>`
+    + `<diameter>${motor[2]}</diameter><length>${motor[3]}</length><delay>${motor[4]}</delay></motor>`));
   const sims = [...m.objs].filter(([, o]) => o.t === 'simulation').map(([id]) => id);
   return { model: m, mountId, configId, sims };
 }
@@ -55,6 +56,9 @@ const messy = {
     .map((l, i) => (i === 0 ? `${l} ; header` : i === 3 ? `${l}   ; peak` : l)).join('\r\n')}\r\n   \r\n`,
 };
 const everyFile = readdirSync(corpus).filter((f) => /\.(eng|rse)$/.test(f)).map(motorFile);
+// A motor from the motor designer (motor.html): SRM_2023's example as the page writes its .eng file.
+const designed = engFile(JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'jsrm-srm2023-example.json'), 'utf8')),
+  { name: '', diameter: 83, length: 560, delays: 'P', hardwareMass: 1.9, manufacturer: 'Custom' });
 
 const cases = {
   // The motor's file is not in the design: OpenRocket asks, then opens the design without it.
@@ -65,6 +69,8 @@ const cases = {
   changed: { design: await design({ digest: '0123456789abcdef0123456789abcdef' }), motors: [motorFile('valid.eng')], asks: true },
   // Its file is one OpenRocket cannot read (stored before uploads were checked): OpenRocket asks.
   unreadable: { design: await design(), motors: [motorFile('manufacturer-with-space.eng')], asks: true, keepsMotor: true },
+  // A motor from the motor designer, used in the design: OpenRocket finds it in its file, no question.
+  designed: { design: await design({ motor: ['Custom', 'L1729', '0.083', '0.56', 'none'] }), motors: [{ name: designed.filename, content: designed.text }], asks: false },
   // Every file of the corpus at once, half of them unreadable, with a design using none: starts.
   corpus: { design: await design({ custom: false }), motors: everyFile, asks: false },
   // Two people: a has the motor's file, b does not. b's session must not change the motor or the

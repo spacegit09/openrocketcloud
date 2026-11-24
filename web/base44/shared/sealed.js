@@ -86,6 +86,9 @@ export function sealer(secret) {
 // Motor record: { owner, ref, sealed } with sealed = { filename, content, summary }
 // SavedFlight record: { owner, ref, sealed } with sealed = { name, design_id, design_name,
 //   launch_time, summary, data }
+// MotorDesign record: { owner, sealed } with sealed = { name, summary, data, motor_id } (a motor from
+//   the motor designer: its worksheets' inputs and results, and the Motor record it was added to
+//   OpenRocket as, if it was)
 //   owner  the lookup key of the person it belongs to
 //   ref    for a record moved from before records were sealed, its old id (links to it still work)
 
@@ -154,5 +157,21 @@ export async function readFlight(s, r) {
 export async function flightFields(s, ownerEmail, f) {
   const p = {};
   for (const k of FLIGHT_FIELDS) p[k] = f[k] ?? null;
+  return { owner: await s.lookupKey(ownerEmail), sealed: await s.seal(p) };
+}
+
+const MOTOR_DESIGN_FIELDS = ['name', 'summary', 'data', 'motor_id'];
+
+/** A MotorDesign record as the site sees it: { id, name, summary, data, motor_id, created_date, updated_date }. */
+export async function readMotorDesign(s, r) {
+  const p = await s.open(r.sealed);
+  const out = { id: r.id };
+  for (const k of MOTOR_DESIGN_FIELDS) out[k] = p[k] ?? null;
+  return { ...out, created_date: r.created_date, updated_date: r.updated_date };
+}
+
+export async function motorDesignFields(s, ownerEmail, f) {
+  const p = {};
+  for (const k of MOTOR_DESIGN_FIELDS) p[k] = f[k] ?? null;
   return { owner: await s.lookupKey(ownerEmail), sealed: await s.seal(p) };
 }

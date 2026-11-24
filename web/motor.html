@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Motor Designer — Rocket in Cloud</title>
+  <link rel="icon" type="image/png" href="/favicon.png?v=2">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
+  <link rel="preload" href="https://cjrtnc.leaningtech.com/5.0/loader.js" as="script">
+</head>
+<body class="motor-page">
+  <header class="topbar">
+    <a class="brand" href="/"><picture><source srcset="/logo-dark.png?v=2" media="(prefers-color-scheme: dark)"><img class="logo" src="/logo.png?v=2" alt=""></picture>Rocket in Cloud</a>
+    <a class="crumb" href="/motor.html">Motor Designer</a>
+    <span class="spacer"></span>
+    <span class="me" id="me" hidden></span>
+  </header>
+
+  <main class="page" id="motors" hidden>
+    <div class="page-head">
+      <h2>Your motors</h2>
+      <span class="spacer"></span>
+      <input class="search" id="motor-search" type="search" placeholder="Search motors" aria-label="Search motors">
+      <a class="btn" href="/" title="Your OpenRocket designs"><span data-icon="rocket"></span>Your designs</a>
+      <a class="btn" href="/planner.html" title="Your launch plans"><span data-icon="target"></span>Launch planner</a>
+      <a class="btn" href="/logbook.html" title="Your flight logbooks"><span data-icon="book"></span>Logbook</a>
+      <a class="btn primary" href="/motor.html?new"><span data-icon="plus"></span>New motor</a>
+    </div>
+    <p class="motor-intro">Design a solid rocket motor with Richard Nakka’s SRM method: the same worksheets, the same numbers. Save it, then use it in OpenRocket or download it as an .eng file.</p>
+    <div class="grid" id="motor-grid"></div>
+    <div class="empty" id="motors-empty" hidden>
+      <h3>No motors yet</h3>
+      <p>Start from SRM’s example motor, change the propellant, the grain and the nozzle, and see its chamber pressure, thrust and impulse.</p>
+      <a class="btn primary" href="/motor.html?new"><span data-icon="plus"></span>New motor</a>
+    </div>
+  </main>
+
+  <div class="workbook" id="workbook" hidden>
+    <div class="wb-bar">
+      <a class="btn ghost" id="all-motors" href="/motor.html" title="All your motors"><span data-icon="back"></span>Motors</a>
+      <input class="wb-name" id="motor-name" type="text" maxlength="200" aria-label="Motor name" placeholder="Motor name">
+      <span class="wb-status" id="status" role="status"></span>
+      <span class="spacer"></span>
+      <button class="ghost" id="download-eng" type="button" title="Download the motor as a RASP .eng file"><span data-icon="download"></span>.eng</button>
+      <button id="use-openrocket" type="button" title="Add the motor to your custom motors, for OpenRocket's motor selector"><span data-icon="flame"></span>Use in OpenRocket</button>
+      <button class="primary" id="save" type="button"><span data-icon="check"></span>Save</button>
+    </div>
+    <div class="wb-sheet" id="sheet"></div>
+    <nav class="wb-tabs" id="tabs" aria-label="Worksheets"></nav>
+  </div>
+
+  <main class="page" id="signed-out" hidden>
+    <h2>Motor Designer</h2>
+    <p>Sign in on the <a href="/">home page</a> to design rocket motors.</p>
+  </main>
+
+  <script type="module" src="/src/motor.js"></script>
+</body>
+</html>

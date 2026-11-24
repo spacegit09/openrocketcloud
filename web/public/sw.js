@@ -3,11 +3,11 @@
 // as new with each release, so without this a returning browser fetched OpenRocket's ~20 MB again
 // (about 120 requests) whenever it had been away an hour or the site had been released.
 //
-// Only the versioned jars the pages load are kept (web/src/lib/jars.js): OpenRocket-web.jar?v=HASH
-// and orcloud-web-HASH.jar, named after their contents, so a kept copy always belongs to exactly
-// that file; a new version is fetched afresh and older ones are dropped. They are kept in 128 KB
-// blocks, the pieces OpenRocket's runtime (CheerpJ) reads them in, and each request for a range is
-// answered from the blocks, fetching only the missing ones. Every other request goes to the network
+// Only the versioned jars the pages load are kept (web/src/lib/jars.js): OpenRocket-web.jar?v=HASH,
+// orcloud-web-HASH.jar and the motor designer's jsrm-web-HASH.jar, named after their contents, so a
+// kept copy always belongs to exactly that file; a new version is fetched afresh and older ones are
+// dropped. They are kept in 128 KB blocks, the pieces OpenRocket's runtime (CheerpJ) reads them in,
+// and each request for a range is answered from the blocks, fetching only the missing ones. Every other request goes to the network
 // as usual, and so does anything unexpected here.
 
 const CACHE = 'or-jars-1';
@@ -23,7 +23,7 @@ function versioned(url) {
   if (url.pathname === '/or/OpenRocket-web.jar' && /^[0-9a-f]{8,64}$/.test(url.searchParams.get('v') ?? '')) {
     return { family: 'OpenRocket-web', version: `${url.pathname}?v=${url.searchParams.get('v')}` };
   }
-  const m = /^\/or\/(orcloud-web)-[0-9a-f]{8,64}\.jar$/.exec(url.pathname);
+  const m = /^\/or\/(orcloud-web|jsrm-web)-[0-9a-f]{8,64}\.jar$/.exec(url.pathname);
   return m && !url.search ? { family: m[1], version: url.pathname } : null;
 }
 

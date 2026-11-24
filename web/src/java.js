@@ -7,6 +7,7 @@ import { view3dNatives } from './view3d.js';
 import { markFileWindow } from './cj-windows.js';
 import { latestPlacement, menuRowNatives } from './menu-row.js';
 import { labNatives } from './flight/lab-natives.js';
+import { motorNatives } from './motor/natives.js';
 import { CLASSPATH, OPENROCKET_JAR, OPENROCKET_STARTUP } from './lib/jars.js';
 
 const CHEERPJ = 'https://cjrtnc.leaningtech.com/5.0/loader.js';
@@ -170,7 +171,7 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
     // Runtime files to fetch up front (recorded with cjGetRuntimeResources): Java threads then never
     // wait on the network halfway through loading a class, which CheerpJ handles badly.
     const [preload] = await Promise.all([
-      fetch(preloadUrl).then((r) => (r.ok ? r.json() : undefined)).catch(() => undefined),
+      preloadUrl ? fetch(preloadUrl).then((r) => (r.ok ? r.json() : undefined)).catch(() => undefined) : undefined,
       loadScript(CHEERPJ),
     ]);
     // CheerpJ's Java 17 lacks the natives behind reflection's type annotations (used by Guice only
@@ -178,7 +179,7 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
     const noTypeAnnotations = async () => null;
     await window.cheerpjInit({
       version: 17,
-      preloadResources: preload,
+      preloadResources: preload ?? {},
       preloadProgress: (done, total) => {
         download = { done, total };
         for (const listener of downloadListeners) listener(download);
@@ -245,6 +246,7 @@ export function prepareJava(designId, { preload: preloadUrl = '/or/preload.json'
         ...view3dNatives,
         ...menuRowNatives,
         ...labNatives,
+        ...motorNatives,
       },
     });
   })();

@@ -1,12 +1,15 @@
-// What the site may do with designs, motors and saved launch plans, checked here for the signed-in
-// person. Design, Motor and SavedFlight records hold only sealed data (sealed.js) and are closed to
-// direct access, so the backend functions (functions/designs, functions/motors, functions/flights)
+// What the site may do with designs, motors, saved launch plans and the motor designer's motors,
+// checked here for the signed-in person. Design, Motor, SavedFlight and MotorDesign records hold only
+// sealed data (sealed.js) and are closed to direct access, so the backend functions (functions/designs,
+// functions/motors, functions/flights, functions/motorDesigns)
 // are the only way in; they are thin wrappers around these handlers, which test/api.test.mjs runs
 // against an in-memory stand-in for Base44.
 //   ctx = { db: service-role entities, s: sealer(DATA_KEY), me: { id, email (lower case), name } }
 import { withParts } from './parts.js';
 import { cleanPreview } from './preview.js';
-import { designFields, flightFields, motorFields, readDesign, readFlight, readMotor, roleIn } from './sealed.js';
+import {
+  designFields, flightFields, motorDesignFields, motorFields, readDesign, readFlight, readMotor, readMotorDesign, roleIn,
+} from './sealed.js';
 
 export class ApiError extends Error {
   constructor(status, message) {
@@ -24,6 +27,7 @@ const ROLES = new Set(['editor', 'viewer']);
 const MAX_PEOPLE = 200;
 const MAX_MOTOR_CHARS = 2_000_000;
 const MAX_FLIGHT_CHARS = 8_000_000;
+const MAX_MOTOR_DESIGN_CHARS = 2_000_000;
 const NOT_FOUND = 'Design not found. It may have been deleted, or it is not shared with you.';
 
 /** A new design's id: 24 random hex digits, like the record ids designs had before (rooms, links). */
@@ -253,6 +257,60 @@ export async function flightsApi({ db: raw, s, me }, body) {
     case 'delete': {
       const { r } = await find(body.id);
       await db.SavedFlight.delete(r.id);
+      return { ok: true };
+    }
+    default:
+      return fail(400, 'Unknown action.');
+  }
+}
+
+/** The signed-in person's motors from the motor designer: list, get, create, update, rename, delete. */
+export async function motorDesignsApi({ db: raw, s, me }, body) {
+  const db = withParts(raw);
+  const key = await s.lookupKey(me.email);
+  const find = async (id) => {
+    const r = id ? await db.MotorDesign.get(String(id)).catch(() => null) : null;
+    if (!r || r.owner !== key) fail(404, 'That motor no longer exists.');
+    return { r, f: await readMotorDesign(s, r) };
+  };
+  const fields = (b, keep = {}) => {
+    const f = { ...keep };
+    if ('name' in b || !('name' in keep)) f.name = cleanName(b.name);
+    if ('summary' in b) f.summary = b.summary == null ? null : String(b.summary).slice(0, 500);
+    if ('motor_id' in b) f.motor_id = b.motor_id == null ? null : String(b.motor_id).slice(0, 100);
+    if ('data' in b) {
+      const data = String(b.data ?? '');
+      if (!data || data.length > MAX_MOTOR_DESIGN_CHARS) fail(400, 'The motor is empty or too large.');
+      f.data = data;
+    }
+    if (!f.data) fail(400, 'The motor is empty or too large.');
+    return f;
+  };
+  switch (body?.action) {
+    case 'list': {
+      const rows = (await db.MotorDesign.filter({ owner: key }, '-updated_date', 200)).filter((r) => r.owner === key);
+      return Promise.all(rows.map((r) => readMotorDesign(s, r)));
+    }
+    case 'get':
+      return (await find(body.id)).f;
+    case 'create': {
+      const r = await db.MotorDesign.create(await motorDesignFields(s, me.email, fields(body)));
+      return readMotorDesign(s, r);
+    }
+    case 'update': {
+      const { r, f } = await find(body.id);
+      const { name, ...rest } = body;
+      const updated = await db.MotorDesign.update(r.id, await motorDesignFields(s, me.email, fields(rest, f)));
+      return readMotorDesign(s, { ...r, ...updated });
+    }
+    case 'rename': {
+      const { r, f } = await find(body.id);
+      const updated = await db.MotorDesign.update(r.id, await motorDesignFields(s, me.email, { ...f, name: cleanName(body.name) }));
+      return readMotorDesign(s, { ...r, ...updated });
+    }
+    case 'delete': {
+      const { r } = await find(body.id);
+      await db.MotorDesign.delete(r.id);
       return { ok: true };
     }
     default:

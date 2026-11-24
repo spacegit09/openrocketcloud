@@ -4,7 +4,7 @@
 // refuses a record with more than MAX_RECORD characters (measured on 2026-11-14 at about 20,000).
 export const MAX_RECORD = 20_000;
 
-export function fakeDb(names = ['Design', 'Motor', 'SavedFlight', 'Logbook', 'SealedPart', 'User']) {
+export function fakeDb(names = ['Design', 'Motor', 'SavedFlight', 'MotorDesign', 'Logbook', 'SealedPart', 'User']) {
   let clock = Date.parse('2026-01-01T00:00:00Z');
   const now = () => new Date((clock += 1000)).toISOString();
   const size = (r) => Object.values(r).reduce((n, v) => n + (typeof v === 'string' ? v.length : JSON.stringify(v ?? '').length), 0);

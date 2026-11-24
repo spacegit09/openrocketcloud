@@ -137,7 +137,7 @@ and live sharing. Nothing runs on your own computer or server.
 Build and deploy (needs Docker, Node 20+ and the Base44 CLI: `npm install -g base44`):
 
 ```bash
-scripts/build-web-jars.sh       # OpenRocket-web.jar and orcloud-web.jar into web/public/or/
+scripts/build-web-jars.sh       # OpenRocket-web.jar, orcloud-web.jar and jsrm-web.jar into web/public/or/
 cd web && npm install
 base44 login
 base44 link --create --name "My OpenRocket"   # once per checkout
@@ -169,6 +169,24 @@ compressed before they are encrypted, and any still longer than 12,000 character
 big launch plans and motor files, detailed drawings, photo previews) are kept in `SealedPart`
 records of 12,000 characters each (`web/base44/shared/parts.js`); the tests' stand-in for Base44
 refuses big records the same way.
+
+### Motor Designer
+
+`web/motor.html` designs solid rocket motors with Richard Nakka's SRM method
+(<https://www.nakka-rocketry.net/softw.html#SRM>), laid out as his SRM_2023 spreadsheet is: its Data
+and Kn, Pressure, Performance, Nozzle Design, Output and Propellant data worksheets. The calculation is
+[JSRM](https://github.com/jbgust/jsrm) 3.3 (GPL-3.0), the Java version of SRM that METEOR
+(<https://meteor.open-sky.fr>) runs, with SRM_2023's propellants; it runs in the browser through
+CheerpJ (`orcloud.bridge.MotorMain` and `MotorLab`, in `worker/bridge/web`), built from JSRM's source
+at a pinned commit by `scripts/build-web-jars.sh`. The worksheets' own cells (the Kn table, the
+throat that gives the target pressure, the nozzle's lengths, the thrust-time table) are worked out
+as the spreadsheet does, in `web/src/motor/srm.js`; `web/test/srm.test.mjs` checks them against the
+values saved in SRM_2023.xls, and `web/test/motor-e2e.mjs` checks that JSRM in the browser answers as
+JSRM in Java (`web/test/fixtures/jsrm-native.json`). Grains are SRM's hollow cylinder (BATES) and
+METEOR's other shapes (C-slot, end burner, finocyl, moon burner, rod and tube, star), whose geometry
+is JSRM's, not SRM's. Motors are saved sealed (`MotorDesign` records, `motorDesigns` function),
+download as RASP .eng files, and go into OpenRocket's motor selector as custom motors. It comes with
+every plan, the OpenRocket plan included.
 
 ### Plans and payments
 

@@ -3,7 +3,7 @@
 // the clear.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ApiError, designsApi, flightsApi, motorsApi } from '../base44/shared/api.js';
+import { ApiError, designsApi, flightsApi, motorDesignsApi, motorsApi } from '../base44/shared/api.js';
 import { readDesign, sealer } from '../base44/shared/sealed.js';
 import { fakeDb, MAX_RECORD } from './fake-base44.mjs';
 
@@ -20,7 +20,7 @@ function setup() {
     };
     const ready = account ? join() : Promise.resolve();
     const call = (api) => async (body) => (await ready, api({ db, s, me }, body));
-    return { designs: call(designsApi), motors: call(motorsApi), flights: call(flightsApi), join, me };
+    return { designs: call(designsApi), motors: call(motorsApi), flights: call(flightsApi), motorDesigns: call(motorDesignsApi), join, me };
   };
   return {
     db, s, ids,
@@ -255,4 +255,30 @@ test('big values are kept in parts: a big launch plan, motor file and drawing sa
   await mina.motors({ action: 'delete', id: m.id });
   await mina.designs({ action: 'delete', id: d.id });
   assert.equal(db.SealedPart.rows.size, 0);
+});
+
+test('motor designs: each person sees and changes only their own, and nothing is stored in the clear', async () => {
+  const { db, mina, joon } = setup();
+  const MOTOR = { name: 'Club L motor', summary: 'L1729 · KNDX · Hollow cylinder (BATES) × 4', data: JSON.stringify({ propellant: 'KNDX' }) };
+  const m = await mina.motorDesigns({ action: 'create', ...MOTOR });
+  assert.equal(m.name, 'Club L motor');
+  assert.equal(m.motor_id, null);
+  assert.deepEqual((await mina.motorDesigns({ action: 'list' })).map((x) => x.id), [m.id]);
+  assert.deepEqual(await joon.motorDesigns({ action: 'list' }), []);
+  for (const action of ['get', 'update', 'rename', 'delete']) {
+    await assert.rejects(joon.motorDesigns({ action, id: m.id, name: 'x', data: 'x' }), refused(404), action);
+  }
+  const updated = await mina.motorDesigns({ action: 'update', id: m.id, name: 'ignored', summary: 'L1700', data: '{"propellant":"KNSU"}', motor_id: 'abc123' });
+  assert.equal(updated.name, 'Club L motor', 'update keeps the name');
+  assert.equal(updated.motor_id, 'abc123');
+  assert.equal((await mina.motorDesigns({ action: 'rename', id: m.id, name: ' L for the club ' })).name, 'L for the club');
+  const got = await mina.motorDesigns({ action: 'get', id: m.id });
+  assert.deepEqual([got.data, got.motor_id], ['{"propellant":"KNSU"}', 'abc123'], 'renaming keeps the rest');
+  await assert.rejects(mina.motorDesigns({ action: 'create', ...MOTOR, data: '' }), refused(400));
+  await assert.rejects(mina.motorDesigns({ action: 'create', ...MOTOR, name: ' ' }), refused(400));
+  const stored = JSON.stringify([...db.MotorDesign.rows.values()]);
+  for (const clear of ['Club', 'KNSU', 'mina@example.com', 'abc123']) assert.ok(!stored.includes(clear), `${clear} stored in the clear`);
+  await mina.motorDesigns({ action: 'delete', id: m.id });
+  assert.deepEqual(await mina.motorDesigns({ action: 'list' }), []);
+  await assert.rejects(mina.motorDesigns({ action: 'get', id: m.id }), refused(404));
 });

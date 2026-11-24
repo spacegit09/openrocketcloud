@@ -1,0 +1,26 @@
+// A motor from the motor designer (its worksheets' inputs and results), sealed
+// (web/base44/shared/sealed.js). Only its owner sees it, through the motorDesigns function.
+{
+  "name": "MotorDesign",
+  "type": "object",
+  "description": "A motor from the motor designer (encrypted)",
+  "properties": {
+    "owner": {
+      "type": "string",
+      "description": "Keyed fingerprint of the owner's email address (not reversible)"
+    },
+    "sealed": {
+      "type": "string",
+      "description": "Encrypted name, summary, worksheets and the custom motor it was added as (AES-256-GCM with the app's DATA_KEY secret)"
+    }
+  },
+  "required": [
+    "sealed"
+  ],
+  "rls": {
+    "create": false,
+    "read": false,
+    "update": false,
+    "delete": false
+  }
+}
