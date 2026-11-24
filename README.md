@@ -181,7 +181,10 @@ CheerpJ (`orcloud.bridge.MotorMain` and `MotorLab`, in `worker/bridge/web`), bui
 at a pinned commit by `scripts/build-web-jars.sh`. One change is applied first,
 `scripts/jsrm-reuse-cross-section.patch`: shaped grains draw each burned-back cross-section twice
 per calculation line instead of three times (a star grain a quarter quicker), and every result
-stays byte-for-byte the same as unpatched JSRM's. The worksheets' own cells (the Kn table, the
+stays byte-for-byte the same as unpatched JSRM's. `MotorLab` also keeps the last four grains with
+JSRM's work on them, so after a grain's first calculation a change to anything else (the nozzle,
+propellant, chamber or settings) takes about as long as a hollow grain's, with the same results
+as from a new grain. The worksheets' own cells (the Kn table, the
 throat that gives the target pressure, the nozzle's lengths, the thrust-time table) are worked out
 as the spreadsheet does, in `web/src/motor/srm.js`; `web/test/srm.test.mjs` checks them against the
 values saved in SRM_2023.xls, and `web/test/motor-e2e.mjs` checks that JSRM in the browser answers as

@@ -152,7 +152,33 @@ final class MotorLab {
 		}
 	}
 
+	/**
+	 * Grains already made, with what JSRM has worked out about them: a shaped grain keeps the areas
+	 * of its burned-back cross-sections (scripts/jsrm-reuse-cross-section.patch), which take most of
+	 * a calculation's time. A change to anything but the grain (the nozzle, the propellant, the
+	 * chamber, the settings) reuses them. JSRM only reads a grain once it is made, and a grain
+	 * answers each question the same way every time, so the results are those of a new grain. The
+	 * last few grains are kept, for going back and forth between them.
+	 */
+	private static final Map<Map<String, Object>, GrainConfigutation> GRAINS = new LinkedHashMap<Map<String, Object>, GrainConfigutation>(8, 0.75f, true) {
+		private static final long serialVersionUID = 1L;
+
+		@Override
+		protected boolean removeEldestEntry(Map.Entry<Map<String, Object>, GrainConfigutation> eldest) {
+			return size() > 4;
+		}
+	};
+
 	private static GrainConfigutation grain(Map<String, Object> g) {
+		GrainConfigutation made = GRAINS.get(g);
+		if (made == null) {
+			made = newGrain(g);
+			GRAINS.put(new LinkedHashMap<>(g), made);
+		}
+		return made;
+	}
+
+	private static GrainConfigutation newGrain(Map<String, Object> g) {
 		switch (String.valueOf(g.get("type"))) {
 		case "hollow":
 			return new HollowCylinderGrain(num(g, "outerDiameter"), num(g, "coreDiameter"), num(g, "segmentLength"), count(g, "segments"),

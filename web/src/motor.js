@@ -176,6 +176,9 @@ function recalcSoon() {
 // worked out together once it is done, not one after another.
 let calculating = false;
 let again = false;
+// The calculator keeps the last four grains it has worked out (MotorLab), so only a new grain is
+// slow; a change to the nozzle, propellant, chamber or settings is not. These are their JSON.
+let keptGrains = [];
 
 async function recalc() {
   if (calculating) {
@@ -197,7 +200,8 @@ async function recalc() {
 async function calculate() {
   const mine = ++generation;
   const m = structuredClone(model);
-  const slow = ['finocyl', 'star'].includes(m.grain.type) ? ' (this grain shape can take 10 seconds or more)' : '';
+  const grainKey = JSON.stringify(m.grain);
+  const slow = ['finocyl', 'star'].includes(m.grain.type) && !keptGrains.includes(grainKey) ? ' (a new grain of this shape can take 10 seconds or more)' : '';
   status(started ? `Calculating…${slow}` : 'Starting the calculator (the first time takes a few seconds)…', 'busy');
   try {
     check(m);
@@ -221,6 +225,7 @@ async function calculate() {
     const kn = knTable(m, rows, abmax, web);
     if (!(kn.dto > 0)) throw new Error('The grain has no burning area.');
     const result = await simulate(javaMotor(m, kn.dto));
+    keptGrains = [grainKey, ...keptGrains.filter((k) => k !== grainKey)].slice(0, 4);
     started = true;
     if (mine !== generation) return;
     calc = {

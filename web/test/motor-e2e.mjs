@@ -5,6 +5,8 @@
 //   - SRM_2023's example motor shows SRM_2023's numbers;
 //   - the browser's JSRM answers exactly as JSRM does in Java on this computer, for every grain
 //     shape and propellant (test/fixtures/jsrm-native.json, made with orcloud.bridge.MotorCheck);
+//   - a change to anything but the grain reuses the grain JSRM has already worked out (MotorLab's
+//     kept grains): far quicker, with the numbers JSRM gives from a new grain;
 //   - a motor is saved, listed with your motors, and added to OpenRocket as a custom motor file
 //     that OpenRocket reads (server/src/motors.js).
 // Screenshots go to test/out/.
@@ -131,6 +133,7 @@ try {
   });
 
   await check('the browser\'s JSRM answers exactly as JSRM in Java, for every grain shape', async () => {
+    const took = {};
     for (const c of native) {
       const t = Date.now();
       const r = await page.evaluate(async (motor) => {
@@ -159,6 +162,10 @@ try {
         c.sample.index.forEach((i, n) => same(r.lines[key][i], c.sample[key][n], `${key}[${i}]`));
       }
       log(`     ${c.name}: ${exact ? 'same to the last digit' : `same to ${worst ? Math.floor(-Math.log10(worst)) : 16}+ digits`} (${(ms / 1000).toFixed(1)} s)`);
+      took[c.name] = ms;
+      // A case with reusesGrainOf changes only the nozzle of the case before it: JSRM's work on the
+      // grain is kept, and the answer (from a new grain, in Java) is the same.
+      if (c.reusesGrainOf) assert.ok(ms < took[c.reusesGrainOf] / 3, `${c.name} took ${ms} ms: the grain was not reused`);
     }
   });
 
@@ -177,6 +184,30 @@ try {
     const st = await waitStatus(page, /^[A-Z]\d+ ·/, 240_000);
     log(`     finocyl: ${st}`);
     await page.screenshot({ path: join(out, 'motor-finocyl.png'), fullPage: true });
+    // Another propellant for the same grain: the calculator reuses the grain, without the long wait
+    // (a new finocyl grain takes about 10 s here, as in the check before).
+    // (The statuses are recorded in the page: a quick calculation keeps the page busy until it is done,
+    // so polling from here can miss "Calculating…".)
+    for (const propellant of ['KNSB fine', 'KNDX']) {
+      await page.evaluate(() => {
+        const el = document.querySelector('#status');
+        window.statuses = [];
+        window.statusWatch?.disconnect();
+        window.statusWatch = new MutationObserver(() => window.statuses.push(el.textContent));
+        window.statusWatch.observe(el, { childList: true, characterData: true, subtree: true });
+      });
+      const t = Date.now();
+      await page.select('select[aria-label="propellant"]', propellant);
+      await page.waitForFunction(() => {
+        const i = window.statuses.findIndex((x) => /Calculating/.test(x));
+        return i >= 0 && window.statuses.slice(i + 1).some((x) => /^[A-Z]\d+ ·/.test(x));
+      }, { timeout: 60_000, polling: 100 });
+      const ms = Date.now() - t;
+      const seen = await page.evaluate(() => window.statuses);
+      log(`     finocyl with ${propellant}: ${seen.at(-1)} (${(ms / 1000).toFixed(1)} s)`);
+      assert.ok(!seen.some((x) => /seconds or more/.test(x)), `a grain already worked out is said to be slow: ${seen.join(' | ')}`);
+      assert.ok(ms < 5_000, `another propellant took ${ms} ms: the grain was not reused`);
+    }
     await page.select('select[aria-label="grain.type"]', 'hollow');
     await page.evaluate(() => {
       const set = (label, v) => {
