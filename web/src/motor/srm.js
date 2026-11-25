@@ -470,6 +470,22 @@ const fixed = (v, digits) => {
   return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s;
 };
 
+/** What the motor file needs and SRM does not work out, with what to say when it is missing. */
+const ENG_DETAILS = {
+  diameter: 'Enter the motor’s outside diameter (mm) for the motor file.',
+  length: 'Enter the motor’s length (mm) for the motor file.',
+  hardwareMass: 'Enter the motor’s empty (hardware) mass for the motor file.',
+};
+
+/** The motor file's details not entered yet: some of 'diameter', 'length' and 'hardwareMass'. */
+export function engMissing(eng) {
+  const missing = [];
+  if (!(Number(eng.diameter) > 0)) missing.push('diameter');
+  if (!(Number(eng.length) > 0)) missing.push('length');
+  if (!(Number(eng.hardwareMass) >= 0) || eng.hardwareMass === '' || eng.hardwareMass == null) missing.push('hardwareMass');
+  return missing;
+}
+
 /**
  * The motor as a RASP .eng file for OpenRocket: { text, filename, points, impulse }. `eng` is the
  * export settings (name, diameter, length, delays, hardwareMass in kg, manufacturer).
@@ -480,9 +496,8 @@ export function engFile(result, eng, { title = '', propellantName = '', grainLab
   const diameter = Number(eng.diameter);
   const length = Number(eng.length);
   const hardware = Number(eng.hardwareMass);
-  if (!(diameter > 0)) throw new Error('Enter the motor’s outside diameter (mm) for the motor file.');
-  if (!(length > 0)) throw new Error('Enter the motor’s length (mm) for the motor file.');
-  if (!(hardware >= 0) || eng.hardwareMass === '' || eng.hardwareMass == null) throw new Error('Enter the motor’s empty (hardware) mass for the motor file.');
+  const [missing] = engMissing(eng);
+  if (missing) throw new Error(ENG_DETAILS[missing]);
   const prop = result.summary.grainMass;
   const total = prop + hardware;
   const L = result.lines;

@@ -7,6 +7,7 @@
 //     shape and propellant (test/fixtures/jsrm-native.json, made with orcloud.bridge.MotorCheck);
 //   - a change to anything but the grain reuses the grain JSRM has already worked out (MotorLab's
 //     kept grains): far quicker, with the numbers JSRM gives from a new grain;
+//   - "Use in OpenRocket" before the motor file's details are in marks the Output tab with a red dot;
 //   - a motor is saved, listed with your motors, and added to OpenRocket as a custom motor file
 //     that OpenRocket reads (server/src/motors.js).
 // Screenshots go to test/out/.
@@ -225,6 +226,43 @@ try {
     // Back to SRM's example: the hollow cylinder's own Kn table, and its numbers.
     await page.waitForFunction(() => [...document.querySelectorAll('.wb-table th')].some((th) => th.textContent === 'tweb')
       && /^L1729 ·/.test(document.querySelector('#status').textContent), { timeout: 60_000 });
+  });
+
+  await check('"Use in OpenRocket" before the motor file\'s details: a red dot on the Output tab, and the empty cells marked', async () => {
+    const tab = (label) => page.evaluate((label) => [...document.querySelectorAll('#tabs button')].find((b) => b.textContent === label).click(), label);
+    const marks = () => page.evaluate(() => ({
+      dot: document.querySelector('#tabs button[data-sheet="output"]').classList.contains('needs'),
+      sheet: document.querySelector('#tabs button.active')?.dataset.sheet,
+      missing: ['diameter', 'length', 'hardwareMass'].filter((k) => document.querySelector(`input[aria-label="eng.${k}"]`)?.classList.contains('missing')),
+      focused: document.activeElement?.getAttribute('aria-label'),
+      boxInView: (() => {
+        const r = document.querySelector('.wb-eng')?.getBoundingClientRect();
+        return !!r && r.top >= 0 && r.top < innerHeight;
+      })(),
+    }));
+    await tab('Data and Kn');
+    await page.click('#use-openrocket');
+    await page.waitForFunction(() => document.querySelector('#tabs button[data-sheet="output"]').classList.contains('needs'), { timeout: 10_000 });
+    assert.deepEqual(await marks(), { dot: true, sheet: 'output', missing: ['diameter', 'length', 'hardwareMass'], focused: 'eng.diameter', boxInView: true });
+    await page.screenshot({ path: join(out, 'motor-eng-needed.png') });
+    assert.equal(db.Motor.rows.size, 0, 'nothing was added to OpenRocket');
+    // Away and back: the dot stays, and the Output tab opens at the motor file.
+    await tab('Pressure');
+    assert.equal((await marks()).dot, true);
+    await tab('Output');
+    assert.deepEqual(await marks(), { dot: true, sheet: 'output', missing: ['diameter', 'length', 'hardwareMass'], focused: 'eng.diameter', boxInView: true });
+    const type = (label, v) => page.evaluate((label, v) => {
+      const el = document.querySelector(`input[aria-label="${label}"]`);
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, label, v);
+    await type('eng.diameter', '83');
+    assert.deepEqual((await marks()).missing, ['length', 'hardwareMass']);
+    assert.equal((await marks()).dot, true);
+    await type('eng.length', '560');
+    await type('eng.hardwareMass', '1.9');
+    assert.deepEqual(await page.evaluate(() => document.querySelector('#tabs button[data-sheet="output"]').classList.contains('needs')), false, 'the dot goes once they are all in');
+    assert.deepEqual((await marks()).missing, []);
   });
 
   await check('a motor is saved, and added to OpenRocket as a file OpenRocket reads', async () => {

@@ -13,7 +13,7 @@ import { saveFile } from './lib/ork.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { grainAreas, simulate, startCalculator } from './motor/calc.js';
 import {
-  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, engFile, exampleMotor, grainDefaults, grainHoles, grainLength, grainOuterDiameter, hollowData,
+  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, engFile, engMissing, exampleMotor, grainDefaults, grainHoles, grainLength, grainOuterDiameter, hollowData,
   knTable, nozzleDesign, output, performance, propellant, shapeRows,
 } from './motor/srm.js';
 import { curveSvg, xyChart } from './motor/chart.js';
@@ -28,6 +28,9 @@ let calc = null; // the latest results: { m, data, kn, result, perf, out, noz }
 let problem = null; // why the latest calculation failed, or null
 let sheet = 'data';
 let dirty = false;
+// "Use in OpenRocket" or ".eng" was asked for before the motor file's details were entered: until
+// they are, the Output tab has a red dot and the cells still empty are marked.
+let engAsked = false;
 
 const SHEETS = [
   ['data', 'Data and Kn'],
@@ -340,6 +343,35 @@ function fill() {
     err.hidden = !problem;
     err.textContent = problem ? `Error: ${problem}` : '';
   }
+  markEngDetails();
+}
+
+/** The motor file's details still wanted (once asked for): some of 'diameter', 'length', 'hardwareMass'. */
+const engWanted = () => (engAsked ? engMissing(model.eng) : []);
+
+/** The Output tab's red dot, and the motor file's cells still empty, while its details are wanted. */
+function markEngDetails() {
+  const wanted = engWanted();
+  const tab = $('#tabs')?.querySelector('button[data-sheet="output"]');
+  if (tab) {
+    tab.classList.toggle('needs', wanted.length > 0);
+    if (wanted.length) tab.setAttribute('aria-label', 'Output: the motor file needs details');
+    else tab.removeAttribute('aria-label');
+    tab.title = wanted.length ? 'Enter the motor file’s details here' : '';
+  }
+  for (const key of ['diameter', 'length', 'hardwareMass']) {
+    document.querySelector(`input[aria-label="eng.${key}"]`)?.classList.toggle('missing', wanted.includes(key));
+  }
+  if (!wanted.length) engAsked = false;
+}
+
+/** On the Output sheet, while the motor file's details are wanted: its box in view, at the first one. */
+function revealEngDetails() {
+  const [first] = engWanted();
+  if (sheet !== 'output' || !first) return;
+  const input = document.querySelector(`input[aria-label="eng.${first}"]`);
+  input?.focus({ preventScroll: true });
+  (input?.closest('.wb-eng') ?? input)?.scrollIntoView({ block: 'center' });
 }
 
 // ------------------------------------------------------------------ the worksheets
@@ -363,6 +395,7 @@ function renderTabs() {
       sheet = key;
       renderSheet();
       $('#sheet').scrollTop = 0;
+      revealEngDetails();
     };
     return b;
   }));
@@ -740,10 +773,12 @@ function currentEng() {
     return engFile(calc.result, model.eng, engNames());
   } catch (e) {
     toast(e.message);
+    engAsked = engMissing(model.eng).length > 0;
     if (sheet !== 'output') {
       sheet = 'output';
       renderSheet();
-    }
+    } else markEngDetails();
+    revealEngDetails();
     return null;
   }
 }

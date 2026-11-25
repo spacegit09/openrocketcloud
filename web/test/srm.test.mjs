@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  engFile, exampleMotor, grainDefaults, grainHoles, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
+  engFile, engMissing, exampleMotor, grainDefaults, grainHoles, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
 } from '../src/motor/srm.js';
 import { readMotorFile } from '../../server/src/motors.js';
 
@@ -186,4 +186,12 @@ test('the grain drawings are JSRM\'s shapes: what they show has the cross-sectio
   }
   // The C-slot default is METEOR's own example (a 30 mm grain: core 10, slot 5 wide and 15 deep, offset 7), scaled.
   assert.deepEqual(grainDefaults('cSlot'), { type: 'cSlot', outerDiameter: 69, coreDiameter: 23, slotWidth: 11.5, slotDepth: 34.5, slotOffset: 16, segmentLength: 115, segments: 4, ends: 'exposed' });
+});
+
+test('engMissing: the motor file\'s details SRM does not work out, as engFile asks for them', () => {
+  assert.deepEqual(engMissing({}), ['diameter', 'length', 'hardwareMass']);
+  assert.deepEqual(engMissing({ diameter: 83, length: 560, hardwareMass: '' }), ['hardwareMass']);
+  assert.deepEqual(engMissing({ diameter: 83, length: 0, hardwareMass: 0 }), ['length'], 'an empty mass of 0 is allowed');
+  assert.deepEqual(engMissing({ diameter: 83, length: 560, hardwareMass: 1.9 }), []);
+  assert.throws(() => engFile(jsrm, { diameter: 83, length: null, delays: 'P', hardwareMass: 1.9 }), /length/);
 });

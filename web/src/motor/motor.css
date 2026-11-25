@@ -68,6 +68,8 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-tabs { display: flex; gap: 2px; padding: 0 10px; background: var(--surface-2); border-top: 1px solid var(--border); overflow-x: auto; flex-shrink: 0; }
 .wb-tabs button { border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); background: var(--surface-2); color: var(--muted); padding: 5px 14px 6px; font-size: 13px; white-space: nowrap; margin-top: -1px; }
 .wb-tabs button.active { background: var(--srm-paper); color: var(--text); font-weight: 600; }
+/* The motor file's details are wanted (src/motor.js, markEngDetails): a red dot on the Output tab. */
+.wb-tabs button.needs::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--srm-red); vertical-align: 1px; }
 
 .wb-cols { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 28px; align-items: start; }
 @media (max-width: 960px) { .wb-cols { grid-template-columns: minmax(0, 1fr); } .wb-paper { padding: 14px 12px 18px; margin: 8px; } }
@@ -87,6 +89,7 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-in.wide { text-align: left; }
 .wb-in:focus { outline: 2px solid color-mix(in srgb, var(--srm-input-border) 45%, transparent); outline-offset: 0; }
 .wb-in.bad { background: color-mix(in srgb, var(--srm-red) 14%, var(--srm-paper)); }
+.wb-in.missing { border-color: var(--srm-red); box-shadow: inset 0 0 0 1px var(--srm-red); }
 .wb-sel { flex: 1; min-width: 0; height: 22px; border: 1px solid var(--srm-input-border); border-radius: 0; background: var(--srm-select); color: var(--srm-input); font: inherit; padding: 0 2px; }
 .wb-row:has(.wb-sel) .wb-cell { grid-column: 2 / 4; }
 .wb-row:has(.wb-sel) .wb-unit { display: none; }
