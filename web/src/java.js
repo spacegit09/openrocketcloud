@@ -156,8 +156,13 @@ export async function designMotors(designId) {
  * a block at a time as it starts. On a first visit the worker takes a moment to install first.
  */
 export function prefetchOpenRocket() {
+  prefetchJar(OPENROCKET_JAR, OPENROCKET_STARTUP);
+}
+
+/** The same for any of the site's versioned jars (`ranges`: [[start, end], ...]; the whole jar by default). */
+export function prefetchJar(url, ranges = [[0, Number.MAX_SAFE_INTEGER]]) {
   navigator.serviceWorker?.ready
-    .then((reg) => reg.active?.postMessage({ type: 'prefetch', url: OPENROCKET_JAR, ranges: OPENROCKET_STARTUP }))
+    .then((reg) => reg.active?.postMessage({ type: 'prefetch', url, ranges }))
     .catch(() => {});
 }
 

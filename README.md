@@ -196,6 +196,16 @@ is JSRM's, not SRM's. Motors are saved sealed (`MotorDesign` records, `motorDesi
 download as RASP .eng files, and go into OpenRocket's motor selector as custom motors. It comes with
 the Monthly, Individual and Group plans, not the OpenRocket plan.
 
+The calculation runs in each visitor's browser, so more people do not load the server: a visit
+asks it for the sign-in, the plan and the motors only (measured: 50 requests at once take as long
+as one), and the files come from Cloudflare's edges and CheerpJ's CDN. What a first visit waits on
+is the Java runtime, so the page starts it at once (alongside the plan check), fetches the parts
+of it the motor designer reads in parallel (`web/public/or/motor-preload.json`, recorded by
+`node web/test/motor-preload.mjs`: record it again after a JSRM or CheerpJ update), has the
+service worker fetch our two jars meanwhile, and never reads OpenRocket's 42 MB jar (JSRM's part of
+Guava is in `jsrm-web.jar`). For a visitor 250 ms from everything on 15 Mbit/s, the first
+calculation came after 19.6 s before these and 12.4 s after; from Korea, 5 s, and 2.4 s when back.
+
 ### Plans and payments
 
 The live site is paid (since 20 November 2026): every account gets a **free week** from its sign-up,

@@ -5,7 +5,8 @@
 #   orcloud-web.jar     the live-share bridge (worker/bridge/src) plus the browser start-up code
 #                       and fixes (worker/bridge/web)
 #   jsrm-web.jar        JSRM, the Java version of Richard Nakka's SRM spreadsheet that METEOR runs
-#                       (the motor designer's calculation, orcloud.bridge.MotorLab), with exp4j;
+#                       (the motor designer's calculation, orcloud.bridge.MotorLab), with exp4j and
+#                       the part of Guava it uses (so the motor designer never reads OpenRocket's jar);
 #                       JSRM has one change, scripts/jsrm-reuse-cross-section.patch, which makes
 #                       its shaped grains quicker without changing a single result
 # Needs Docker (for the JDK and Maven), git and python3.
@@ -27,8 +28,10 @@ fi
 python3 "$root/scripts/slim-openrocket-jar.py" "$jar" "$out/OpenRocket-web.jar"
 
 # JSRM (github.com/jbgust/jsrm, GPL-3.0), built from its source at a pinned release with our one
-# change (the patch, which the jar carries in META-INF). Its other library, Guava, comes with
-# OpenRocket's jar, which the motor designer loads alongside.
+# change (the patch, which the jar carries in META-INF). Its other library, Guava, is the copy in
+# OpenRocket's jar: only the classes JSRM uses, with every class they use in turn (jdeps), go in
+# jsrm-web.jar, so that the motor designer reads 1.3 MB of Guava rather than 5 MB of OpenRocket's
+# 42 MB jar to find it.
 jsrm_tag=v3.3
 jsrm_commit=f3795b8041547165502bfe8ae8f69df927c22ae1
 jsrm_patch="$root/scripts/jsrm-reuse-cross-section.patch"
@@ -42,14 +45,26 @@ if [ ! -f "$jsrm/target/Java-Solid-Rocket-Motor-${jsrm_tag#v}.jar" ]; then
   docker run --rm -v "$jsrm":/w -v "$cache/m2":/root/.m2 -w /w maven:3.9-eclipse-temurin-17 \
     mvn -q -B -DskipTests package dependency:copy-dependencies -DincludeScope=runtime
 fi
-docker run --rm -v "$root":/w -w /w -e JSRM="${jsrm#"$root"/}" -e PATCH="${jsrm_patch#"$root"/}" eclipse-temurin:17-jdk sh -c '
+docker run --rm -v "$root":/w -w /w -e JSRM="${jsrm#"$root"/}" -e PATCH="${jsrm_patch#"$root"/}" -e OR_JAR="${jar#"$root"/}" eclipse-temurin:17-jdk sh -c '
   set -e
   t=$(mktemp -d)
   (cd "$t" && jar xf /w/$JSRM/target/Java-Solid-Rocket-Motor-*[0-9].jar && jar xf /w/$JSRM/target/dependency/exp4j-0.4.8.jar)
   rm -rf "$t/META-INF" && mkdir "$t/META-INF"
+  # Guava: the classes JSRM refers to, then everything those refer to, until nothing new.
+  g=$(mktemp -d)
+  (cd "$g" && jar xf "/w/$OR_JAR" com/google/common META-INF/maven/com.google.guava/guava/pom.properties)
+  jdeps -filter:none -verbose:class "$g" 2>/dev/null | awk "\$2 == \"->\" && \$3 ~ /^com[.]google[.]common[.]/ { print \$1, \$3 }" > "$g/edges"
+  jdeps -filter:none -verbose:class -cp "$g" "$t" 2>/dev/null | awk "\$2 == \"->\" && \$1 !~ /^com[.]google/ && \$3 ~ /^com[.]google[.]common[.]/ { print \$3 }" | sort -u > "$g/seeds"
+  awk "NR == FNR { next_[\$1] = next_[\$1] \" \" \$2; next } { todo[++n] = \$1 }
+    END { for (i = 1; i <= n; i++) { c = todo[i]; if (c in seen) continue; seen[c] = 1; print c;
+            k = split(next_[c], d, \" \"); for (j = 1; j <= k; j++) if (!(d[j] in seen)) todo[++n] = d[j] } }" "$g/edges" "$g/seeds" > "$g/needed"
+  [ -s "$g/needed" ] || { echo "no Guava classes found for JSRM"; exit 1; }
+  while read -r c; do f=$(echo "$c" | tr . /).class; mkdir -p "$t/$(dirname "$f")"; cp "$g/$f" "$t/$f"; done < "$g/needed"
+  echo "jsrm-web.jar: $(wc -l < "$g/needed") Guava classes"
   cp "$JSRM/LICENSE" "$t/META-INF/LICENSE-JSRM.txt"
   cp "$PATCH" "$t/META-INF/JSRM-CHANGES.patch"
   printf "%s\n" "exp4j 0.4.8 (net.objecthunter.exp4j), Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0" > "$t/META-INF/NOTICE-exp4j.txt"
+  printf "%s\n" "Guava $(sed -n "s/^version=//p" "$g/META-INF/maven/com.google.guava/guava/pom.properties") (com.google.common, part of it), Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0" > "$t/META-INF/NOTICE-guava.txt"
   jar cf web/public/or/jsrm-web.jar -C "$t" .'
 
 docker run --rm -v "$root":/w -w /w -e JAR="web/.cache/OpenRocket-$ver.jar" eclipse-temurin:17-jdk sh -c '

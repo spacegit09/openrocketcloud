@@ -1082,6 +1082,9 @@ async function main() {
   }
   $('#me').replaceChildren(avatar(me), h('span', { class: 'name' }, me.name));
   $('#me').hidden = false;
+  // Java starts at once, while their plan and their motor are looked up: each lookup is a round trip
+  // to the site's server, a third of a second or more from far away, and Java's start is the long part.
+  if (params.has('id') || params.has('new')) startCalculator().catch(() => {}); // openWorkbook says if it fails
   await requirePlan({ full: true }); // without a plan (or with OpenRocket only): the plans notice (src/plan.js)
   if (params.has('id')) {
     try {
