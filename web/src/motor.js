@@ -13,7 +13,7 @@ import { saveFile } from './lib/ork.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { grainAreas, simulate, startCalculator } from './motor/calc.js';
 import {
-  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, engFile, exampleMotor, grainDefaults, grainLength, grainOuterDiameter, hollowData,
+  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, engFile, exampleMotor, grainDefaults, grainHoles, grainLength, grainOuterDiameter, hollowData,
   knTable, nozzleDesign, output, performance, propellant, shapeRows,
 } from './motor/srm.js';
 import { curveSvg, xyChart } from './motor/chart.js';
@@ -106,8 +106,7 @@ function check(m) {
   pos(m.chamber.length, 'the chamber length');
   for (const [key, , desc, kind] of GRAIN_FIELDS[m.grain.type]) {
     const v = m.grain[key];
-    const zeroOk = ['holeDiameter', 'holeDepth', 'slotOffset', 'coreOffset'].includes(key);
-    if (!Number.isFinite(v) || v < 0 || (!zeroOk && v === 0)) throw new Error(`Enter the ${desc.toLowerCase()}.`);
+    if (!Number.isFinite(v) || v < 0 || (kind !== 'zero' && v === 0)) throw new Error(`Enter the ${desc.toLowerCase()}.`);
     if (kind === 'count' && (v !== Math.round(v) || v > 100)) throw new Error(`The ${desc.toLowerCase()} must be a whole number.`);
   }
   if (m.throat.mode !== 'target') pos(m.throat.diameter, 'the throat diameter');
@@ -706,51 +705,18 @@ function grainSvg(g, chamberDiameter) {
   const svg = svgEl('svg', { viewBox: '0 0 300 300', class: 'wb-drawing grain', role: 'img', 'aria-label': 'The grain, end on' });
   svg.append(svgEl('circle', { cx: c, cy: c, r: R, class: 'casing' }));
   const od = grainOuterDiameter(g) * scale / 2;
-  const holes = [];
   const circle = (cx, cy, r) => `M${cx - r},${cy}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`;
   const poly = (pts) => `M${pts.map((p) => p.map((v) => v.toFixed(2)).join(',')).join('L')}Z`;
-  switch (g.type) {
-    case 'hollow': holes.push(circle(c, c, g.coreDiameter * scale / 2)); break;
-    case 'rodTube': {
-      holes.push(circle(c, c, g.tubeInnerDiameter * scale / 2));
-      svg.append(svgEl('path', { d: `${circle(c, c, od)}${circle(c, c, g.tubeInnerDiameter * scale / 2)}`, class: 'grain', 'fill-rule': 'evenodd' }));
-      svg.append(svgEl('circle', { cx: c, cy: c, r: g.rodDiameter * scale / 2, class: 'grain' }));
-      return svg;
-    }
-    case 'moonBurner': holes.push(circle(c, c + g.coreOffset * scale, g.coreDiameter * scale / 2)); break;
-    case 'endBurner': if (g.holeDiameter > 0) holes.push(circle(c, c, g.holeDiameter * scale / 2)); break;
-    case 'cSlot': {
-      holes.push(circle(c, c, g.coreDiameter * scale / 2));
-      const w = g.slotWidth * scale / 2;
-      const y0 = c + g.slotOffset * scale;
-      holes.push(poly([[c - w, y0], [c + w, y0], [c + w, y0 + g.slotDepth * scale], [c - w, y0 + g.slotDepth * scale]]));
-      break;
-    }
-    case 'finocyl': {
-      holes.push(circle(c, c, g.innerDiameter * scale / 2));
-      const w = g.finWidth * scale / 2;
-      const r = g.finDiameter * scale / 2;
-      for (let i = 0; i < g.finCount; i++) {
-        const a = (2 * Math.PI * i) / g.finCount;
-        const rot = ([x, y]) => [c + x * Math.cos(a) - y * Math.sin(a), c + x * Math.sin(a) + y * Math.cos(a)];
-        holes.push(poly([[-w, 0], [w, 0], [w, r], [-w, r]].map(rot)));
-      }
-      break;
-    }
-    case 'star': {
-      const ri = g.innerDiameter * scale / 2;
-      const rp = g.pointDiameter * scale / 2;
-      const pts = [];
-      for (let i = 0; i < 2 * g.pointCount; i++) {
-        const a = (Math.PI * i) / g.pointCount - Math.PI / 2;
-        const r = i % 2 ? ri : rp;
-        pts.push([c + r * Math.cos(a), c + r * Math.sin(a)]);
-      }
-      holes.push(poly(pts));
-      break;
-    }
-    default:
+  if (g.type === 'rodTube') {
+    svg.append(svgEl('path', { d: `${circle(c, c, od)}${circle(c, c, g.tubeInnerDiameter * scale / 2)}`, class: 'grain', 'fill-rule': 'evenodd' }));
+    svg.append(svgEl('circle', { cx: c, cy: c, r: g.rodDiameter * scale / 2, class: 'grain' }));
+    return svg;
   }
+  // The holes as JSRM builds them (grainHoles: millimetres from the centre, x to the right, y down).
+  const at = (x, y) => [c + x * scale, c + y * scale];
+  const holes = (grainHoles(g) ?? []).map((hole) => (hole.circle
+    ? circle(...at(hole.circle[0], hole.circle[1]), hole.circle[2] * scale)
+    : poly(hole.polygon.map(([x, y]) => at(x, y)))));
   // The grain with its holes cut out (the shapes may overlap, as METEOR's do: drawn as one path).
   const mask = svgEl('mask', { id: 'grain-holes' }, svgEl('rect', { x: 0, y: 0, width: 300, height: 300, fill: '#fff' }),
     ...holes.map((d) => svgEl('path', { d, fill: '#000' })));

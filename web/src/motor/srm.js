@@ -110,12 +110,16 @@ export function exampleMotor() {
   };
 }
 
-/** Default dimensions for a grain shape newly chosen (METEOR's own examples, in millimetres). */
+/**
+ * Default dimensions for a grain shape newly chosen, in millimetres: a starting point scaled to the
+ * chamber, with SRM_2023's example segments. The C-slot is METEOR's own C-slot example (a 30 mm
+ * grain: core 10, slot 5 wide and 15 deep, offset 7), scaled.
+ */
 export function grainDefaults(type, chamberDiameter = 75) {
   const od = Math.max(10, Math.round(chamberDiameter * 0.92));
   switch (type) {
     case 'rodTube': return { type, rodDiameter: Math.round(od * 0.2), tubeOuterDiameter: od, tubeInnerDiameter: Math.round(od * 0.55), segmentLength: 115, segments: 4, ends: 'exposed' };
-    case 'cSlot': return { type, outerDiameter: od, coreDiameter: Math.round(od * 0.29), slotWidth: Math.round(od * 0.1), slotDepth: Math.round(od * 0.5), slotOffset: Math.round(od * 0.3), segmentLength: 115, segments: 4, ends: 'exposed' };
+    case 'cSlot': return { type, outerDiameter: od, coreDiameter: od / 3, slotWidth: od / 6, slotDepth: od / 2, slotOffset: Math.round((od * 7) / 30), segmentLength: 115, segments: 4, ends: 'exposed' };
     case 'finocyl': return { type, outerDiameter: od, innerDiameter: Math.round(od * 0.29), finWidth: Math.round(od * 0.07), finDiameter: Math.round(od * 0.58), finCount: 5, segmentLength: 115, segments: 4, ends: 'exposed' };
     case 'moonBurner': return { type, outerDiameter: od, coreDiameter: Math.round(od * 0.29), coreOffset: Math.round(od * 0.2), segmentLength: 115, segments: 4, ends: 'exposed' };
     case 'star': return { type, outerDiameter: od, innerDiameter: Math.round(od * 0.29), pointDiameter: Math.round(od * 0.58), pointCount: 6, segmentLength: 115, segments: 4, ends: 'exposed' };
@@ -124,24 +128,71 @@ export function grainDefaults(type, chamberDiameter = 75) {
   }
 }
 
-/** Each grain shape's dimensions, as the Data and Kn worksheet asks for them. */
+/**
+ * The holes in a grain's cross-section at the start, as JSRM builds them (its grain classes, after
+ * Bill Kuker's motorsim), in its coordinates: millimetres from the grain's centre, x to the right
+ * and y down. Each is { circle: [x, y, r] } or { polygon: [[x, y], ...] }, and they may overlap.
+ * The rod and tube is two pieces instead: null.
+ */
+export function grainHoles(g) {
+  switch (g.type) {
+    case 'hollow': return [{ circle: [0, 0, g.coreDiameter / 2] }];
+    case 'endBurner': return g.holeDiameter > 0 ? [{ circle: [0, 0, g.holeDiameter / 2] }] : [];
+    case 'moonBurner': return [{ circle: [g.coreOffset, 0, g.coreDiameter / 2] }]; // MoonBurnerGrain
+    case 'cSlot': {
+      // CSlotGrain: the slot is cut from the grain's outer edge (x = Do/2) inward by its depth, its
+      // centre line the offset away from the grain's; the core, if any, is centred at its inner end.
+      const edge = g.outerDiameter / 2;
+      const [x0, y0, w] = [edge - g.slotDepth, -g.slotOffset, g.slotWidth / 2];
+      const slot = { polygon: [[x0, y0 - w], [edge, y0 - w], [edge, y0 + w], [x0, y0 + w]] };
+      return g.coreDiameter > 0 ? [slot, { circle: [x0, y0, g.coreDiameter / 2] }] : [slot];
+    }
+    case 'finocyl': {
+      // FinocylGrain: the core, and each fin from the centre out to half the fin diameter, turned by 2π/n.
+      const [w, r] = [g.finWidth / 2, g.finDiameter / 2];
+      const fins = Array.from({ length: g.finCount }, (_, i) => {
+        const a = (2 * Math.PI * i) / g.finCount;
+        return { polygon: [[-w, 0], [w, 0], [w, r], [-w, r]].map(([x, y]) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)]) };
+      });
+      return [{ circle: [0, 0, g.innerDiameter / 2] }, ...fins];
+    }
+    case 'star': {
+      // StarGrain: from the inner diameter on the y axis, the point and the inner diameter by turns, every π/n.
+      const polygon = Array.from({ length: 2 * g.pointCount }, (_, i) => {
+        const r = (i % 2 ? g.pointDiameter : g.innerDiameter) / 2;
+        const a = (Math.PI * i) / g.pointCount;
+        return [r * Math.sin(a), r * Math.cos(a)];
+      });
+      return [{ polygon }];
+    }
+    default: return null;
+  }
+}
+
+/**
+ * Each grain shape's dimensions, as the Data and Kn worksheet asks for them: [key, symbol,
+ * description, kind], kind 'count' for a whole number and 'zero' for one that may be 0 (as METEOR
+ * allows); the rest must be more than 0. The meanings are JSRM's (its grain classes).
+ */
 export const GRAIN_FIELDS = {
   hollow: [['outerDiameter', 'Do', 'Outer diameter (initial)'], ['coreDiameter', 'do', 'Core diameter (initial)'],
     ['segmentLength', 'Lo', 'Segment length (initial)'], ['segments', 'N', 'Number of segments', 'count']],
   rodTube: [['rodDiameter', 'Dr', 'Rod diameter'], ['tubeOuterDiameter', 'Do', 'Tube outer diameter'], ['tubeInnerDiameter', 'do', 'Tube inner diameter'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
-  cSlot: [['outerDiameter', 'Do', 'Outer diameter'], ['coreDiameter', 'do', 'Core diameter'], ['slotWidth', 'ws', 'Slot width'],
-    ['slotDepth', 'hs', 'Slot depth'], ['slotOffset', 'os', 'Slot offset'], ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
+  cSlot: [['outerDiameter', 'Do', 'Outer diameter'], ['coreDiameter', 'do', 'Core diameter, centred at the slot’s inner end (0: none)', 'zero'],
+    ['slotWidth', 'ws', 'Slot width'], ['slotDepth', 'hs', 'Slot depth, from the grain’s outer edge inward'],
+    ['slotOffset', 'os', 'Slot offset, from the grain’s centre line to the slot’s', 'zero'],
+    ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   finocyl: [['outerDiameter', 'Do', 'Outer diameter'], ['innerDiameter', 'do', 'Core diameter'], ['finWidth', 'wf', 'Fin width'],
     ['finDiameter', 'Df', 'Fin tip diameter (centre to fin tip × 2)'], ['finCount', 'nf', 'Number of fins', 'count'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
-  moonBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['coreDiameter', 'do', 'Core diameter'], ['coreOffset', 'oc', 'Core offset (from the centre)'],
+  moonBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['coreDiameter', 'do', 'Core diameter'], ['coreOffset', 'oc', 'Core offset (from the centre)', 'zero'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   star: [['outerDiameter', 'Do', 'Outer diameter'], ['innerDiameter', 'Di', 'Star inner diameter (centre to inner points × 2)'],
     ['pointDiameter', 'Dp', 'Star point diameter (centre to outer points × 2)'], ['pointCount', 'np', 'Number of points', 'count'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
-  endBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['length', 'Lo', 'Grain length'], ['holeDiameter', 'dh', 'Ignition hole diameter (0: none)'],
-    ['holeDepth', 'hh', 'Ignition hole depth']],
+  endBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['length', 'Lo', 'Grain length'], ['holeDiameter', 'dh', 'Ignition hole diameter (0: none)', 'zero'],
+    ['holeDepth', 'hh', 'Ignition hole depth', 'zero']],
 };
 
 const exposed = (v) => (v === 'inhibited' ? 0 : 1);

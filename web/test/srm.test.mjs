@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  engFile, exampleMotor, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
+  engFile, exampleMotor, grainDefaults, grainHoles, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
 } from '../src/motor/srm.js';
 import { readMotorFile } from '../../server/src/motors.js';
 
@@ -140,4 +140,50 @@ test('The motor file: OpenRocket reads it, with the designed impulse', () => {
   assert.ok(eng.points.length > 20 && eng.points.length < 200, `${eng.points.length} points`);
   assert.match(eng.text, /^L1729 83 560 P 2\.81245 4\.71245 Rocket-Team$/m);
   assert.throws(() => engFile(jsrm, { diameter: 83, length: 560, delays: 'P', hardwareMass: null }), /hardware/);
+});
+
+// The area of a grain's cross-section as the page draws it (grainHoles), counted on a fine grid.
+function drawnArea(g, n = 1500) {
+  const R = g.outerDiameter / 2;
+  const holes = grainHoles(g);
+  const inPolygon = (x, y, pts) => {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i];
+      const [xj, yj] = pts[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const y = ((i + 0.5) / n) * 2 * R - R;
+    for (let k = 0; k < n; k++) {
+      const x = ((k + 0.5) / n) * 2 * R - R;
+      if (x * x + y * y > R * R) continue;
+      if (holes.some((h) => (h.circle ? (x - h.circle[0]) ** 2 + (y - h.circle[1]) ** 2 <= h.circle[2] ** 2 : inPolygon(x, y, h.polygon)))) continue;
+      count++;
+    }
+  }
+  return count * ((2 * R) / n) ** 2;
+}
+
+test('the grain drawings are JSRM\'s shapes: what they show has the cross-section JSRM works out', () => {
+  // JSRM's cross-section at the start, in Java (orcloud.bridge.MotorLab areas: endSurface[0]). Read
+  // otherwise (the C-slot's core at the grain's centre, its slot from the offset outward, as the page
+  // once drew it), the first C-slot would show 0.7% more propellant.
+  const cases = [
+    [{ type: 'cSlot', outerDiameter: 69, coreDiameter: 20, slotWidth: 7, slotDepth: 34, slotOffset: 20 }, 3302.034927618202],
+    [{ type: 'cSlot', outerDiameter: 69, coreDiameter: 0, slotWidth: 7, slotDepth: 34, slotOffset: 20 }, 3547.710497522063],
+    [grainDefaults('cSlot'), 3102.2974985236774],
+    [{ type: 'finocyl', outerDiameter: 69, innerDiameter: 20, finWidth: 5, finDiameter: 40, finCount: 5 }, 3173.408803724927],
+    [{ type: 'moonBurner', outerDiameter: 69, coreDiameter: 20, coreOffset: 14 }, 3426.006274450336],
+    [{ type: 'star', outerDiameter: 69, innerDiameter: 20, pointDiameter: 40, pointCount: 6 }, 3140.233652671712],
+  ];
+  for (const [g, jsrm] of cases) {
+    const area = drawnArea(g);
+    assert.ok(Math.abs(area / jsrm - 1) < 0.002, `${g.type} ${JSON.stringify(g)}: drawn ${area.toFixed(1)} mm², JSRM ${jsrm.toFixed(1)} mm²`);
+  }
+  // The C-slot default is METEOR's own example (a 30 mm grain: core 10, slot 5 wide and 15 deep, offset 7), scaled.
+  assert.deepEqual(grainDefaults('cSlot'), { type: 'cSlot', outerDiameter: 69, coreDiameter: 23, slotWidth: 11.5, slotDepth: 34.5, slotOffset: 16, segmentLength: 115, segments: 4, ends: 'exposed' });
 });

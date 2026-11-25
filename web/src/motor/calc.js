@@ -36,6 +36,8 @@ const MESSAGES = [
   [/Hole length diameter should be < than grain length/, 'The ignition hole must be shorter than the grain.'],
   [/Hole diameter should be < than outer diameter/, 'The ignition hole must be narrower than the grain.'],
   [/Slot offset should be < than grain radius/, 'The slot’s offset must be less than the grain’s radius.'],
+  [/Slot depth should be <= than outer diameter/, 'The slot must be less deep than the grain is wide.'],
+  [/Slot width should be <= than outer diameter/, 'The slot must be narrower than the grain.'],
   [/Core offset should be inside the grain/, 'The core’s offset must keep the core inside the grain.'],
   [/should be > 0|should be positive|Number of segment/, (m, text) => `${text.replace(/should be/, 'must be').replace(/ than /, ' ')}.`],
 ];
