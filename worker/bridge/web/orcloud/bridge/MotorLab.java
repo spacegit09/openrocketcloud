@@ -101,10 +101,18 @@ final class MotorLab {
 	/**
 	 * The grain alone, for the Kn table and the throat from a target pressure: its burning area,
 	 * end surface and volume at each of SRM's 50 steps of web regression (0 to the whole web).
+	 * With the chamber ({ grain, chamber }), JSRM's checks of the design come first, as in
+	 * simulate: a grain that cannot be (a core wider than the grain, say) is said to be, rather
+	 * than measured as nothing. Those checks do not involve the throat, not yet known here.
 	 */
 	static String areas(Map<String, Object> m) {
 		try {
 			GrainConfigutation g = grain(map(m.get("grain")));
+			if (m.get("chamber") != null) {
+				Map<String, Object> chamber = map(m.get("chamber"));
+				g.checkConfiguration(new SolidRocketMotor(new PropellantGrain(PropellantType.KNDX, g),
+						new CombustionChamber(num(chamber, "diameter"), num(chamber, "length")), 0.0));
+			}
 			List<Object> burning = new ArrayList<>(), ends = new ArrayList<>(), volume = new ArrayList<>();
 			for (int i = 0; i <= AREA_STEPS; i++) {
 				double p = (double) i / AREA_STEPS;

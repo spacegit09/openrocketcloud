@@ -13,7 +13,7 @@ import { saveFile } from './lib/ork.js';
 import { readMotorFile } from '../../server/src/motors.js';
 import { grainAreas, simulate, startCalculator } from './motor/calc.js';
 import {
-  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, engFile, engMissing, exampleMotor, grainDefaults, grainHoles, grainLength, grainOuterDiameter, hollowData,
+  GRAIN_FIELDS, GRAINS, PROPELLANTS, TARGETS, cellNumber, engFile, engMissing, exampleMotor, grainDefaults, grainHoles, grainLength, grainOuterDiameter, hollowData,
   knTable, nozzleDesign, output, performance, propellant, shapeRows,
 } from './motor/srm.js';
 import { curveSvg, xyChart } from './motor/chart.js';
@@ -43,47 +43,6 @@ const SHEETS = [
 
 // ------------------------------------------------------------------ numbers in cells
 
-/**
- * A cell's number: as typed, or, as in SRM, a formula after "=" (for instance =25.4*2.75 for 2.75
- * inches in millimetres): numbers, + − × ÷ ^ and brackets.
- */
-export function cellNumber(text) {
-  const s = String(text ?? '').trim().replace(/,/g, '');
-  if (!s) return NaN;
-  if (!s.startsWith('=')) return Number(s);
-  const tokens = s.slice(1).match(/\d*\.?\d+(?:e[+-]?\d+)?|[-+*/^()]|\S/gi) ?? [];
-  let i = 0;
-  const peek = () => tokens[i];
-  const take = () => tokens[i++];
-  const expr = () => {
-    let v = term();
-    while (peek() === '+' || peek() === '-') v = take() === '+' ? v + term() : v - term();
-    return v;
-  };
-  const term = () => {
-    let v = power();
-    while (peek() === '*' || peek() === '/') v = take() === '*' ? v * power() : v / power();
-    return v;
-  };
-  const power = () => {
-    const base = unary();
-    return peek() === '^' ? (take(), base ** power()) : base;
-  };
-  const unary = () => {
-    if (peek() === '-') return take(), -unary();
-    if (peek() === '+') return take(), unary();
-    if (peek() === '(') {
-      take();
-      const v = expr();
-      return take() === ')' ? v : NaN;
-    }
-    const t = take();
-    return t != null && /^\d*\.?\d+(e[+-]?\d+)?$/i.test(t) ? Number(t) : NaN;
-  };
-  const v = expr();
-  return i === tokens.length ? v : NaN;
-}
-
 const fmt = (v, digits) => (Number.isFinite(v) ? v.toLocaleString('en', { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false }) : '–');
 
 // ------------------------------------------------------------------ the model
@@ -107,11 +66,14 @@ function check(m) {
   };
   pos(m.chamber.diameter, 'the chamber diameter');
   pos(m.chamber.length, 'the chamber length');
-  for (const [key, , desc, kind] of GRAIN_FIELDS[m.grain.type]) {
+  for (const [key, , desc, kind, most = 100] of GRAIN_FIELDS[m.grain.type]) {
     const v = m.grain[key];
     if (!Number.isFinite(v) || v < 0 || (kind !== 'zero' && v === 0)) throw new Error(`Enter the ${desc.toLowerCase()}.`);
-    if (kind === 'count' && (v !== Math.round(v) || v > 100)) throw new Error(`The ${desc.toLowerCase()} must be a whole number.`);
+    if (kind === 'count' && (v !== Math.round(v) || v > most)) throw new Error(`The ${desc.toLowerCase()} must be a whole number from 1 to ${most}.`);
   }
+  // JSRM's own rules for the grain in the chamber, before the throat is worked out from them.
+  if (grainOuterDiameter(m.grain) > m.chamber.diameter) throw new Error('The grain is wider than the chamber. Make the chamber wider or the grain narrower.');
+  if (grainLength(m.grain) > m.chamber.length) throw new Error('The grain is longer than the chamber. Make the chamber longer, or the grain shorter.');
   if (m.throat.mode !== 'target') pos(m.throat.diameter, 'the throat diameter');
   const s = m.settings;
   if (!(s.densityRatio > 0 && s.densityRatio <= 1)) throw new Error('The density ratio is between 0 and 1.');
@@ -141,10 +103,10 @@ function javaMotor(m, throat) {
 }
 
 const areaCache = new Map();
-function areasOf(grain) {
+function areasOf(grain, chamber) {
   const key = JSON.stringify(grain);
   if (!areaCache.has(key)) {
-    const p = grainAreas(grain);
+    const p = grainAreas(grain, chamber);
     p.catch(() => areaCache.delete(key));
     areaCache.set(key, p);
   }
@@ -205,6 +167,8 @@ async function calculate() {
   const grainKey = JSON.stringify(m.grain);
   const slow = ['finocyl', 'star'].includes(m.grain.type) && !keptGrains.includes(grainKey) ? ' (a new grain of this shape can take 10 seconds or more)' : '';
   status(started ? `Calculating…${slow}` : 'Starting the calculator (the first time takes a few seconds)…', 'busy');
+  let asked = false; // whether Java was asked (until then, it may still be starting)
+  let throat = null; // as worked out for the target pressure
   try {
     check(m);
     let data;
@@ -218,7 +182,8 @@ async function calculate() {
       abmax = data.abmax;
       web = data.web;
     } else {
-      const areas = await areasOf(m.grain);
+      asked = true;
+      const areas = await areasOf(m.grain, m.chamber);
       data = shapeData(m, areas);
       rows = shapeRows(areas);
       abmax = Math.max(...areas.burningArea);
@@ -226,27 +191,43 @@ async function calculate() {
     }
     const kn = knTable(m, rows, abmax, web);
     if (!(kn.dto > 0)) throw new Error('The grain has no burning area.');
+    throat = kn.dto;
+    asked = true;
     const result = await simulate(javaMotor(m, kn.dto));
     keptGrains = [grainKey, ...keptGrains.filter((k) => k !== grainKey)].slice(0, 4);
     started = true;
     if (mine !== generation) return;
+    // Beyond the pressures the propellant's burn rate was measured at, JSRM (as SRM's own lookup)
+    // goes on with the last range of burn rate data: worked out, but said to be extrapolated.
+    const upTo = propellant(m.propellant).burnUpTo;
+    const peak = result.summary.maxPressure + m.settings.ambientPressure;
+    const warning = peak > upTo
+      ? `The peak chamber pressure (${fmt(peak, 1)} MPa) is beyond ${m.propellant}’s measured burn rate data (up to ${fmt(upTo, 1)} MPa). Above it the burn rate is extrapolated, as SRM and METEOR do, and a real motor may burst. Use a bigger throat, or less burning area.`
+      : null;
     calc = {
-      m, data, kn, result,
+      m, data, kn, result, warning,
       perf: performance(m, result, kn),
       out: output(result),
       noz: nozzleDesign(m, kn.dto, result.nozzle.exitDiameter),
     };
     problem = null;
-    status(`${calc.out.designation} · ${fmt(calc.out.totalImpulse, 1)} N·s · Isp ${fmt(calc.out.isp, 1)} s`, 'ok');
+    status(`${calc.out.designation} · ${fmt(calc.out.totalImpulse, 1)} N·s · Isp ${fmt(calc.out.isp, 1)} s${warning ? ' · pressure beyond the burn rate data' : ''}`, warning ? 'warn' : 'ok');
   } catch (e) {
-    started = true;
+    if (asked) started = true;
     if (mine !== generation) return;
     calc = null;
     problem = e.message;
+    // With the throat from the target pressure, the throat is not theirs to narrow: say what to change.
+    if (m.throat.mode === 'target' && throat && /throat is wider than the grain’s core/.test(problem)) {
+      problem = `The throat that gives this target pressure (${fmt(throat, 2)} mm) is wider than the grain’s core (${fmt(m.grain.coreDiameter, 2)} mm). Choose a higher target pressure, or make the core wider.`;
+    }
     status('Not calculated: see the worksheet.', 'error');
   }
   fill();
+  // How many calculations have finished, for anything waiting on the next (test/motor-edges-e2e.mjs).
+  $('#status').dataset.calculations = String(++calculations);
 }
+let calculations = 0;
 
 function status(text, kind) {
   const el = $('#status');
@@ -265,13 +246,15 @@ function numCell(path, { digits = null, onChange = null, recalc: again = true } 
     input.classList.toggle('bad', input.value.trim() !== '' && !Number.isFinite(n));
     set(path, input.value.trim() === '' ? null : n);
     markDirty();
+    redrawLive();
     onChange?.();
     if (again) recalcSoon();
     else fill();
   });
-  // A formula shows its result once left, as in a spreadsheet.
+  // A formula shows its result once left, as in a spreadsheet (to 15 digits, as Excel shows it:
+  // =25.4*3 shows 76.2; the cell keeps the exact number).
   input.addEventListener('change', () => {
-    if (input.value.trim().startsWith('=') && Number.isFinite(get(path))) input.value = String(get(path));
+    if (input.value.trim().startsWith('=') && Number.isFinite(get(path))) input.value = String(Number(get(path).toPrecision(15)));
   });
   return input;
 }
@@ -327,6 +310,23 @@ function region(draw, cls = '') {
   return el;
 }
 
+/** A part of the sheet drawn from the inputs alone, at once and whether or not they work out (the grain). */
+function liveRegion(draw, cls = '') {
+  const el = h('div', { class: `wb-region ${cls}` });
+  const redraw = () => {
+    try {
+      el.replaceChildren(...[].concat(draw() ?? []));
+    } catch {
+      el.replaceChildren();
+    }
+  };
+  live.push(redraw);
+  regions.push(redraw);
+  return el;
+}
+let live = [];
+const redrawLive = () => live.forEach((f) => f());
+
 /** A row of a worksheet: symbol, cell, unit, description. */
 const row = (sym, cell, unit = '', desc = '', cls = '') => h('div', { class: `wb-row ${cls}` },
   h('span', { class: 'wb-sym', html: sym }), h('span', { class: 'wb-cell' }, cell), h('span', { class: 'wb-unit', html: unit }), h('span', { class: 'wb-desc' }, desc));
@@ -340,8 +340,10 @@ function fill() {
   for (const f of regions) f();
   const err = $('#wb-error');
   if (err) {
-    err.hidden = !problem;
-    err.textContent = problem ? `Error: ${problem}` : '';
+    const warning = !problem && calc?.warning;
+    err.hidden = !problem && !warning;
+    err.classList.toggle('warn', !!warning);
+    err.textContent = problem ? `Error: ${problem}` : warning ? `Warning: ${warning}` : '';
   }
   markEngDetails();
 }
@@ -379,6 +381,7 @@ function revealEngDetails() {
 function renderSheet() {
   outputs = [];
   regions = [];
+  live = [];
   const draw = {
     data: dataSheet, pressure: pressureSheet, performance: performanceSheet, nozzle: nozzleSheet, output: outputSheet, propellants: propellantSheet,
   }[sheet];
@@ -479,7 +482,7 @@ function dataSheet() {
       }, { yFrom0: false });
     }),
     region((c) => box(null, boxRow('K<sub>n max</sub>', h('b', {}, fmt(c.kn.knMax, 0))), boxRow('K<sub>n min</sub>', h('b', {}, fmt(c.kn.knMin, 0))), boxRow('K<sub>n avg</sub>', h('b', {}, fmt(c.kn.knAvg, 0)))), 'wb-results'),
-    region(() => grainSvg(model.grain, model.chamber.diameter), 'wb-grain'),
+    liveRegion(() => grainSvg(model.grain, model.chamber.diameter), 'wb-grain'),
   ];
   const table = h('details', { class: 'wb-table-wrap', open: true }, h('summary', {}, 'Kn table'),
     region((c) => (c.m.grain.type === 'hollow' ? knTableHollow(c) : knTableShape(c))));
@@ -622,18 +625,18 @@ function nozzleSheet() {
 function outputSheet() {
   const e = model.eng;
   const engRows = [
-    row('Name', h('input', { class: 'wb-in wide', type: 'text', value: e.name ?? '', maxlength: 40, placeholder: calc?.out.designation ?? '', oninput: (ev) => { e.name = ev.target.value; markDirty(); fill(); } }), '', 'Motor name in OpenRocket (no spaces); empty: its class and average thrust'),
+    row('Name', h('input', { class: 'wb-in wide', type: 'text', value: e.name ?? '', maxlength: 40, placeholder: calc?.out.designation ?? '', 'aria-label': 'eng.name', oninput: (ev) => { e.name = ev.target.value; markDirty(); fill(); } }), '', 'Motor name in OpenRocket (no spaces); empty: its class and average thrust'),
     row('D', numCell('eng.diameter', { recalc: false }), 'mm', 'Motor diameter (outside of the casing), as OpenRocket fits it in a motor mount'),
     row('L', numCell('eng.length', { recalc: false }), 'mm', 'Motor length, from the forward closure to the nozzle exit'),
     row('m <small>empty</small>', numCell('eng.hardwareMass', { recalc: false }), 'kg.', 'Motor mass without propellant (casing, nozzle, closures, liner)'),
-    row('Delays', h('input', { class: 'wb-in', type: 'text', value: e.delays ?? 'P', maxlength: 30, oninput: (ev) => { e.delays = ev.target.value; markDirty(); fill(); } }), '', 'Ejection delays in seconds (for example 4-6-8), or P for none'),
-    row('Maker', h('input', { class: 'wb-in wide', type: 'text', value: e.manufacturer ?? 'Custom', maxlength: 40, oninput: (ev) => { e.manufacturer = ev.target.value; markDirty(); fill(); } }), '', 'Manufacturer, as OpenRocket groups motors (one word)'),
+    row('Delays', h('input', { class: 'wb-in', type: 'text', value: e.delays ?? 'P', maxlength: 30, 'aria-label': 'eng.delays', oninput: (ev) => { e.delays = ev.target.value; markDirty(); fill(); } }), '', 'Ejection delays in seconds (for example 4-6-8), or P for none'),
+    row('Maker', h('input', { class: 'wb-in wide', type: 'text', value: e.manufacturer ?? 'Custom', maxlength: 40, 'aria-label': 'eng.manufacturer', oninput: (ev) => { e.manufacturer = ev.target.value; markDirty(); fill(); } }), '', 'Manufacturer, as OpenRocket groups motors (one word)'),
   ];
   const left = [
     h('h3', { class: 'wb-heading' }, 'Motor Output Data'),
     h('p', { class: 'wb-note' }, 'A summary of the motor’s performance, and its thrust curve for flight simulation.'),
     region((c) => h('table', { class: 'wb-summary' },
-      h('tr', {}, h('td', { colspan: 3, class: 'wb-summary-title' }, c.m.title || model.title || '', h('br'), c.m.subtitle || '')),
+      h('tr', {}, h('td', { colspan: 3, class: 'wb-summary-title' }, model.title || '', h('br'), model.subtitle || '')),
       ...[['Grain mass', c.out.grainMass, 3, 'kg.'], ['', c.out.grainMassLb, 3, 'lb.'], ['Total impulse', c.out.totalImpulse, 1, 'N-sec.'], ['', c.out.totalImpulseLbs, 1, 'lb-sec.'],
         ['Average thrust', c.out.averageThrust, 1, 'N.'], ['', c.out.averageThrustLb, 1, 'lb.'], ['Thrust time', c.out.thrustTime, 3, 'sec.'], ['Specific Impulse', c.out.isp, 1, 'sec.']]
         .map(([l, v, d, u]) => h('tr', {}, h('td', {}, l), h('td', { class: 'num', title: String(v) }, h('b', {}, fmt(v, d))), h('td', {}, u))),
@@ -655,7 +658,7 @@ function outputSheet() {
   });
   const dl = h('button', { type: 'button', class: 'ghost' }, icon('download'), 'Download .eng');
   dl.onclick = downloadEng;
-  const use = h('button', { type: 'button' }, icon('flame'), 'Use in OpenRocket');
+  const use = h('button', { type: 'button' }, 'Use in OpenRocket');
   use.onclick = useInOpenRocket;
   const right = [
     region((c) => xyChart({ title: 'Thrust vs time', x: { title: 'Time', unit: 'seconds' }, y: { title: 'Thrust', unit: 'Newtons' },
@@ -732,6 +735,8 @@ function nozzleSvg(c) {
 
 /** The grain's end, as seen down the motor: SRM's hollow cylinder, or the shape METEOR models. */
 function grainSvg(g, chamberDiameter) {
+  // Drawn once its dimensions are numbers (with an empty or bad cell, nothing yet).
+  if (!(chamberDiameter > 0) || !(grainOuterDiameter(g) > 0) || GRAIN_FIELDS[g.type].some(([key]) => !(Number.isFinite(g[key]) && g[key] >= 0))) return null;
   const R = 130;
   const scale = R / (chamberDiameter / 2);
   const c = 150;
@@ -788,23 +793,38 @@ function downloadEng() {
   if (f) saveFile(new TextEncoder().encode(f.text), f.filename);
 }
 
+let adding = false;
+
+/**
+ * Adds the motor to their custom motors and saves it, with the motor's id: the motor it added
+ * before is removed once the new one is in and saved (never before, so a failure loses nothing).
+ */
 async function useInOpenRocket() {
+  if (adding) return;
   const f = currentEng();
   if (!f) return;
-  const button = $('#use-openrocket');
-  button.disabled = true;
+  adding = true;
+  const buttons = [$('#use-openrocket'), ...document.querySelectorAll('.wb-eng .wb-actions button')];
+  buttons.forEach((b) => (b.disabled = true));
   try {
     const bytes = new TextEncoder().encode(f.text);
     const { motors, text } = readMotorFile(f.filename, Object.assign(bytes, { toString: () => f.text }));
-    // The motor replaces the one this design added before, if any.
-    if (record?.motor_id) await api('motors', { action: 'delete', id: record.motor_id }).catch(() => {});
+    if (!(await motorName())) return; // asked first: nothing is added if they cancel
+    const before = record?.motor_id ?? null;
     const added = await api('motors', { action: 'add', filename: f.filename, content: text, summary: JSON.stringify(motors) });
-    await save({ motorId: added.id, quiet: true });
+    try {
+      if (!(await save({ motorId: added.id, quiet: true }))) throw new Error('The motor could not be saved.');
+    } catch (e) {
+      await api('motors', { action: 'delete', id: added.id }).catch(() => {});
+      throw e;
+    }
+    if (before && before !== added.id) await api('motors', { action: 'delete', id: before }).catch(() => {});
     addedDialog(motors[0]);
   } catch (e) {
     toast(e.message);
   } finally {
-    button.disabled = false;
+    adding = false;
+    buttons.forEach((b) => (b.disabled = false));
   }
 }
 
@@ -846,10 +866,25 @@ function summaryOf(card) {
   return `${card.designation} · ${card.propellant} · ${card.grain}${segs}`;
 }
 
-async function save({ motorId, quiet = false } = {}) {
-  const name = $('#motor-name').value.trim() || model.title?.trim() || (await promptDialog('Save motor', 'Name', calc?.out.designation ?? 'My motor', 'Save'));
+/** The motor's name: as typed above the sheets, else its title, else asked for (null if they cancel). */
+async function motorName() {
+  const name = $('#motor-name').value.trim() || model.title?.trim() || (await promptDialog('Save motor', 'Name', calc?.out.designation ?? 'My motor', 'Save'))?.trim();
+  if (name) $('#motor-name').value = name;
+  return name || null;
+}
+
+// Saves run one after another, so that two at once (Save, and Use in OpenRocket) make one motor.
+let saving = Promise.resolve();
+
+function save(options) {
+  const run = saving.catch(() => {}).then(() => saveNow(options));
+  saving = run;
+  return run;
+}
+
+async function saveNow({ motorId, quiet = false } = {}) {
+  const name = await motorName();
   if (!name) return null;
-  $('#motor-name').value = name;
   const card = cardOf();
   const body = {
     name,
@@ -928,10 +963,15 @@ function modelOf(r) {
 
 let motors = [];
 
+let menusClose = false;
+
 async function showMotors() {
   $('#motors').hidden = false;
   $('#motor-search').oninput = renderMotors;
-  document.addEventListener('click', () => document.querySelectorAll('.menu').forEach((m) => (m.hidden = true)));
+  if (!menusClose) {
+    menusClose = true;
+    document.addEventListener('click', () => document.querySelectorAll('.menu').forEach((m) => (m.hidden = true)));
+  }
   try {
     motors = await api('motorDesigns', { action: 'list' });
   } catch (e) {

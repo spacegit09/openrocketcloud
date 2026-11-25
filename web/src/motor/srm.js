@@ -171,8 +171,9 @@ export function grainHoles(g) {
 
 /**
  * Each grain shape's dimensions, as the Data and Kn worksheet asks for them: [key, symbol,
- * description, kind], kind 'count' for a whole number and 'zero' for one that may be 0 (as METEOR
- * allows); the rest must be more than 0. The meanings are JSRM's (its grain classes).
+ * description, kind, most], kind 'count' for a whole number from 1 to `most` (100 if not given;
+ * METEOR's limits for fins and star points) and 'zero' for one that may be 0 (as METEOR allows);
+ * the rest must be more than 0. The meanings are JSRM's (its grain classes).
  */
 export const GRAIN_FIELDS = {
   hollow: [['outerDiameter', 'Do', 'Outer diameter (initial)'], ['coreDiameter', 'do', 'Core diameter (initial)'],
@@ -184,12 +185,12 @@ export const GRAIN_FIELDS = {
     ['slotOffset', 'os', 'Slot offset, from the grain’s centre line to the slot’s', 'zero'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   finocyl: [['outerDiameter', 'Do', 'Outer diameter'], ['innerDiameter', 'do', 'Core diameter'], ['finWidth', 'wf', 'Fin width'],
-    ['finDiameter', 'Df', 'Fin tip diameter (centre to fin tip × 2)'], ['finCount', 'nf', 'Number of fins', 'count'],
+    ['finDiameter', 'Df', 'Fin tip diameter (centre to fin tip × 2)'], ['finCount', 'nf', 'Number of fins', 'count', 10],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   moonBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['coreDiameter', 'do', 'Core diameter'], ['coreOffset', 'oc', 'Core offset (from the centre)', 'zero'],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   star: [['outerDiameter', 'Do', 'Outer diameter'], ['innerDiameter', 'Di', 'Star inner diameter (centre to inner points × 2)'],
-    ['pointDiameter', 'Dp', 'Star point diameter (centre to outer points × 2)'], ['pointCount', 'np', 'Number of points', 'count'],
+    ['pointDiameter', 'Dp', 'Star point diameter (centre to outer points × 2)'], ['pointCount', 'np', 'Number of points', 'count', 9],
     ['segmentLength', 'Lo', 'Segment length'], ['segments', 'N', 'Number of segments', 'count']],
   endBurner: [['outerDiameter', 'Do', 'Outer diameter'], ['length', 'Lo', 'Grain length'], ['holeDiameter', 'dh', 'Ignition hole diameter (0: none)', 'zero'],
     ['holeDepth', 'hh', 'Ignition hole depth', 'zero']],
@@ -461,6 +462,56 @@ const trapezoid = (pts) => {
   for (let i = 1; i < pts.length; i++) s += (pts[i][1] + pts[i - 1][1]) / 2 * (pts[i][0] - pts[i - 1][0]);
   return s;
 };
+
+/**
+ * A cell's number: as typed, or, as in SRM, a formula after "=" (for instance =25.4*2.75 for 2.75
+ * inches in millimetres): numbers, + − × ÷ ^ and brackets. Not a number: NaN, never a guess.
+ */
+export function cellNumber(text) {
+  const s = String(text ?? '').trim();
+  if (!s) return NaN;
+  if (!s.startsWith('=')) {
+    if (!s.includes(',')) return Number(s);
+    // Commas: thousands (12,345.6 or 1,234,567) or a decimal comma (1,5 or 0,85), as people type
+    // them around the world. One comma and three digits (1,200) could be either: not guessed.
+    if (/^[+-]?\d{1,3}(,\d{3})+\.\d*$|^[+-]?\d{1,3}(,\d{3}){2,}$/.test(s)) return Number(s.replace(/,/g, ''));
+    if (/^[+-]?\d*,\d+$/.test(s) && !/^[+-]?\d{1,3},\d{3}$/.test(s)) return Number(s.replace(',', '.'));
+    return NaN;
+  }
+  const tokens = s.slice(1).match(/\d*\.?\d+(?:e[+-]?\d+)?|[-+*/^()]|\S/gi) ?? [];
+  let i = 0;
+  const peek = () => tokens[i];
+  const take = () => tokens[i++];
+  const expr = () => {
+    let v = term();
+    while (peek() === '+' || peek() === '-') v = take() === '+' ? v + term() : v - term();
+    return v;
+  };
+  const term = () => {
+    let v = power();
+    while (peek() === '*' || peek() === '/') v = take() === '*' ? v * power() : v / power();
+    return v;
+  };
+  // As in Excel: ^ from left to right (=2^3^2 is 64), and a minus sign before it (=-2^2 is 4).
+  const power = () => {
+    let v = unary();
+    while (peek() === '^') v = (take(), v ** unary());
+    return v;
+  };
+  const unary = () => {
+    if (peek() === '-') return take(), -unary();
+    if (peek() === '+') return take(), unary();
+    if (peek() === '(') {
+      take();
+      const v = expr();
+      return take() === ')' ? v : NaN;
+    }
+    const t = take();
+    return t != null && /^\d*\.?\d+(e[+-]?\d+)?$/i.test(t) ? Number(t) : NaN;
+  };
+  const v = expr();
+  return i === tokens.length ? v : NaN;
+}
 
 /** A word OpenRocket's .eng reader takes (no spaces), or the fallback. */
 const word = (s, fallback) => String(s ?? '').trim().replace(/\s+/g, '-').replace(/[^\x21-\x7e]/g, '') || fallback;

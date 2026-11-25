@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import {
-  engFile, engMissing, exampleMotor, grainDefaults, grainHoles, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
+  GRAIN_FIELDS, cellNumber, engFile, engMissing, exampleMotor, grainDefaults, grainHoles, hollowData, knForPressure, knTable, nozzleDesign, output, performance, pressureConstants, targetPressure,
 } from '../src/motor/srm.js';
 import { readMotorFile } from '../../server/src/motors.js';
 
@@ -194,4 +194,22 @@ test('engMissing: the motor file\'s details SRM does not work out, as engFile as
   assert.deepEqual(engMissing({ diameter: 83, length: 0, hardwareMass: 0 }), ['length'], 'an empty mass of 0 is allowed');
   assert.deepEqual(engMissing({ diameter: 83, length: 560, hardwareMass: 1.9 }), []);
   assert.throws(() => engFile(jsrm, { diameter: 83, length: null, delays: 'P', hardwareMass: 1.9 }), /length/);
+});
+
+test('cellNumber: numbers and Excel formulas as typed, and never a guess', () => {
+  const cases = [
+    ['69', 69], [' 69.5 ', 69.5], ['-5', -5], ['1e3', 1000],
+    // A decimal comma, and thousands, as typed around the world; 1,200 could be either.
+    ['1,5', 1.5], ['0,85', 0.85], ['12,345.6', 12345.6], ['1,234,567', 1234567], ['1,200', NaN], ['1,2,3', NaN],
+    // Formulas, as Excel works them out (SRM's hint: =25.4*number for inches).
+    ['=25.4*2.75', 69.85], ['=(1+2)^2', 9], ['=2^3^2', 64], ['=-2^2', 4], ['=2*3^2', 18], ['=2^-1', 0.5], ['=1e3/2', 500],
+    ['=1/0', Infinity], ['=25,4*2', NaN], ['=(1+2', NaN], ['=1+', NaN], ['abc', NaN], ['', NaN], ['1.2.3', NaN],
+  ];
+  for (const [text, want] of cases) assert.ok(Object.is(cellNumber(text), want) || Math.abs(cellNumber(text) - want) < 1e-12, `${text} -> ${cellNumber(text)}`);
+});
+
+test('grain counts: METEOR\'s limits for fins (10) and star points (9)', () => {
+  const most = (type, key) => GRAIN_FIELDS[type].find(([k]) => k === key)[4];
+  assert.equal(most('finocyl', 'finCount'), 10);
+  assert.equal(most('star', 'pointCount'), 9);
 });

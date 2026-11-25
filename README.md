@@ -188,7 +188,9 @@ as from a new grain. The worksheets' own cells (the Kn table, the
 throat that gives the target pressure, the nozzle's lengths, the thrust-time table) are worked out
 as the spreadsheet does, in `web/src/motor/srm.js`; `web/test/srm.test.mjs` checks them against the
 values saved in SRM_2023.xls, and `web/test/motor-e2e.mjs` checks that JSRM in the browser answers as
-JSRM in Java (`web/test/fixtures/jsrm-native.json`). Grains are SRM's hollow cylinder (BATES) and
+JSRM in Java (`web/test/fixtures/jsrm-native.json`); `web/test/motor-edges-e2e.mjs` goes through
+every feature and edge case as people use the page (cells, each grain's limits, JSRM's errors in
+plain words, saving, the motor file, "Use in OpenRocket", the list of motors, phones, dark mode). Grains are SRM's hollow cylinder (BATES) and
 METEOR's other shapes (C-slot, end burner, finocyl, moon burner, rod and tube, star), whose geometry
 is JSRM's, not SRM's. Motors are saved sealed (`MotorDesign` records, `motorDesigns` function),
 download as RASP .eng files, and go into OpenRocket's motor selector as custom motors. It comes with

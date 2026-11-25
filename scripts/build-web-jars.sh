@@ -55,7 +55,9 @@ docker run --rm -v "$root":/w -w /w -e JSRM="${jsrm#"$root"/}" -e PATCH="${jsrm_
 docker run --rm -v "$root":/w -w /w -e JAR="web/.cache/OpenRocket-$ver.jar" eclipse-temurin:17-jdk sh -c '
   set -e
   classes=$(mktemp -d)
-  javac --release 17 -nowarn -cp "$JAR:web/public/or/jsrm-web.jar" -d "$classes" $(find worker/bridge/src worker/bridge/web -name "*.java") 2>&1 | grep -v "^Note:" || true
+  # A compile error stops the build (a jar without the classes that failed would still run, broken).
+  javac --release 17 -nowarn -cp "$JAR:web/public/or/jsrm-web.jar" -d "$classes" $(find worker/bridge/src worker/bridge/web -name "*.java") 2>"$classes.log" || { grep -v "^Note:" "$classes.log"; exit 1; }
+  grep -v "^Note:" "$classes.log" || true
   mkdir -p "$classes/orcloud"
   # The @Plugin classes, for the browser replacement of OpenRocket'"'"'s class-path scanner.
   java -cp "$JAR:$classes" orcloud.web.PluginIndex > "$classes/orcloud/plugins.txt"

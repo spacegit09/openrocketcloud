@@ -61,6 +61,7 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-status[data-kind="busy"]::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: wb-spin 0.8s linear infinite; vertical-align: -1px; }
 .wb-status[data-kind="ok"] { color: var(--text); font-weight: 600; }
 .wb-status[data-kind="error"] { color: var(--danger); }
+.wb-status[data-kind="warn"] { color: var(--danger); font-weight: 600; }
 @keyframes wb-spin { to { transform: rotate(360deg); } }
 #save.unsaved::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #f59f00; margin-left: 2px; }
 .wb-sheet { flex: 1; min-height: 0; overflow: auto; background: var(--bg); }
@@ -109,6 +110,7 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-note { color: var(--muted); font-size: 12.5px; margin: 6px 0 10px; }
 .wb-note.warn { color: var(--srm-red); }
 .wb-error { color: var(--srm-red); font-weight: 700; border: 1px solid var(--srm-red); padding: 6px 10px; margin-bottom: 12px; background: color-mix(in srgb, var(--srm-red) 8%, var(--srm-paper)); }
+.wb-error.warn { font-weight: 600; }
 .wb-right { display: grid; gap: 14px; min-width: 0; }
 .wb-region:empty { display: none; }
 .wb-results { justify-self: end; }
