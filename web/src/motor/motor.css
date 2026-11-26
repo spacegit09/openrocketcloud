@@ -70,6 +70,11 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-tabs button { border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); background: var(--surface-2); color: var(--muted); padding: 5px 14px 6px; font-size: 13px; white-space: nowrap; margin-top: -1px; }
 .wb-tabs button.active { background: var(--srm-paper); color: var(--text); font-weight: 600; }
 /* The motor file's details are wanted (src/motor.js, markEngDetails): a red dot on the Output tab. */
+/* Motor Design | Casing Design, at the top; the worksheets' tabs (Motor Design's) at the bottom. */
+.wb-views { display: flex; gap: 2px; padding: 6px 14px 0; background: var(--surface-2); border-bottom: 1px solid var(--border); flex-shrink: 0; overflow-x: auto; }
+.wb-views button { border: 1px solid var(--border); border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; background: var(--surface-2); color: var(--muted); padding: 6px 16px 7px; font-size: 13.5px; white-space: nowrap; margin-bottom: -1px; }
+.wb-views button.active { background: var(--srm-paper); color: var(--text); font-weight: 600; }
+.wb-views button.needs::after,
 .wb-tabs button.needs::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-radius: 50%; background: var(--srm-red); vertical-align: 1px; }
 
 .wb-cols { display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 28px; align-items: start; }
@@ -175,3 +180,20 @@ body.workbook-page { height: 100vh; display: flex; flex-direction: column; overf
 .wb-drawing.grain .casing { fill: var(--surface-2); stroke: var(--muted); stroke-width: 2; }
 .wb-drawing.grain .grain { fill: var(--srm-grain); }
 .wb-credit { margin: 22px 0 0; padding-top: 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11.5px; }
+
+/* Casing Design (Nakka's CASING.XLS) */
+.wb-casing-notes { border: 1px solid var(--srm-red); color: var(--srm-red); background: color-mix(in srgb, var(--srm-red) 6%, var(--srm-paper)); padding: 4px 10px; margin-bottom: 10px; font-size: 12.5px; }
+.wb-casing-notes p { margin: 4px 0; }
+.wb-live-text { color: var(--muted); font-size: 12.5px; }
+.wb-casing-drawing { justify-self: center; width: min(260px, 100%); }
+.wb-drawing.casing .wall-ring { fill: var(--muted); }
+.wb-drawing.casing .bore { fill: var(--surface-2); }
+.wb-drawing.casing .grain-out { fill: none; stroke: var(--srm-grain); stroke-width: 3; stroke-dasharray: 6 4; }
+.wb-drawing.casing .grain-out.too-big { stroke: var(--srm-red); }
+.wb-note.center { text-align: center; }
+.wb-casing-motor .wb-box { display: block; color: var(--text); padding: 10px 14px; }
+.wb-casing-motor .wb-box p { margin: 4px 0; }
+.wb-verdict { font-weight: 700; }
+.wb-verdict.ok { color: var(--ok, #15803d); }
+.wb-verdict.bad { color: var(--srm-red); }
+.wb-casing-motor .wb-actions { margin-top: 8px; }

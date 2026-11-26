@@ -8,7 +8,11 @@
 //   - each worksheet, the title, saving and opening again, the motor file, and "Use in OpenRocket"
 //     twice and in a hurry (one custom motor, the old one replaced);
 //   - the list of motors (search, duplicate, rename, delete), leaving with changes, a phone's
-//     screen and dark mode.
+//     screen and dark mode;
+//   - a cell being typed (half a formula, emptied) says nothing until it is a number or left; the
+//     title line follows the propellant; a throat of one's own starts as the worked-out one;
+//   - Casing Design (Nakka's CASING.XLS): the casing suggested, its limits and cautions, the motor's
+//     pressure checked against it on every sheet, and its diameters and pressure carried into the motor.
 // Screenshots go to test/out/ (motor-edge-*.png).
 //   node test/motor-edges-e2e.mjs
 import assert from 'node:assert/strict';
@@ -25,6 +29,7 @@ import { guardDevReloads } from './dev-reload-guard.mjs';
 import { fakeDb } from './fake-base44.mjs';
 
 const WEB = 5196;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const out = join(import.meta.dirname, 'out');
 mkdirSync(out, { recursive: true });
 const downloads = mkdtempSync(join(tmpdir(), 'orc-eng-'));
@@ -122,17 +127,27 @@ async function next(page, act) {
     drawn: !!document.querySelector('.wb-grain svg'),
   }));
 }
-/** Cells given values at once (inputs by `input`, drop-downs by `change`), then the calculation. */
-const edit = (page, changes) => next(page, () => page.evaluate((changes) => {
+/** Cells given values at once, as people do (inputs typed in and left, drop-downs chosen). */
+const setCells = (page, changes) => page.evaluate((changes) => {
   for (const [label, v] of changes) {
     const el = document.querySelector(`[aria-label="${label}"]`);
     if (!el) throw new Error(`no cell ${label}`);
     el.value = v;
-    el.dispatchEvent(new Event(el.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+    if (el.tagName !== 'SELECT') el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
   }
-}, changes));
+}, changes);
+/** Cells given values, then the calculation. */
+const edit = (page, changes) => next(page, () => setCells(page, changes));
 const values = (page, labels) => page.evaluate((labels) => labels.map((l) => document.querySelector(`[aria-label="${l}"]`)?.value), labels);
-const tab = (page, label) => page.evaluate((label) => [...document.querySelectorAll('#tabs button')].find((b) => b.textContent === label).click(), label);
+/** A design (Motor Design, Casing Design: at the top) or one of Motor Design's worksheets (at the bottom). */
+const tab = (page, label) => page.evaluate((label) => {
+  const views = [...document.querySelectorAll('#views button')];
+  const top = views.find((b) => b.textContent === label);
+  if (top) return top.click();
+  views.find((b) => b.dataset.view === 'motor').click();
+  [...document.querySelectorAll('#tabs button')].find((b) => b.textContent === label).click();
+}, label);
 const shape = (page, type) => edit(page, [['grain.type', type]]);
 /** A new motor (SRM_2023's example), worked out: each check starts from it. */
 async function fresh(page) {
@@ -190,11 +205,7 @@ try {
       r = await refused(page, [['chamber.length', bad]], /Enter the chamber length/);
     }
     // A bad cell is shaded, as SRM's would be.
-    await page.evaluate(() => {
-      const el = document.querySelector('[aria-label="chamber.length"]');
-      el.value = 'abc';
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    await setCells(page, [['chamber.length', 'abc']]);
     assert.equal(await page.$eval('[aria-label="chamber.length"]', (el) => el.classList.contains('bad')), true);
     await accepted(page, [['chamber.length', '470']]);
     // A formula shows its result once the cell is left.
@@ -338,7 +349,7 @@ try {
     await fresh(page);
     const r = await accepted(page, [['grain.outerDiameter', '69']]);
     assert.match(r.status, /^[A-Z]\d+ ·/);
-    for (const [label, file] of [['Pressure', 'pressure'], ['Performance', 'performance'], ['Nozzle Design', 'nozzle'], ['Output', 'output'], ['Propellant data', 'propellants'], ['Data and Kn', 'data']]) {
+    for (const [label, file] of [['Pressure', 'pressure'], ['Performance', 'performance'], ['Nozzle Design', 'nozzle'], ['Casing Design', 'casing'], ['Output', 'output'], ['Propellant data', 'propellants'], ['Data and Kn', 'data']]) {
       await tab(page, label);
       const drawn = await page.$$eval('#sheet .mt-chart, #sheet .wb-table, #sheet .wb-drawing, #sheet .wb-summary', (els) => els.length);
       assert.ok(drawn > 0, `${label}: nothing drawn`);
@@ -346,11 +357,235 @@ try {
     }
     // Not worked out: the error on every worksheet, and nothing else missing.
     await edit(page, [['grain.segments', '0']]);
-    for (const label of ['Pressure', 'Performance', 'Nozzle Design', 'Output', 'Data and Kn']) {
+    for (const label of ['Pressure', 'Performance', 'Nozzle Design', 'Casing Design', 'Output', 'Data and Kn']) {
       await tab(page, label);
       assert.match(await page.$eval('#wb-error', (el) => (el.hidden ? '' : el.textContent)), /Enter the number of segments/, label);
     }
     await accepted(page, [['grain.segments', '4']]);
+  });
+
+  await check('a cell being typed says nothing until it is a number, or until it is left', async () => {
+    await fresh(page);
+    const n0 = await finished(page);
+    const cellBad = () => page.$eval('[aria-label="chamber.length"]', (el) => el.classList.contains('bad'));
+    await page.$eval('[aria-label="chamber.length"]', (el) => { el.focus(); el.select(); });
+    await page.keyboard.type('=25.4*', { delay: 40 });
+    await sleep(1200); // well past the 350 ms a calculation waits for typing to stop
+    assert.equal(await finished(page), n0, 'no calculation for half a formula');
+    assert.equal(await page.$eval('#wb-error', (el) => el.hidden), true, 'no error while it is typed');
+    assert.equal(await cellBad(), false, 'not shaded while it is typed');
+    let r = await next(page, () => page.keyboard.press('Tab')); // left: now it is said
+    assert.equal(r.kind, 'error');
+    assert.match(r.error, /Enter the chamber length/);
+    assert.equal(await cellBad(), true, 'shaded once left');
+    await page.$eval('[aria-label="chamber.length"]', (el) => { el.focus(); el.select(); });
+    r = await next(page, () => page.keyboard.type('=25.4*18.5', { delay: 40 })); // finished: worked out as typed
+    assert.equal(r.kind, 'ok', r.error);
+    assert.equal(await cellBad(), false);
+    // Emptied to type a new number: nothing said in between.
+    const n1 = await finished(page);
+    await page.$eval('[aria-label="chamber.length"]', (el) => { el.focus(); el.select(); });
+    await page.keyboard.press('Backspace');
+    await sleep(1200);
+    assert.equal(await finished(page), n1, 'no calculation for an emptied cell being typed into');
+    assert.equal(await page.$eval('#wb-error', (el) => el.hidden), true);
+    r = await next(page, () => page.keyboard.type('470', { delay: 40 }));
+    assert.equal(r.kind, 'ok', r.error);
+  });
+
+  await check('SRM\'s title line follows the propellant, until it is someone\'s own', async () => {
+    await fresh(page);
+    const line = () => page.$eval('[aria-label="Second title line"]', (el) => el.value);
+    assert.equal(await line(), 'utilizing KNDX propellant.');
+    await accepted(page, [['propellant', 'KNSB fine']]);
+    assert.equal(await line(), 'utilizing KNSB fine propellant.');
+    await tab(page, 'Output');
+    assert.match(await page.$eval('.wb-summary-title', (el) => el.textContent), /utilizing KNSB fine propellant\./);
+    await tab(page, 'Data and Kn');
+    await page.evaluate(() => {
+      const el = document.querySelector('[aria-label="Second title line"]');
+      el.value = 'for the club’s 2027 season';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await accepted(page, [['propellant', 'KNSU']]);
+    assert.equal(await line(), 'for the club’s 2027 season');
+  });
+
+  await check('a throat of one\'s own starts as the throat the target pressure gave', async () => {
+    await fresh(page);
+    await accepted(page, [['throat.target', '1000 psi']]);
+    const dto = Number(await page.evaluate(() => [...document.querySelectorAll('#sheet .wb-row')].find((r) => /^Throat diameter \(initial\)$/.test(r.querySelector('.wb-desc').textContent)).querySelector('.wb-out').title));
+    assert.ok(dto > 0 && Math.abs(dto - 16.79) > 0.05, `the target's throat (${dto} mm) differs from the example's stored one`);
+    const before = await page.$eval('#status', (el) => el.textContent);
+    const r = await edit(page, [['throat.mode', 'diameter']]);
+    assert.equal(r.kind, 'ok', r.error);
+    assert.equal(await page.$eval('[aria-label="throat.diameter"]', (el) => el.value), String(Math.round(dto * 100) / 100));
+    assert.equal(r.status.split(' · ')[0], before.split(' · ')[0], 'the same motor class');
+  });
+
+  /** The Casing Design sheet's worked-out cells, by their descriptions, and what it says. */
+  const casingOut = (page) => page.evaluate(() => {
+    const val = (re) => [...document.querySelectorAll('#sheet .wb-row')].find((r) => re.test(r.querySelector('.wb-desc')?.textContent ?? ''))?.querySelector('.wb-out')?.textContent ?? null;
+    const psi = (re) => [...document.querySelectorAll('#sheet .wb-row')].find((r) => re.test(r.querySelector('.wb-desc')?.textContent ?? ''))?.nextElementSibling?.querySelector('.wb-out')?.textContent ?? null;
+    const text = (sel) => document.querySelector(sel)?.textContent ?? '';
+    const banner = document.querySelector('#wb-error');
+    return {
+      di: val(/^Inside diameter/), beta: val(/^Fty\/Ftu$/), b: val(/^Burst factor/), pd: val(/^Design pressure/), pdPsi: psi(/^Design pressure/),
+      pu: val(/^Burst pressure$/), su: val(/^Burst safety/), dd: val(/^Diameter increase/), dc: val(/^Circumference increase/),
+      error: text('#casing-error'), notes: text('#casing-notes'), verdict: text('#casing-verdict'), fit: text('#casing-fit'),
+      status: text('#status'), kind: document.querySelector('#status').dataset.kind, banner: banner.hidden ? '' : banner.textContent,
+      use: document.querySelector('#casing-use')?.disabled ?? null, meop: text('#casing-meop'), meopOff: document.querySelector('#casing-meop')?.disabled ?? null,
+    };
+  });
+
+  await check('Casing Design at the top; the worksheets\' tabs at the bottom, Motor Design\'s only', async () => {
+    await fresh(page);
+    const layout = () => page.evaluate(() => ({
+      views: [...document.querySelectorAll('#views button')].map((b) => `${b.textContent}${b.classList.contains('active') ? '*' : ''}${b.classList.contains('needs') ? '•' : ''}`).join(' | '),
+      tabs: document.querySelector('#tabs').hidden ? null : [...document.querySelectorAll('#tabs button')].map((b) => b.textContent).join(' | '),
+      heading: document.querySelector('#sheet .wb-heading')?.textContent,
+    }));
+    assert.deepEqual(await layout(), { views: 'Motor Design* | Casing Design', tabs: 'Data and Kn | Pressure | Performance | Nozzle Design | Output | Propellant data', heading: 'Basic Data and Kn Calculation' });
+    await tab(page, 'Casing Design');
+    assert.deepEqual(await layout(), { views: 'Motor Design | Casing Design*', tabs: null, heading: 'Motor Casing Design' });
+    await tab(page, 'Motor Design'); // back to the worksheet it was on
+    assert.deepEqual(await layout(), { views: 'Motor Design* | Casing Design', tabs: 'Data and Kn | Pressure | Performance | Nozzle Design | Output | Propellant data', heading: 'Basic Data and Kn Calculation' });
+    await tab(page, 'Pressure');
+    await tab(page, 'Casing Design');
+    await tab(page, 'Motor Design');
+    assert.equal((await layout()).heading, 'Rocket Motor chamber pressure');
+    // The motor file's details asked for: the red dot is on Motor Design while the Output tab is hidden.
+    await page.click('#use-openrocket');
+    await page.waitForFunction(() => document.querySelector('#tabs button[data-sheet="output"]').classList.contains('needs'), { timeout: 20_000 });
+    assert.equal((await layout()).heading, 'Motor Output Data', 'taken to the Output sheet');
+    await tab(page, 'Casing Design');
+    assert.equal((await layout()).views, 'Motor Design• | Casing Design*');
+    // From the casing, the motor file needs its details: to Motor Design's Output sheet.
+    await page.click('#download-eng');
+    await page.waitForFunction(() => document.querySelector('#views button[data-view="motor"]').classList.contains('active'), { timeout: 20_000 });
+    assert.equal((await layout()).heading, 'Motor Output Data');
+    assert.equal((await layout()).views, 'Motor Design* | Casing Design');
+    await tab(page, 'Data and Kn');
+  });
+
+  await check('Casing Design: Nakka\'s example tube around the chamber, and the motor within it', async () => {
+    await fresh(page);
+    const n0 = await finished(page);
+    await tab(page, 'Casing Design');
+    assert.deepEqual(await values(page, ['casing.material', 'casing.outerDiameter', 'casing.wall', 'casing.designFactor', 'casing.fty', 'casing.ftu', 'casing.e', 'casing.nu', 'casing.temperature']),
+      ['6061-t6511', '78.302', '1.651', '1.5', '241.325', '262.01', '68310', '0.33', '20']);
+    const c = await casingOut(page);
+    assert.deepEqual([c.di, c.beta, c.b, c.pd, c.pdPsi, c.pu, c.su, c.dd, c.dc], ['75.00', '0.921', '1.231', '6.78', '984', '12.53', '1.85', '0.154', '0.484']);
+    assert.match(c.verdict, /^Within the design pressure \(\d+% to spare\)\.$/);
+    assert.equal(c.error, '');
+    assert.equal(c.banner, '', 'a suggested casing warns nowhere');
+    assert.equal(await page.$$eval('#sheet .wb-drawing.casing', (els) => els.length), 1, 'drawn');
+    assert.equal(await finished(page), n0, 'no calculation from the casing');
+    await page.screenshot({ path: join(out, 'motor-edge-casing.png') });
+    // Nakka's own example, in inches: 2.368 in inside, 0.065 in wall, 1214 psi.
+    await setCells(page, [['casing.outerDiameter', '=25.4*(2.368+2*0.065)'], ['casing.wall', '=25.4*0.065']]);
+    const ex = await casingOut(page);
+    assert.deepEqual([ex.pdPsi, ex.su], ['1214', '1.85']);
+    assert.equal(await page.$eval('[aria-label="casing.outerDiameter"]', (el) => el.value), '63.4492');
+    assert.equal(await finished(page), n0, 'still no calculation');
+  });
+
+  await check('Casing Design: a weaker casing, warned of on every sheet', async () => {
+    await setCells(page, [['casing.outerDiameter', '78.302'], ['casing.wall', '1.651'], ['casing.material', '6061-t4']]);
+    let c = await casingOut(page);
+    assert.match(c.verdict, /^Above the design pressure/);
+    assert.match(c.status, / · above the casing’s design pressure$/);
+    assert.equal(c.kind, 'warn');
+    assert.match(c.banner, /^Warning: The peak chamber pressure \([\d.]+ MPa\) is above the casing’s design pressure \(3\.10 MPa, with a design factor of 1\.50\)/);
+    for (const label of ['Data and Kn', 'Pressure', 'Output', 'Casing Design']) {
+      await tab(page, label);
+      assert.match((await casingOut(page)).banner, /above the casing’s design pressure/, label);
+    }
+    await setCells(page, [['casing.wall', '0.6']]);
+    c = await casingOut(page);
+    assert.match(c.verdict, /^At or above the burst pressure/);
+    assert.match(c.status, / · beyond the casing’s burst pressure$/);
+    assert.match(c.banner, /at or above the casing’s burst pressure \([\d.]+ MPa\): it would likely burst/);
+    // A stronger tube, and all is well again.
+    await setCells(page, [['casing.wall', '1.651'], ['casing.material', '4130-n']]);
+    c = await casingOut(page);
+    assert.match(c.verdict, /^Within the design pressure/);
+    assert.equal(c.banner, '');
+    assert.equal(c.kind, 'ok');
+  });
+
+  await check('Casing Design: what a casing cannot be, and its cautions', async () => {
+    const said = async (changes, key, re) => {
+      await setCells(page, changes);
+      const c = await casingOut(page);
+      assert.match(c[key], re, `${JSON.stringify(changes)}: ${c.error || c.notes}`);
+      return c;
+    };
+    await said([['casing.wall', '40']], 'error', /The wall is as thick as the casing’s radius or thicker/);
+    await said([['casing.wall', '']], 'error', /Enter the casing’s wall thickness/);
+    await said([['casing.wall', 'abc']], 'error', /Enter the casing’s wall thickness/);
+    assert.equal(await page.$eval('[aria-label="casing.wall"]', (el) => el.classList.contains('bad')), true);
+    await said([['casing.wall', '1.651'], ['casing.outerDiameter', '0']], 'error', /Enter the casing’s outside diameter/);
+    await said([['casing.outerDiameter', '78.302'], ['casing.designFactor', '-1']], 'error', /Enter the design factor/);
+    await said([['casing.designFactor', '1.2']], 'notes', /below the 1\.5 to 2\.0 Nakka recommends/);
+    await said([['casing.designFactor', '0.9']], 'notes', /below 1: the casing would yield below its design pressure/);
+    await said([['casing.designFactor', '1.5'], ['casing.wall', '9']], 'notes', /thicker than a tenth of the diameter/);
+    await said([['casing.wall', '1.651'], ['casing.fty', '900']], 'error', /yield strength \(Fty\) is more than the ultimate strength/);
+    assert.equal(await page.$eval('[aria-label="casing.material"]', (el) => el.value), 'other', 'a property of one\'s own: one\'s own material');
+    await said([['casing.material', 'paperboard']], 'error', /Nakka’s table has no yield strength for paperboard/);
+    assert.deepEqual(await values(page, ['casing.fty', 'casing.ftu']), ['', '13.79']);
+    await said([['casing.material', 'abs']], 'notes', /Enter Poisson’s ratio/);
+    assert.equal((await casingOut(page)).dd, '–');
+    await said([['casing.material', '7075-t6'], ['casing.temperature', '100']], 'error', /no strength data above room temperature.*Other material/);
+    await said([['casing.material', '6061-t6511'], ['casing.temperature', '204.4']], 'notes', /yield strength is taken as equal to it/);
+    await said([['casing.temperature', '300']], 'error', /goes up to 260 °C \(500 °F\)/);
+    await said([['casing.temperature', '']], 'error', /Enter the casing temperature/);
+    await said([['casing.temperature', '150']], 'verdict', /./);
+    assert.match(await page.evaluate(() => document.querySelector('#sheet').textContent), /Strength left at this temperature: Fty 83\.0%, Ftu 79\.7%/);
+    await said([['casing.temperature', '20'], ['casing.fty', '120'], ['casing.ftu', '400']], 'notes', /below Nakka’s burst factor chart/);
+    await said([['casing.material', 'other'], ['casing.temperature', '300']], 'error', /^$/); // one's own values, as entered
+    await setCells(page, [['casing.temperature', '20'], ['casing.material', '6061-t6511']]);
+    assert.equal((await casingOut(page)).error, '');
+  });
+
+  await check('Casing Design: its diameters, and the target MEOP it allows, into the motor', async () => {
+    await setCells(page, [['casing.material', '4130-cd'], ['casing.outerDiameter', '82'], ['casing.wall', '2']]);
+    let c = await casingOut(page);
+    assert.equal(c.di, '78.00');
+    assert.equal(c.use, false);
+    assert.match(c.meop, /^Target MEOP: 9 MPa$/); // its design pressure (20.2 MPa) is past SRM's highest
+    let r = await next(page, () => page.click('#casing-use'));
+    assert.equal(r.kind, 'ok', r.error);
+    await tab(page, 'Data and Kn');
+    assert.deepEqual(await values(page, ['chamber.diameter']), ['78']);
+    await tab(page, 'Output');
+    assert.deepEqual(await values(page, ['eng.diameter']), ['82']);
+    await tab(page, 'Casing Design');
+    c = await casingOut(page);
+    assert.equal(c.use, true, 'nothing more to carry over');
+    assert.match(c.fit, /^$/);
+    r = await next(page, () => page.click('#casing-meop'));
+    assert.equal(r.kind, 'ok', r.error);
+    await tab(page, 'Data and Kn');
+    assert.deepEqual(await values(page, ['throat.mode', 'throat.target']), ['target', '9 MPa']);
+    await tab(page, 'Casing Design');
+    assert.equal((await casingOut(page)).meopOff, true, 'already the target');
+    // A weak tube: SRM's lowest target or none.
+    await setCells(page, [['casing.material', 'pvc40']]);
+    assert.match((await casingOut(page)).meop, /^Target MEOP: 150 psi$/);
+    await setCells(page, [['casing.wall', '1']]);
+    c = await casingOut(page);
+    assert.equal(c.meop, 'No target MEOP this low');
+    assert.equal(c.meopOff, true);
+    // A casing too narrow for the grain: said, and the motor refuses it once carried over.
+    await setCells(page, [['casing.material', '4130-cd'], ['casing.outerDiameter', '60'], ['casing.wall', '2']]);
+    assert.match((await casingOut(page)).fit, /The grain \(69\.00 mm\) is wider than this casing’s inside/);
+    r = await next(page, () => page.click('#casing-use'));
+    assert.equal(r.kind, 'error');
+    assert.match(r.error, /grain is wider than the chamber/);
+    await setCells(page, [['casing.outerDiameter', '82']]);
+    r = await next(page, () => page.click('#casing-use'));
+    assert.equal(r.kind, 'ok', r.error);
   });
 
   await check('the title, as now, in the motor file and the Output summary', async () => {
@@ -423,6 +658,10 @@ try {
     await tab(page, 'Data and Kn');
     await shape(page, 'star');
     await accepted(page, [['grain.pointCount', '5'], ['propellant', 'KNSB fine']]);
+    await tab(page, 'Casing Design');
+    await setCells(page, [['casing.material', '4130-n'], ['casing.wall', '2']]);
+    const casing = await casingOut(page);
+    await tab(page, 'Data and Kn');
     const status = await page.$eval('#status', (el) => el.textContent);
     await page.click('#save');
     await page.waitForFunction(() => !document.querySelector('#save').classList.contains('unsaved'), { timeout: 20_000 });
@@ -432,6 +671,10 @@ try {
     assert.deepEqual(await values(again, ['grain.type', 'grain.pointCount', 'propellant', 'eng.diameter']), ['star', '5', 'KNSB fine', null]);
     await tab(again, 'Output');
     assert.deepEqual(await values(again, ['eng.diameter', 'eng.length', 'eng.hardwareMass']), ['83', '560', '1.9']);
+    await tab(again, 'Casing Design');
+    assert.deepEqual(await values(again, ['casing.material', 'casing.wall']), ['4130-n', '2']);
+    const back = await casingOut(again);
+    assert.deepEqual([back.pd, back.pu, back.verdict, back.banner], [casing.pd, casing.pu, casing.verdict, casing.banner]);
     await again.close();
   });
 
@@ -482,6 +725,12 @@ try {
       const wide = await phone.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       await phone.screenshot({ path: join(out, `motor-edge-phone-${path.endsWith('new') ? 'sheet' : 'home'}.png`) });
       assert.ok(wide <= 1, `${path}: ${wide}px wider than the screen`);
+      if (path.endsWith('new')) {
+        await tab(phone, 'Casing Design');
+        const casingWide = await phone.evaluate(() => Math.max(document.documentElement.scrollWidth, document.querySelector('#sheet').scrollWidth) - innerWidth);
+        await phone.screenshot({ path: join(out, 'motor-edge-phone-casing.png') });
+        assert.ok(casingWide <= 1, `casing sheet: ${casingWide}px wider than the screen`);
+      }
       await phone.close();
     }
   });

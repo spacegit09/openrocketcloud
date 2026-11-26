@@ -1,6 +1,7 @@
 // The motor designer: a solid rocket motor worked out with Richard Nakka's SRM method, laid out as
 // his SRM_2023 spreadsheet lays it out (its Data and Kn, Pressure, Performance, Nozzle Design,
-// Output and Propellant data worksheets). The calculation is JSRM's, the Java version of SRM that
+// Output and Propellant data worksheets), with a Casing Design worksheet after his CASING.XLS
+// (src/motor/casing.js). The calculation is JSRM's, the Java version of SRM that
 // METEOR runs (src/motor/calc.js); the worksheets' own cells are worked out as SRM does
 // (src/motor/srm.js). Motors are saved (motorDesigns function), downloaded as .eng files, and added
 // to the person's custom motors, which OpenRocket's motor selector lists in every design.
@@ -17,6 +18,9 @@ import {
   knTable, nozzleDesign, output, performance, propellant, shapeRows,
 } from './motor/srm.js';
 import { curveSvg, xyChart } from './motor/chart.js';
+import {
+  CASING_MATERIALS, HEAT, PSI_PER_MPA, casingMaterial, casingResult, materialProperties, suggestedCasing, targetUnder,
+} from './motor/casing.js';
 
 for (const el of document.querySelectorAll('[data-icon]')) el.replaceWith(icon(el.dataset.icon));
 
@@ -26,7 +30,11 @@ let record = null; // the saved motor (MotorDesign record) on show, or null
 let model = null; // the worksheets' inputs (srm.js exampleMotor() has their shape)
 let calc = null; // the latest results: { m, data, kn, result, perf, out, noz }
 let problem = null; // why the latest calculation failed, or null
-let sheet = 'data';
+let sheet = 'data'; // Motor Design's worksheet
+// What is shown: the motor (SRM's worksheets, their tabs at the bottom) or its casing (Nakka's
+// CASING.XLS: one sheet, chosen at the top with the motor).
+let view = 'motor';
+const VIEWS = [['motor', 'Motor Design'], ['casing', 'Casing Design']];
 let dirty = false;
 // "Use in OpenRocket" or ".eng" was asked for before the motor file's details were entered: until
 // they are, the Output tab has a red dot and the cells still empty are marked.
@@ -211,7 +219,7 @@ async function calculate() {
       noz: nozzleDesign(m, kn.dto, result.nozzle.exitDiameter),
     };
     problem = null;
-    status(`${calc.out.designation} · ${fmt(calc.out.totalImpulse, 1)} N·s · Isp ${fmt(calc.out.isp, 1)} s${warning ? ' · pressure beyond the burn rate data' : ''}`, warning ? 'warn' : 'ok');
+    showResult(true);
   } catch (e) {
     if (asked) started = true;
     if (mine !== generation) return;
@@ -235,6 +243,39 @@ function status(text, kind) {
   el.dataset.kind = kind;
 }
 
+/**
+ * The casing (Casing Design), once it is theirs, against this motor's peak chamber pressure (JSRM's,
+ * above the air outside: what the casing holds): { level, text } past its design or burst pressure,
+ * else null. A casing that cannot be worked out says so on its own sheet, not here.
+ */
+function casingWarning() {
+  const c = model?.casing;
+  if (!c?.set || !calc) return null;
+  let r;
+  try {
+    r = casingResult(c);
+  } catch {
+    return null;
+  }
+  const peak = calc.result.summary.maxPressure;
+  const p = (v) => `${fmt(v, 2)} MPa`;
+  if (peak >= r.burstPressure) {
+    return { level: 'burst', text: `The peak chamber pressure (${p(peak)}) is at or above the casing’s burst pressure (${p(r.burstPressure)}): it would likely burst. Use a stronger casing, or a bigger throat (a lower target pressure).` };
+  }
+  if (peak > r.designPressure) {
+    return { level: 'design', text: `The peak chamber pressure (${p(peak)}) is above the casing’s design pressure (${p(r.designPressure)}, with a design factor of ${fmt(c.designFactor, 2)}): the casing may stretch for good. Use a stronger casing, or a bigger throat (a lower target pressure).` };
+  }
+  return null;
+}
+
+/** The status line for a motor worked out, with its warnings; not over a calculation under way. */
+function showResult(force = false) {
+  if (!calc || problem || (!force && $('#status').dataset.kind === 'busy')) return;
+  const cw = casingWarning();
+  const notes = [calc.warning ? 'pressure beyond the burn rate data' : null, cw ? (cw.level === 'burst' ? 'beyond the casing’s burst pressure' : 'above the casing’s design pressure') : null].filter(Boolean);
+  status(`${calc.out.designation} · ${fmt(calc.out.totalImpulse, 1)} N·s · Isp ${fmt(calc.out.isp, 1)} s${notes.map((n) => ` · ${n}`).join('')}`, notes.length ? 'warn' : 'ok');
+}
+
 // ------------------------------------------------------------------ cells
 
 /** An input cell (blue, as SRM's), bound to `path` in the model. */
@@ -244,32 +285,48 @@ function numCell(path, { digits = null, onChange = null, recalc: again = true } 
   // again after =25.4*1.22, the cell shows 30.988, not 30.987999999999996.
   const shown = (x) => String(Number(x.toPrecision(15)));
   const input = h('input', { class: 'wb-in', type: 'text', inputmode: 'decimal', value: v == null || Number.isNaN(v) ? '' : digits == null ? shown(v) : fmt(v, digits), 'aria-label': path });
-  input.addEventListener('input', () => {
-    const n = cellNumber(input.value);
-    input.classList.toggle('bad', input.value.trim() !== '' && !Number.isFinite(n));
-    set(path, input.value.trim() === '' ? null : n);
+  const apply = (value) => {
+    set(path, value);
     markDirty();
     redrawLive();
-    onChange?.();
+    onChange?.(value);
     if (again) recalcSoon();
     else fill();
+  };
+  // A number is worked out as it is typed. Anything else (an empty cell, half a formula such as
+  // =25.4*) waits until the cell is left, as a spreadsheet waits for Enter: the sheet does not flash
+  // an error at each keystroke on the way to a number.
+  input.addEventListener('input', () => {
+    const n = cellNumber(input.value);
+    input.classList.remove('bad');
+    if (input.value.trim() !== '' && Number.isFinite(n)) apply(n);
+    // On the way to a number, past one (=25.4 on the way to =25.4*18.5): not worked out after all.
+    else clearTimeout(timer);
   });
-  // A formula shows its result once left, as in a spreadsheet (to 15 digits, as Excel shows it:
-  // =25.4*3 shows 76.2; the cell keeps the exact number).
+  // Left: a cell that is not a number is shaded (as SRM's would be) and said to be; a formula shows
+  // its result, to 15 digits as Excel shows it (=25.4*3 shows 76.2; the cell keeps the exact number).
   input.addEventListener('change', () => {
-    if (input.value.trim().startsWith('=') && Number.isFinite(get(path))) input.value = shown(get(path));
+    const text = input.value.trim();
+    const n = cellNumber(input.value);
+    if (text === '' || !Number.isFinite(n)) {
+      input.classList.toggle('bad', text !== '');
+      apply(text === '' ? null : n);
+      return;
+    }
+    if (text.startsWith('=')) input.value = shown(n);
   });
   return input;
 }
 
 /** A drop-down cell (SRM's are shaded, with "select" beside them). */
-function selectCell(path, options, { onChange = null } = {}) {
+function selectCell(path, options, { onChange = null, recalc: again = true } = {}) {
   const sel = h('select', { class: 'wb-sel', 'aria-label': path }, ...options.map(([value, label]) => h('option', { value, selected: get(path) === value }, label)));
   sel.onchange = () => {
     set(path, sel.value);
     markDirty();
     onChange?.();
-    recalcSoon();
+    if (again) recalcSoon();
+    else fill();
   };
   return sel;
 }
@@ -343,12 +400,13 @@ function fill() {
   for (const f of regions) f();
   const err = $('#wb-error');
   if (err) {
-    const warning = !problem && calc?.warning;
+    const warning = !problem && [calc?.warning, casingWarning()?.text].filter(Boolean).join(' ');
     err.hidden = !problem && !warning;
     err.classList.toggle('warn', !!warning);
     err.textContent = problem ? `Error: ${problem}` : warning ? `Warning: ${warning}` : '';
   }
   markEngDetails();
+  showResult();
 }
 
 /** The motor file's details still wanted (once asked for): some of 'diameter', 'length', 'hardwareMass'. */
@@ -357,6 +415,7 @@ const engWanted = () => (engAsked ? engMissing(model.eng) : []);
 /** The Output tab's red dot, and the motor file's cells still empty, while its details are wanted. */
 function markEngDetails() {
   const wanted = engWanted();
+  $('#views')?.querySelector('button[data-view="motor"]')?.classList.toggle('needs', wanted.length > 0 && view !== 'motor');
   const tab = $('#tabs')?.querySelector('button[data-sheet="output"]');
   if (tab) {
     tab.classList.toggle('needs', wanted.length > 0);
@@ -373,7 +432,7 @@ function markEngDetails() {
 /** On the Output sheet, while the motor file's details are wanted: its box in view, at the first one. */
 function revealEngDetails() {
   const [first] = engWanted();
-  if (sheet !== 'output' || !first) return;
+  if (view !== 'motor' || sheet !== 'output' || !first) return;
   const input = document.querySelector(`input[aria-label="eng.${first}"]`);
   input?.focus({ preventScroll: true });
   (input?.closest('.wb-eng') ?? input)?.scrollIntoView({ block: 'center' });
@@ -388,13 +447,30 @@ function renderSheet() {
   const draw = {
     data: dataSheet, pressure: pressureSheet, performance: performanceSheet, nozzle: nozzleSheet, output: outputSheet, propellants: propellantSheet,
   }[sheet];
-  $('#sheet').replaceChildren(h('div', { class: 'wb-paper' }, h('div', { class: 'wb-error', id: 'wb-error', hidden: true }), ...draw(),
+  const drawn = view === 'casing' ? casingSheet : draw;
+  $('#sheet').replaceChildren(h('div', { class: 'wb-paper' }, h('div', { class: 'wb-error', id: 'wb-error', hidden: true }), ...drawn(),
     h('p', { class: 'wb-credit' }, 'Calculation: JSRM 3.3, the Java version of Richard Nakka’s SRM_2023 that METEOR runs. Predictions, not guarantees: test a motor statically before flying it.')));
   for (const b of $('#tabs').querySelectorAll('button')) b.classList.toggle('active', b.dataset.sheet === sheet);
+  for (const b of $('#views').querySelectorAll('button')) {
+    b.classList.toggle('active', b.dataset.view === view);
+    b.setAttribute('aria-selected', String(b.dataset.view === view));
+  }
+  $('#tabs').hidden = view !== 'motor'; // the worksheets' tabs are Motor Design's
   fill();
 }
 
 function renderTabs() {
+  $('#views').replaceChildren(...VIEWS.map(([key, label]) => {
+    const b = h('button', { type: 'button', role: 'tab', 'data-view': key }, label);
+    b.onclick = () => {
+      if (view === key) return;
+      view = key;
+      renderSheet();
+      $('#sheet').scrollTop = 0;
+      if (view === 'motor') revealEngDetails();
+    };
+    return b;
+  }));
   $('#tabs').replaceChildren(...SHEETS.map(([key, label]) => {
     const b = h('button', { type: 'button', 'data-sheet': key }, label);
     b.onclick = () => {
@@ -422,6 +498,15 @@ function dataSheet() {
     model.subtitle = subtitle.value;
     markDirty();
   };
+  // SRM's title line "utilizing KNDX propellant." names the propellant: while it still reads so, it
+  // follows the propellant chosen (it goes into the motor file's description in OpenRocket).
+  const followPropellant = () => {
+    const named = /^utilizing (.+) propellant\.$/.exec(model.subtitle ?? '');
+    if (named && PROPELLANTS.some((p) => p.name === named[1])) {
+      model.subtitle = `utilizing ${model.propellant} propellant.`;
+      subtitle.value = model.subtitle;
+    }
+  };
   const grainRows = GRAIN_FIELDS[g.type].map(([key, sym, desc, kind]) => row(sym, numCell(`grain.${key}`, { digits: kind === 'count' ? 0 : null }), kind === 'count' ? '' : 'mm', desc));
   const surfaces = hollow
     ? [row('Outer surface:', [selectCell('grain.outer', SURFACES), hint('select')]), row('Core surface:', [selectCell('grain.core', SURFACES), hint('select')]),
@@ -434,7 +519,14 @@ function dataSheet() {
       row('<b>D<sub>to</sub></b>', out((c) => c.kn.dto, 3, { cls: 'strong' }), 'mm', h('b', {}, 'Throat diameter (initial)'))]
     : [row('<b>D<sub>to</sub></b>', numCell('throat.diameter'), 'mm', h('b', {}, 'Throat diameter (initial)')),
       row('A<sub>to</sub>', out((c) => c.kn.at, 0), 'mm²', 'Throat cross-section area (initial)')];
-  const throatMode = selectCell('throat.mode', [['target', 'From the target pressure (SRM)'], ['diameter', 'Throat diameter as given']], { onChange: renderSheet });
+  // Switched to a throat of their own: it starts as the throat the target pressure gave (to 0.01 mm),
+  // so the motor stays as it was, rather than as an old diameter that may not fit the grain.
+  const throatMode = selectCell('throat.mode', [['target', 'From the target pressure (SRM)'], ['diameter', 'Throat diameter as given']], {
+    onChange: () => {
+      if (model.throat.mode === 'diameter' && calc?.m.throat.mode === 'target' && calc.kn.dto > 0) model.throat.diameter = Math.round(calc.kn.dto * 100) / 100;
+      renderSheet();
+    },
+  });
   const grainType = selectCell('grain.type', Object.entries(GRAINS).map(([k, v]) => [k, v.label]), {
     onChange: () => {
       model.grain = grainDefaults(model.grain.type, model.chamber.diameter);
@@ -450,7 +542,7 @@ function dataSheet() {
     row('L<sub>c</sub>', numCell('chamber.length'), 'mm', 'Chamber length (inside)'),
     row('V<sub>c</sub>', out((c) => c.data.vc, 0), 'mm³', 'Chamber volume (empty)'),
     section('Propellant grain:'),
-    row('Propellant type', [selectCell('propellant', PROPELLANTS.map((p) => [p.name, p.name])), hint('select')], '', h('a', { href: '#', onclick: (e) => { e.preventDefault(); sheet = 'propellants'; renderSheet(); } }, 'See Propellant data')),
+    row('Propellant type', [selectCell('propellant', PROPELLANTS.map((p) => [p.name, p.name]), { onChange: followPropellant }), hint('select')], '', h('a', { href: '#', onclick: (e) => { e.preventDefault(); sheet = 'propellants'; renderSheet(); } }, 'See Propellant data')),
     row('Grain shape', [grainType, hint('select')], '', hollow ? 'SRM’s grain (BATES)' : 'METEOR’s grain (JSRM geometry, not part of SRM)'),
     ...grainRows,
     ...surfaces,
@@ -625,6 +717,223 @@ function nozzleSheet() {
   return [h('div', { class: 'wb-cols' }, h('div', { class: 'wb-left' }, ...left), h('div', { class: 'wb-right' }, ...right))];
 }
 
+// ------------------------------------------------------------------ Casing Design (Nakka's CASING.XLS)
+
+/**
+ * The casing's values, there from the first look: Nakka's example tube (6061-T6511, 0.065 in wall)
+ * around the chamber, following the chamber until anything here is changed. From then on (`set`)
+ * the casing is theirs, and every sheet checks the motor's pressure against it.
+ */
+function casingModel() {
+  if (!model.casing?.set) model.casing = suggestedCasing(model.chamber.diameter);
+  return model.casing;
+}
+
+/** The casing worked out now, or throws (its error, in the site's words). */
+const casingNow = () => casingResult(model.casing);
+
+/** A worked-out cell drawn from the inputs alone, as they are typed (the casing's). */
+function liveOut(value, digits, { cls = '' } = {}) {
+  const el = h('span', { class: `wb-out ${cls}` });
+  const draw = () => {
+    let v = null;
+    try {
+      v = value();
+    } catch {
+      v = null;
+    }
+    el.textContent = fmt(v, digits);
+    if (Number.isFinite(v)) el.title = String(v);
+    else el.removeAttribute('title');
+  };
+  live.push(draw);
+  regions.push(draw);
+  return el;
+}
+
+const materialLabel = (m) => `${m.kind}: ${m.spec}${m.id === 'emt1' ? ' (brand 1)' : m.id === 'emt2' ? ' (brand 2)' : ''}`;
+
+function casingSheet() {
+  const c = casingModel();
+  const mine = () => {
+    c.set = true;
+  };
+  const cell = (key) => numCell(`casing.${key}`, { recalc: false, onChange: mine });
+  const material = selectCell('casing.material', [...CASING_MATERIALS.map((m) => [m.id, materialLabel(m)]), ['other', 'Other material (enter its properties)']], {
+    recalc: false,
+    onChange: () => {
+      c.set = true;
+      Object.assign(c, materialProperties(c.material) ?? {});
+      renderSheet();
+    },
+  });
+  // A property typed in that is not the table's: the material is now one's own.
+  const prop = (key) => numCell(`casing.${key}`, {
+    recalc: false,
+    onChange: () => {
+      c.set = true;
+      const table = materialProperties(c.material);
+      if (table && table[key] !== c[key]) {
+        c.material = 'other';
+        material.value = 'other';
+      }
+    },
+  });
+  const heatNote = () => {
+    const m = casingMaterial(c.material);
+    if (!m) return 'Your own values: taken as entered, as the material is at the casing’s temperature.';
+    const parts = [m.use, m.note, m.heat ? `When hot: Nakka’s ${HEAT[m.heat].name} data.` : 'Nakka’s sheet has no data for it when hot.'];
+    return parts.filter(Boolean).join(' · ');
+  };
+  const pct = (f) => `${fmt(f * 100, 1)}%`;
+  const left = [
+    h('h3', { class: 'wb-heading' }, 'Motor Casing Design'),
+    h('p', { class: 'wb-note' }, 'The casing’s design pressure and burst pressure, as Richard Nakka’s CASING.XLS works them out. The design pressure is the highest chamber pressure (MEOP) the casing takes without stretching for good, with the design factor on its yield strength. Once anything here is changed, every sheet checks the motor’s peak pressure against it.'),
+    liveRegion(() => {
+      try {
+        const r = casingNow();
+        return r.notes.length ? h('div', { class: 'wb-casing-notes', id: 'casing-notes' }, ...r.notes.map((n) => h('p', {}, n))) : [];
+      } catch (e) {
+        return h('div', { class: 'wb-error', id: 'casing-error' }, `Error: ${e.message}`);
+      }
+    }),
+    section('Casing dimensions and design factor:'),
+    row('D<sub>o</sub>', cell('outerDiameter'), 'mm', 'Outside diameter'),
+    row('t', cell('wall'), 'mm', 'Wall thickness'),
+    row('D<sub>i</sub>', liveOut(() => casingNow().inside, 2), 'mm', 'Inside diameter (the chamber’s)'),
+    row('SD', cell('designFactor'), '', 'Design factor, on yield (Nakka: 1.5 to 2.0, more for a material of unknown strength)'),
+    section('Material properties:'),
+    row('Material', [material, hint('select')], '', liveText(heatNote)),
+    row('F<sub>ty</sub>', prop('fty'), 'MPa', 'Tensile yield strength (room temperature)'),
+    row('F<sub>tu</sub>', prop('ftu'), 'MPa', 'Tensile ultimate strength (room temperature)'),
+    row('E', prop('e'), 'MPa', 'Modulus of elasticity'),
+    row('ν', prop('nu'), '', 'Poisson’s ratio'),
+    row('T', cell('temperature'), '°C', 'Casing temperature in use (a casing that gets hot is weaker)'),
+    row('', '', '', liveText(() => {
+      const r = casingNow();
+      if (r.heat.asEntered || (r.heat.fty === 1 && r.heat.ftu === 1)) return 'Full strength at this temperature.';
+      return `Strength left at this temperature: Fty ${pct(r.heat.fty)}, Ftu ${pct(r.heat.ftu)} (${fmt(r.fty, 1)} and ${fmt(r.ftu, 1)} MPa).`;
+    })),
+    section('Design pressure and burst pressure:'),
+    row('β', liveOut(() => casingNow().beta, 3), '', 'Fty/Ftu'),
+    row('B', liveOut(() => casingNow().burstFactor, 3), '', 'Burst factor (Nakka’s chart for pressurized cylinders)'),
+    row('<b class="wb-red">P<sub>D</sub></b>', liveOut(() => casingNow().designPressure, 2, { cls: 'red strong' }), '<b class="wb-red">MPa</b>', h('b', {}, 'Design pressure: the MEOP the casing allows')),
+    row('', liveOut(() => casingNow().designPressure * PSI_PER_MPA, 0, { cls: 'red' }), 'psi', ''),
+    row('<b class="wb-red">P<sub>U</sub></b>', liveOut(() => casingNow().burstPressure, 2, { cls: 'red strong' }), '<b class="wb-red">MPa</b>', h('b', {}, 'Burst pressure')),
+    row('', liveOut(() => casingNow().burstPressure * PSI_PER_MPA, 0, { cls: 'red' }), 'psi', ''),
+    row('SU', liveOut(() => casingNow().burstSafety, 2), '', 'Burst safety factor (PU/PD)'),
+    section('Elastic growth under pressure, at the design pressure *:'),
+    row('ΔD', liveOut(() => casingNow().growth?.diameter ?? null, 3), 'mm', 'Diameter increase'),
+    row('ΔC', liveOut(() => casingNow().growth?.circumference ?? null, 3), 'mm', 'Circumference increase'),
+    h('p', { class: 'wb-note' }, '* Not permanent: gone when the pressure is (it matters for a grain bonded to the casing). For comparison, a sheet of writing paper is about 0.10 mm thick.'),
+    h('p', { class: 'wb-note' }, 'Fit a way to let pressure out before it reaches the burst pressure: shear pins holding the nozzle or the bulkhead, or a burst disc (Nakka).'),
+  ];
+  const right = [liveRegion(() => casingSvg(c), 'wb-casing-drawing'), liveRegion(() => casingMotorBox(c), 'wb-casing-motor')];
+  return [h('div', { class: 'wb-cols' }, h('div', { class: 'wb-left' }, ...left), h('div', { class: 'wb-right' }, ...right))];
+}
+
+/** Text drawn from the inputs alone, as they are typed ('' if it cannot be). */
+function liveText(text) {
+  const el = h('span', { class: 'wb-live-text' });
+  const draw = () => {
+    try {
+      el.textContent = text() ?? '';
+    } catch {
+      el.textContent = '';
+    }
+  };
+  live.push(draw);
+  regions.push(draw);
+  return el;
+}
+
+/** The casing's end, to scale: its wall, and the grain inside (red where it would not fit). */
+function casingSvg(c) {
+  const od = c.outerDiameter;
+  const id = od - 2 * c.wall;
+  if (!(od > 0 && id > 0)) return [];
+  const g = grainOuterDiameter(model.grain);
+  const s = 120 / Math.max(od, Number.isFinite(g) ? g : 0);
+  const svg = svgEl('svg', { viewBox: '0 0 300 300', class: 'wb-drawing casing', role: 'img', 'aria-label': 'The casing, end on' });
+  svg.append(svgEl('circle', { cx: 150, cy: 150, r: (od / 2) * s, class: 'wall-ring' }), svgEl('circle', { cx: 150, cy: 150, r: (id / 2) * s, class: 'bore' }));
+  if (g > 0) svg.append(svgEl('circle', { cx: 150, cy: 150, r: (g / 2) * s, class: g > id ? 'grain-out too-big' : 'grain-out' }));
+  return [svg, h('div', { class: 'wb-note center' }, `End on, to scale: the casing (${fmt(od, 1)} × ${fmt(c.wall, 2)} mm) and the grain (${fmt(g, 1)} mm).`)];
+}
+
+/** This motor against the casing, and the buttons that carry the casing into the motor's cells. */
+function casingMotorBox(c) {
+  let r;
+  try {
+    r = casingNow();
+  } catch {
+    return [];
+  }
+  const p = (v) => `${fmt(v, 2)} MPa (${fmt(v * PSI_PER_MPA, 0)} psi)`;
+  const lines = [];
+  if (calc && !problem) {
+    const peak = calc.result.summary.maxPressure;
+    const verdict = peak >= r.burstPressure ? ['bad', 'At or above the burst pressure: it would likely burst.']
+      : peak > r.designPressure ? ['bad', 'Above the design pressure: the casing may stretch for good.']
+        : ['ok', `Within the design pressure (${fmt((1 - peak / r.designPressure) * 100, 0)}% to spare).`];
+    lines.push(h('p', {}, 'Peak chamber pressure of this motor: ', h('b', {}, p(peak))), h('p', { class: `wb-verdict ${verdict[0]}`, id: 'casing-verdict' }, verdict[1]));
+  } else {
+    lines.push(h('p', { class: 'wb-note' }, 'The motor’s peak pressure shows here once it is worked out.'));
+  }
+  const id = r.inside;
+  const sameChamber = Math.abs(model.chamber.diameter - id) < 0.005;
+  lines.push(h('p', {}, `Motor chamber diameter: ${fmt(model.chamber.diameter, 2)} mm; this casing’s inside: ${fmt(id, 2)} mm${sameChamber ? ' (the same)' : ''}.`));
+  const g = grainOuterDiameter(model.grain);
+  if (g > id) lines.push(h('p', { class: 'wb-verdict bad', id: 'casing-fit' }, `The grain (${fmt(g, 2)} mm) is wider than this casing’s inside.`));
+  const use = h('button', { type: 'button', id: 'casing-use', disabled: sameChamber && model.eng.diameter === c.outerDiameter }, 'Use as the motor’s casing');
+  use.title = `Chamber diameter ${fmt(id, 2)} mm (its inside); motor diameter for OpenRocket ${fmt(c.outerDiameter, 2)} mm`;
+  use.onclick = () => useCasing();
+  const target = targetUnder(r.designPressure, TARGETS);
+  const meop = h('button', { type: 'button', id: 'casing-meop', disabled: !target || (model.throat.mode === 'target' && model.throat.target === target[0]) },
+    target ? `Target MEOP: ${target[0]}` : 'No target MEOP this low');
+  meop.title = target ? `The highest of SRM’s target pressures at or under the design pressure (${fmt(r.designPressure, 2)} MPa)` : `SRM’s lowest target pressure is above the design pressure (${fmt(r.designPressure, 2)} MPa)`;
+  meop.onclick = () => useCasingPressure();
+  return box(null, ...lines, h('p', { class: 'wb-note' }, '“Use as the motor’s casing” sets the chamber diameter to the casing’s inside and the motor diameter for OpenRocket to its outside. “Target MEOP” has the throat sized for the highest target pressure the casing allows.'),
+    h('div', { class: 'wb-actions' }, use, meop));
+}
+
+/** The casing's diameters into the motor: the chamber's (its inside) and OpenRocket's (its outside). */
+function useCasing() {
+  let r;
+  try {
+    r = casingNow();
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  const c = model.casing;
+  c.set = true;
+  model.chamber.diameter = Number(r.inside.toPrecision(12));
+  model.eng.diameter = Number(c.outerDiameter.toPrecision(12));
+  markDirty();
+  toast(`From the casing: chamber diameter ${fmt(model.chamber.diameter, 2)} mm, motor diameter ${fmt(model.eng.diameter, 2)} mm.`);
+  renderSheet();
+  recalcSoon();
+}
+
+/** The throat sized for the highest of SRM's target pressures the casing allows. */
+function useCasingPressure() {
+  let target;
+  try {
+    target = targetUnder(casingNow().designPressure, TARGETS);
+  } catch (e) {
+    toast(e.message);
+    return;
+  }
+  if (!target) return;
+  model.casing.set = true;
+  model.throat.mode = 'target';
+  model.throat.target = target[0];
+  markDirty();
+  toast(`Target MEOP: ${target[0]}, the throat sized for it.`);
+  renderSheet();
+  recalcSoon();
+}
+
 function outputSheet() {
   const e = model.eng;
   const engRows = [
@@ -782,7 +1091,8 @@ function currentEng() {
   } catch (e) {
     toast(e.message);
     engAsked = engMissing(model.eng).length > 0;
-    if (sheet !== 'output') {
+    if (view !== 'motor' || sheet !== 'output') {
+      view = 'motor';
       sheet = 'output';
       renderSheet();
     } else markEngDetails();
@@ -959,6 +1269,7 @@ function modelOf(r) {
     settings: { ...base.settings, ...saved.settings },
     eng: { ...base.eng, ...saved.eng },
     grain: saved.grain ?? base.grain,
+    ...(saved.casing ? { casing: { ...suggestedCasing(saved.chamber?.diameter ?? base.chamber.diameter), ...saved.casing } } : {}),
   };
 }
 
