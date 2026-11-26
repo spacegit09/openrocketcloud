@@ -21,6 +21,7 @@ export default defineConfig({
         tourOpenrocket: resolve(import.meta.dirname, 'features/openrocket.html'),
         tourPlanner: resolve(import.meta.dirname, 'features/launch-planner.html'),
         tourLogbook: resolve(import.meta.dirname, 'features/logbook.html'),
+        tourMotor: resolve(import.meta.dirname, 'features/motor-designer.html'),
       },
     },
   },

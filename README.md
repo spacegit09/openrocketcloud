@@ -408,9 +408,10 @@ docker run --rm -v openrocket-cloud_orcloud-data:/data -v "$PWD":/backup alpine 
 
 - **Home page** (browser version, signed out): a dark tour of the site (`web/src/tour.css`,
   `web/src/tour.js`) with a page for each part: `web/features/openrocket.html` (what the browser
-  version adds to OpenRocket, including the 3D view, STL parts and fin airfoils and fillets), `launch-planner.html` and `logbook.html`. The screenshots in
+  version adds to OpenRocket, including the 3D view, STL parts and fin airfoils and fillets), `launch-planner.html`, `logbook.html` and `motor-designer.html`. The screenshots in
   `web/public/tour` were taken from the real pages with made-up people, designs and flights (no
-  one's real data); signed in, the home page is the dashboard as before.
+  one's real data); the Motor Designer's (`md-*.webp`) come from `node web/test/motor-tour-shots.mjs`.
+  Signed in, the home page is the dashboard as before.
 - **New design**: blank (exactly like OpenRocket's *File → New*), one of OpenRocket's example
   designs, or upload an `.ork` file (drag and drop works too).
 - **Share**: invite people by their Google email as *Can edit* or *Can view*. Viewers see every

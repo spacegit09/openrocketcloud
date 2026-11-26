@@ -122,7 +122,7 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 
 /* ---------- strip of facts */
 .t-strip { margin-top: 92px; border-top: 1px solid var(--t-line); border-bottom: 1px solid var(--t-line); background: rgba(10, 16, 32, 0.6); }
-.t-strip .t-wrap { display: grid; grid-template-columns: repeat(5, 1fr); }
+.t-strip .t-wrap { display: grid; grid-template-columns: repeat(6, 1fr); }
 .t-strip div { padding: 22px 16px; text-align: center; border-right: 1px solid var(--t-line); }
 .t-strip div:last-child { border-right: 0; }
 .t-strip b { display: block; color: #fff; font-size: 15.5px; font-weight: 650; }
@@ -138,6 +138,7 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 
 /* ---------- three products */
 .t-products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.t-products.four { grid-template-columns: repeat(2, 1fr); }
 .t-product {
   position: relative; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden;
   background: linear-gradient(180deg, rgba(19, 29, 53, 0.9), rgba(12, 19, 36, 0.9)); border: 1px solid var(--t-line);
@@ -283,7 +284,7 @@ body.tour-page > .topbar, body.tour-page > .site-foot, html.tour-first body > .t
 }
 @media (max-width: 980px) {
   .t-links { display: none; }
-  .t-products, .t-grid, .t-steps3, .t-prices { grid-template-columns: 1fr; }
+  .t-products, .t-products.four, .t-grid, .t-steps3, .t-prices { grid-template-columns: 1fr; }
   .t-feature, .t-feature.rev { grid-template-columns: 1fr; gap: 36px; }
   .t-feature.rev .text { order: 0; }
   .t-feature + .t-feature { margin-top: 90px; }
