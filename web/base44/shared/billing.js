@@ -33,12 +33,11 @@ export const PLANS_START = '2026-11-20T10:30:00Z';
 let plansStart = PLANS_START ? Date.parse(PLANS_START) : null;
 /**
  * Whether Paddle's live account takes payments (Paddle enables its checkout once the account's
- * onboarding is complete). Until then nobody whose free week is over is locked out ('waiting':
- * they keep using everything), and the plan page says payments open soon instead of offering a
- * checkout. Set true once Paddle takes payments, and deploy: from then, someone whose week is over
- * needs a plan at once.
+ * onboarding is complete; it did on 26 November 2026). While false, nobody whose free week is over
+ * is locked out ('waiting': they keep using everything), and the plan page says payments open soon
+ * instead of offering a checkout. While true, someone whose week is over needs a plan at once.
  */
-export const CHECKOUT_OPEN = false;
+export const CHECKOUT_OPEN = true;
 let checkoutOpen = CHECKOUT_OPEN;
 
 /** For tests: plans begin at `ms` (null: not yet). */
@@ -604,7 +603,7 @@ export async function billingApi(ctx, body) {
     } catch (e) {
       if (!(e instanceof PaddleError)) throw e;
       console.error('Paddle refused', e.status, e.code ?? '');
-      // The live account's checkout not enabled yet (CHECKOUT_OPEN should still be false).
+      // The live account's checkout not enabled (CHECKOUT_OPEN should be false then).
       if (e.code === 'transaction_checkout_not_enabled') fail(503, PAYMENTS_SOON);
       fail(502, 'The payment service did not answer as expected. Please try again in a minute.');
     }
