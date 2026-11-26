@@ -21,6 +21,7 @@ import { designsApi, motorDesignsApi, motorsApi } from '../base44/shared/api.js'
 import { billingApi, OPEN_ACTIONS, requirePlan } from '../base44/shared/billing.js';
 import { readMotor, readMotorDesign, sealer } from '../base44/shared/sealed.js';
 import { readMotorFile } from '../../server/src/motors.js';
+import { guardDevReloads } from './dev-reload-guard.mjs';
 import { fakeDb } from './fake-base44.mjs';
 
 const WEB = 5196;
@@ -63,7 +64,7 @@ async function open(path, viewport = { width: 1360, height: 980 }) {
   const page = await browser.newPage();
   await page.setViewport(viewport);
   page.on('pageerror', (e) => problems.push(`${path}: ${e.message}`));
-  page.on('dialog', (d) => d.accept()); // leaving a page with changes, between checks
+  guardDevReloads(page, path); // leaving a page with changes, between checks: "leave"
   page.on('console', (m) => {
     if (m.type() === 'error' && !/favicon|404/.test(m.text())) problems.push(`${path} console: ${m.text().slice(0, 200)}`);
   });

@@ -22,6 +22,7 @@ import { designsApi, motorDesignsApi, motorsApi } from '../base44/shared/api.js'
 import { billingApi, OPEN_ACTIONS, requirePlan } from '../base44/shared/billing.js';
 import { sealer } from '../base44/shared/sealed.js';
 import { readMotorFile } from '../../server/src/motors.js';
+import { guardDevReloads } from './dev-reload-guard.mjs';
 import { fakeDb } from './fake-base44.mjs';
 
 const WEB = 5193;
@@ -64,6 +65,7 @@ let failed = false;
 async function open(path) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1360, height: 980 });
+  guardDevReloads(page, path);
   page.on('pageerror', (e) => problems.push(`${path}: ${e.message}`));
   page.on('console', (m) => {
     if (m.type() === 'error' && !/favicon|404/.test(m.text())) problems.push(`${path} console: ${m.text().slice(0, 200)}`);

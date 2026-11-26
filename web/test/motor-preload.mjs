@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
+import { guardDevReloads } from './dev-reload-guard.mjs';
 
 const web = join(import.meta.dirname, '..');
 const PORT = 5195;
@@ -22,6 +23,7 @@ const browser = await puppeteer.launch({
 const user = { id: 'u1', email: 'p@example.com', full_name: 'P', role: 'user', created_date: '2026-03-02T09:15:00.000000' };
 try {
   const page = await browser.newPage();
+  guardDevReloads(page, 'motor.html');
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     const url = new URL(req.url());

@@ -11,6 +11,7 @@ import { createServer } from 'vite';
 import { motorDesignsApi, motorsApi } from '../base44/shared/api.js';
 import { billingApi } from '../base44/shared/billing.js';
 import { sealer } from '../base44/shared/sealed.js';
+import { guardDevReloads } from './dev-reload-guard.mjs';
 import { fakeDb } from './fake-base44.mjs';
 
 const WEB = 5196;
@@ -37,6 +38,7 @@ const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)} s]`
 async function open(path, { width = 1200, height = 750 } = {}) {
   const page = await browser.newPage();
   await page.setViewport({ width, height, deviceScaleFactor: 1.5 });
+  guardDevReloads(page, path);
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
   await page.setRequestInterception(true);
   page.on('request', async (req) => {
