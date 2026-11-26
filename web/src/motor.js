@@ -240,7 +240,10 @@ function status(text, kind) {
 /** An input cell (blue, as SRM's), bound to `path` in the model. */
 function numCell(path, { digits = null, onChange = null, recalc: again = true } = {}) {
   const v = get(path);
-  const input = h('input', { class: 'wb-in', type: 'text', inputmode: 'decimal', value: v == null || Number.isNaN(v) ? '' : digits == null ? String(v) : fmt(v, digits), 'aria-label': path });
+  // To 15 digits, as Excel shows a cell (and as a formula's result shows once it is left): drawn
+  // again after =25.4*1.22, the cell shows 30.988, not 30.987999999999996.
+  const shown = (x) => String(Number(x.toPrecision(15)));
+  const input = h('input', { class: 'wb-in', type: 'text', inputmode: 'decimal', value: v == null || Number.isNaN(v) ? '' : digits == null ? shown(v) : fmt(v, digits), 'aria-label': path });
   input.addEventListener('input', () => {
     const n = cellNumber(input.value);
     input.classList.toggle('bad', input.value.trim() !== '' && !Number.isFinite(n));
@@ -254,7 +257,7 @@ function numCell(path, { digits = null, onChange = null, recalc: again = true } 
   // A formula shows its result once left, as in a spreadsheet (to 15 digits, as Excel shows it:
   // =25.4*3 shows 76.2; the cell keeps the exact number).
   input.addEventListener('change', () => {
-    if (input.value.trim().startsWith('=') && Number.isFinite(get(path))) input.value = String(Number(get(path).toPrecision(15)));
+    if (input.value.trim().startsWith('=') && Number.isFinite(get(path))) input.value = shown(get(path));
   });
   return input;
 }

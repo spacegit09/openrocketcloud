@@ -204,6 +204,11 @@ try {
       await page.keyboard.press('Tab');
     });
     assert.equal(await page.$eval('[aria-label="chamber.diameter"]', (el) => el.value), '76.2'); // as Excel shows it
+    // ...and still once the sheet is drawn again (another tab, then back): not 76.19999999999999.
+    for (const label of ['Pressure', 'Data and Kn']) {
+      await page.evaluate((label) => [...document.querySelectorAll('#tabs button')].find((b) => b.textContent.trim().startsWith(label)).click(), label);
+    }
+    assert.equal(await page.$eval('[aria-label="chamber.diameter"]', (el) => el.value), '76.2');
     await accepted(page, [['chamber.diameter', '75']]);
   });
 
