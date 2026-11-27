@@ -211,8 +211,8 @@ public final class WebMain {
 		openrocket.node("windows").put("size." + BasicFrame.class.getCanonicalName(), "max");
 		// Preferences the browser version leaves out (see our copies of its panels) stay off. Two slow
 		// it down: "Update flight estimates in design window" (a background simulation that makes
-		// every edit wait ~2 s under CheerpJ) and "Run out-dated simulations when you open the
-		// simulation tab" (1-4 s per simulation). Two conflict with it: checking for OpenRocket
+		// every edit wait ~2 s under CheerpJ; our RocketPanel shows its own estimate instead) and
+		// "Run out-dated simulations when you open the simulation tab" (1-4 s per simulation). Two conflict with it: checking for OpenRocket
 		// updates (the site is updated instead) and opening the last design file (the page opens
 		// the shared design).
 		openrocket.putBoolean("backgroundFlight", false);

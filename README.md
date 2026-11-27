@@ -130,7 +130,10 @@ and live sharing. Nothing runs on your own computer or server.
 - **Limits:** no Photo Studio (it needs OpenGL); OpenRocket takes 15–25 s to open on a fast connection and computer, longer on slow ones, because CheerpJ downloads about 25 MB of its Java runtime from its CDN on each visit (browsers keep little of it); simulations
   run about 15× slower than desktop (1–4 s each), so "Update flight estimates in design window"
   and "Run out-dated simulations when you open the simulation tab" are kept off and left out of
-  the settings; *Save As* and exports download straight to your computer. CheerpJ's free Community
+  the settings. The design window still shows the estimated apogee, maximum velocity and
+  acceleration at the bottom left: our own, worked out once an edit is done (when its window is
+  closed with OK, not for each number typed), on a copy of the rocket that is not part of the
+  design, in short slices that wait for OpenRocket, so the next task can start at once. *Save As* and exports download straight to your computer. CheerpJ's free Community
   licence covers personal and non-commercial use, and software published by an individual or a
   one-person company with a "Built with CheerpJ" credit; other business use needs a licence.
 

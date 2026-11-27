@@ -4,6 +4,16 @@
  * the rocket, so each edit did all of it three times (about 0.1 s per edit under CheerpJ). Now the
  * first of them to hear of a change does it, once; marked "orcloud". It is placed ahead of
  * OpenRocket.jar on the class path.
+ *
+ * The flight estimate at the bottom left (apogee, maximum velocity and acceleration) is also
+ * orcloud's (estimateFlight): OpenRocket's own re-runs the design's simulation after each edit,
+ * which made every edit wait ~2 s under CheerpJ, so it is kept off. Instead the panel simulates a
+ * copy of the rocket on its own, once the edit window is closed (OK) or, for an edit made
+ * elsewhere, once the edits stop: never for each number typed in the window. The copy is not part
+ * of the design (no simulation of the design changes, nothing is saved or shared). It works in
+ * short slices, each only once OpenRocket has nothing left to do, and slower while the user
+ * presses, drags or types, so OpenRocket answers as quickly as when it is idle (EstimatePace);
+ * a further edit cancels it.
  */
 package info.openrocket.swing.gui.scalefigure;
 
@@ -27,8 +37,12 @@ import info.openrocket.core.rocketcomponent.Rocket;
 import info.openrocket.core.rocketcomponent.RocketComponent;
 import info.openrocket.core.rocketcomponent.SymmetricComponent;
 import info.openrocket.core.simulation.FlightData;
+import info.openrocket.core.simulation.SimulationStatus;
 import info.openrocket.core.simulation.customexpression.CustomExpression;
 import info.openrocket.core.simulation.customexpression.CustomExpressionSimulationListener;
+import info.openrocket.core.simulation.exception.SimulationCancelledException;
+import info.openrocket.core.simulation.exception.SimulationException;
+import info.openrocket.core.simulation.listeners.AbstractSimulationListener;
 import info.openrocket.core.simulation.listeners.SimulationListener;
 import info.openrocket.core.simulation.listeners.system.GroundHitListener;
 import info.openrocket.core.simulation.listeners.system.InterruptListener;
@@ -75,10 +89,12 @@ import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.TreePath;
 import javax.swing.tree.TreeSelectionModel;
+import java.awt.AWTEvent;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
@@ -899,9 +915,9 @@ public class RocketPanel extends JPanel implements TreeSelectionListener, Change
 
 		// Check whether to compute or not
 		if (!((SwingPreferences) Application.getPreferences()).computeFlightInBackground()) {
-			extraText.setSimulation(null);
-			extraText.setCalculatingData(false);
+			// orcloud: OpenRocket's way is kept off (see the top of this file); the panel's own estimate.
 			stopBackgroundSimulation();
+			estimateFlight(curConfig);
 			return;
 		}
 
@@ -950,6 +966,245 @@ public class RocketPanel extends JPanel implements TreeSelectionListener, Change
 				break;
 			}
 		}
+	}
+
+	////////  orcloud: the flight estimate (see the top of this file)
+
+	/** After an edit window closes: the estimate starts this long after. */
+	private static final int ESTIMATE_AFTER_WINDOW_MS = 200;
+	/** After an edit made outside an edit window (deleting a part, a motor chosen...): once edits stop this long. */
+	private static final int ESTIMATE_AFTER_EDIT_MS = 300;
+	/** The estimate works this long at a time, then lets OpenRocket and the page do what they have to. */
+	private static final int ESTIMATE_SLICE_MS = 12;
+	/** While the user presses, drags or types (within INPUT_RECENT_MS), it pauses this long after every step. */
+	private static final int ESTIMATE_SLOW_PAUSE_MS = 15;
+	/** While the event thread has work, the estimate looks again this often. */
+	private static final int ESTIMATE_WAIT_MS = 10;
+	private static final int INPUT_RECENT_MS = 300;
+
+	/** design.html?debug=1: each estimate's time and numbers in the console. */
+	private static final boolean DEBUG = Boolean.getBoolean("orcloud.debug");
+	private static volatile long lastInputAt = 0;
+	private static boolean inputWatched = false;
+
+	/** The rocket (functional state) and flight configuration the estimate shown or coming is for. */
+	private ModID estimateFor = ModID.INVALID;
+	private FlightConfigurationId estimateConfig = null;
+	/** One more for each change: an estimate for an earlier one stops and shows nothing. */
+	private volatile int estimateGeneration = 0;
+	private long editedAt = 0;
+	private long windowSeenAt = 0;
+	private javax.swing.Timer estimateTimer = null;
+
+	/**
+	 * Brings the estimate up to date with the rocket: at once from the design's own simulation of this
+	 * configuration when that is up to date, or by simulating a copy once the edits are done.
+	 */
+	private void estimateFlight(FlightConfiguration config) {
+		ModID mod = config.getRocket().getFunctionalModID();
+		FlightConfigurationId id = config.getId();
+		if (mod == estimateFor && id.equals(estimateConfig)) {
+			return;
+		}
+		estimateFor = mod;
+		estimateConfig = id;
+		estimateGeneration++; // an estimate under way for the rocket as it was stops
+		// While the edits go on, the numbers shown stay as they were (for the rocket before them).
+		extraText.setCalculatingData(false);
+
+		if (!config.hasMotors()) {
+			stopEstimateTimer();
+			extraText.setSimulation(null);
+			extraText.setFlightData(FlightData.NaN_DATA);
+			return;
+		}
+		Simulation own = ownSimulation(id);
+		if (own != null && Simulation.isStatusUpToDate(own.getStatus()) && own.hasSummaryData()) {
+			stopEstimateTimer();
+			extraText.setSimulation(own);
+			return;
+		}
+		editedAt = System.currentTimeMillis();
+		watchInput();
+		if (estimateTimer == null) {
+			estimateTimer = new javax.swing.Timer(100, e -> estimateWhenEditsDone());
+		}
+		estimateTimer.restart();
+	}
+
+	/** The design's simulation of a flight configuration (its first), or null. */
+	private Simulation ownSimulation(FlightConfigurationId id) {
+		for (Simulation sim : document.getSimulations()) {
+			if (id.equals(sim.getFlightConfigurationId())) {
+				return sim;
+			}
+		}
+		return null;
+	}
+
+	private void stopEstimateTimer() {
+		if (estimateTimer != null) {
+			estimateTimer.stop();
+		}
+	}
+
+	/** Every 100 ms while an estimate is due: it starts when no edit window is open and the edits have stopped. */
+	private void estimateWhenEditsDone() {
+		long now = System.currentTimeMillis();
+		if (ComponentConfigDialog.isDialogVisible()) {
+			windowSeenAt = now; // the window's edits count when it closes: OK, with its last numbers
+			return;
+		}
+		if (now - windowSeenAt < ESTIMATE_AFTER_WINDOW_MS || now - editedAt < ESTIMATE_AFTER_EDIT_MS) {
+			return;
+		}
+		stopEstimateTimer();
+		startEstimate();
+	}
+
+	/**
+	 * Simulates a copy of the rocket, with the settings of the design's simulation of this
+	 * configuration (or a new simulation's), on a thread of its own. The copy is not the design's:
+	 * a simulation made with no document tells no one of its results.
+	 */
+	private void startEstimate() {
+		final int generation = estimateGeneration;
+		final Simulation sim;
+		try {
+			sim = new Simulation(document.getRocket().copyWithOriginalID()); // as for an undo step: the motors stay in their configurations
+			Simulation own = ownSimulation(estimateConfig);
+			if (own != null) {
+				sim.getOptions().copyConditionsFrom(own.getOptions());
+				sim.copyExtensionsFrom(own.getSimulationExtensions());
+			}
+			sim.setFlightConfigurationId(estimateConfig);
+		} catch (RuntimeException e) {
+			log.warn("Flight estimate not started", e);
+			showEstimate(generation, null);
+			return;
+		}
+		extraText.setCalculatingData(true); // the numbers shown, dimmed, with "Calculating..."
+		repaintFigure();
+		if (DEBUG) {
+			System.out.println("[flight estimate] started");
+		}
+
+		final long startedAt = System.currentTimeMillis();
+		Thread thread = new Thread(() -> {
+			Simulation done = null;
+			try {
+				sim.simulate(new EstimatePace(generation), InterruptListener.INSTANCE, GroundHitListener.INSTANCE);
+				done = sim;
+				if (DEBUG) {
+					FlightData d = sim.getSimulatedData();
+					System.out.println(String.format(java.util.Locale.ROOT, "[flight estimate] %d ms: apogee %.2f m, max velocity %.2f m/s, max acceleration %.2f m/s2",
+							System.currentTimeMillis() - startedAt, d.getMaxAltitude(), d.getMaxVelocity(), d.getMaxAcceleration()));
+				}
+			} catch (SimulationCancelledException e) {
+				if (DEBUG) {
+					System.out.println("[flight estimate] cancelled after " + (System.currentTimeMillis() - startedAt) + " ms: the rocket changed");
+				}
+				return; // the rocket changed: the next estimate shows its numbers
+			} catch (Throwable e) {
+				if (generation != estimateGeneration) {
+					return;
+				}
+				log.info("Flight estimate failed", e);
+			}
+			final Simulation result = done;
+			SwingUtilities.invokeLater(() -> showEstimate(generation, result));
+		}, "orcloud flight estimate");
+		thread.setDaemon(true);
+		thread.setPriority(Thread.MIN_PRIORITY);
+		thread.start();
+	}
+
+	/** The estimate's numbers (or, for a flight OpenRocket aborted, its reason), unless the rocket changed since. */
+	private void showEstimate(int generation, Simulation sim) {
+		if (generation != estimateGeneration) {
+			return;
+		}
+		if (sim != null) {
+			extraText.setSimulation(sim);
+		} else {
+			extraText.setSimulation(null);
+			extraText.setFlightData(FlightData.NaN_DATA);
+		}
+		extraText.setCalculatingData(false);
+		repaintFigure();
+	}
+
+	private void repaintFigure() {
+		if (!is3d)
+			figure.repaint();
+		else
+			figure3d.repaint();
+	}
+
+	/**
+	 * Paces the estimate, after each step of the simulation. CheerpJ runs every Java thread on the
+	 * page's one thread, switching only when one waits; OpenRocket's event thread waits often while
+	 * it works (for classes, fonts and the page), and every time, the estimate would run in its place.
+	 * So the estimate works ESTIMATE_SLICE_MS at a time, and only once the event thread has done all
+	 * it had to do (a task it queued for the event thread has run); while the user presses, drags or
+	 * types, it goes one step at a time. It stops once the rocket changes.
+	 */
+	private class EstimatePace extends AbstractSimulationListener {
+		private final int generation;
+		private long sliceStart = System.currentTimeMillis();
+		private volatile boolean eventThreadBusy = false;
+
+		EstimatePace(int generation) {
+			this.generation = generation;
+		}
+
+		@Override
+		public void postStep(SimulationStatus status) throws SimulationException {
+			stopIfChanged();
+			long now = System.currentTimeMillis();
+			boolean userBusy = now - lastInputAt < INPUT_RECENT_MS;
+			if (!userBusy && now - sliceStart < ESTIMATE_SLICE_MS) {
+				return;
+			}
+			try {
+				eventThreadBusy = true;
+				SwingUtilities.invokeLater(() -> eventThreadBusy = false);
+				Thread.sleep(userBusy ? ESTIMATE_SLOW_PAUSE_MS : 1);
+				while (eventThreadBusy) {
+					Thread.sleep(ESTIMATE_WAIT_MS);
+					stopIfChanged();
+				}
+			} catch (InterruptedException e) {
+				throw new SimulationCancelledException(e);
+			}
+			sliceStart = System.currentTimeMillis();
+			stopIfChanged();
+		}
+
+		private void stopIfChanged() throws SimulationCancelledException {
+			if (generation != estimateGeneration) {
+				throw new SimulationCancelledException("The rocket changed");
+			}
+		}
+
+		@Override
+		public boolean isSystemListener() {
+			return true; // OpenRocket's own kind: it changes nothing in the flight
+		}
+	}
+
+	/** Notes when the user last pressed, dragged, scrolled or typed (not plain mouse moves). */
+	private static synchronized void watchInput() {
+		if (inputWatched) {
+			return;
+		}
+		inputWatched = true;
+		Toolkit.getDefaultToolkit().addAWTEventListener(e -> {
+			int id = e.getID();
+			if (id != MouseEvent.MOUSE_MOVED && id != MouseEvent.MOUSE_ENTERED && id != MouseEvent.MOUSE_EXITED) {
+				lastInputAt = System.currentTimeMillis();
+			}
+		}, AWTEvent.KEY_EVENT_MASK | AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.MOUSE_WHEEL_EVENT_MASK);
 	}
 
 	/**

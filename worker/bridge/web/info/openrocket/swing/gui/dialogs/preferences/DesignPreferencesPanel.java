@@ -121,7 +121,8 @@ public class DesignPreferencesPanel extends PreferencesPanel {
 		this.add(showDiscardSimulationConfirmation, "wrap, growx, spanx");
 
 		// orcloud: "Update estimated flight parameters in design window" is left out: its background
-		// simulation makes every edit wait about 2 seconds in the browser. It is kept off.
+		// simulation makes every edit wait about 2 seconds in the browser. It is kept off; the design
+		// window shows its own estimate instead, worked out once an edit is done (RocketPanel).
 
 		// // Only show pod set/booster markers when they are selected
 		final JCheckBox showMarkers = new JCheckBox(
